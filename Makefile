@@ -9,6 +9,10 @@
 SOLUTION  := Ccgnf.sln
 CONFIG    ?= Debug
 RESULTS   := TestResults
+# Override to point at a specific dotnet binary. Useful under WSL where the
+# Windows install is reachable as dotnet.exe but not plain dotnet:
+#   make DOTNET=dotnet.exe ci
+DOTNET    ?= dotnet
 
 .PHONY: all help restore build test clean format ci \
         ccgnf-lint ccgnf-build
@@ -18,27 +22,29 @@ all: build
 help:
 	@echo "CCGNF project — make targets"
 	@echo ""
-	@echo "  make build      dotnet build ($(CONFIG))"
-	@echo "  make test       dotnet test; results in $(RESULTS)/"
-	@echo "  make restore    dotnet restore"
-	@echo "  make clean      dotnet clean and remove bin/obj/$(RESULTS)/"
-	@echo "  make format     dotnet format (whitespace + analyzer fixes)"
+	@echo "  make build      $(DOTNET) build ($(CONFIG))"
+	@echo "  make test       $(DOTNET) test; results in $(RESULTS)/"
+	@echo "  make restore    $(DOTNET) restore"
+	@echo "  make clean      $(DOTNET) clean and remove bin/obj/$(RESULTS)/"
+	@echo "  make format     $(DOTNET) format (whitespace + analyzer fixes)"
 	@echo "  make ci         restore + build + test (invoked by GitHub Actions)"
 	@echo ""
 	@echo "  make ccgnf-lint (future) validate all .ccgnf source files"
 	@echo "  make ccgnf-build (future) preprocess .ccgnf into intermediates"
 	@echo ""
 	@echo "Overrides:"
-	@echo "  CONFIG=Release make build"
+	@echo "  make CONFIG=Release build       debug vs release configuration"
+	@echo "  make DOTNET=dotnet.exe test     useful from WSL when only"
+	@echo "                                  Windows dotnet is installed"
 
 restore:
-	dotnet restore $(SOLUTION)
+	$(DOTNET) restore $(SOLUTION)
 
 build: restore
-	dotnet build $(SOLUTION) --configuration $(CONFIG) --no-restore
+	$(DOTNET) build $(SOLUTION) --configuration $(CONFIG) --no-restore
 
 test: build
-	dotnet test $(SOLUTION) \
+	$(DOTNET) test $(SOLUTION) \
 		--configuration $(CONFIG) \
 		--no-build \
 		--logger "trx;LogFileName=test-results.trx" \
@@ -46,7 +52,7 @@ test: build
 		--results-directory $(RESULTS)
 
 clean:
-	dotnet clean $(SOLUTION) 2>/dev/null || true
+	$(DOTNET) clean $(SOLUTION) 2>/dev/null || true
 	find . -type d \( -name bin -o -name obj \) -prune -exec rm -rf {} + 2>/dev/null || true
 	rm -rf $(RESULTS)
 	rm -rf build
@@ -54,7 +60,7 @@ clean:
 	find . -type f -name '*.ccgnf.expanded' -delete 2>/dev/null || true
 
 format:
-	dotnet format $(SOLUTION)
+	$(DOTNET) format $(SOLUTION)
 
 ci: restore build test
 
