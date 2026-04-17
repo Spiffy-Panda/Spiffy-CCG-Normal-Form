@@ -40,26 +40,26 @@ See [`grammar/GrammarSpec.md`](grammar/GrammarSpec.md) for the full language spe
 
 ## Status
 
-CCGNF is pre-alpha. The specification is complete; the engine implementation has not started.
+CCGNF is pre-alpha. The preprocessor and parser pipeline is live; higher-layer stages (AST builder, validator, interpreter) are the next work.
 
 | Component                                  | State                         |
 |--------------------------------------------|-------------------------------|
 | CCGNF grammar specification                | **Complete** (§1–§12)         |
-| CCGNF engine — preprocessor                | Not started                   |
-| CCGNF engine — ANTLR grammar               | Not started                   |
+| CCGNF engine — preprocessor                | **Working** — v1              |
+| CCGNF engine — ANTLR grammar               | **Working** — v1              |
 | CCGNF engine — AST builder                 | Not started                   |
 | CCGNF engine — validator                   | Not started                   |
 | CCGNF engine — interpreter                 | Not started                   |
-| E2E grammar coverage fixture               | **Complete**                  |
+| E2E grammar coverage fixture               | **Complete**; parses clean    |
 | Resonance rules (design docs)              | **Complete**                  |
-| Resonance CCGNF encoding                   | **Complete** (all cards, engine, setup, play chain, Clash) |
-| CLI host (`Ccgnf.Cli`)                     | **Skeleton** — builds; no behavior yet |
+| Resonance CCGNF encoding                   | **Complete**; some files contain informal syntax that the v1 parser does not yet accept (tracked for cleanup) |
+| CLI host (`Ccgnf.Cli`)                     | **Working** — runs preprocess + parse on .ccgnf files |
 | REST host (`Ccgnf.Rest`)                   | Specified; not scaffolded     |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Skeleton** — builds green   |
+| Solution + test project                    | **Working** — 30 tests green  |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
-"Skeleton" means the project compiles and CI is green, but no product logic lives inside.
+"v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.
 
 ---
 

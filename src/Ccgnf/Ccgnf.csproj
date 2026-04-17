@@ -16,6 +16,19 @@
   <ItemGroup>
     <!-- Logging abstraction only. Concrete providers live in host projects. -->
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.*" />
+    <!-- ANTLR C# runtime (4.13.1) as specified in the grammar spec. -->
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <!-- ANTLR code-generation MSBuild task (bundles its own Java runtime). -->
+    <PackageReference Include="Antlr4BuildTasks" Version="12.*" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Grammar files are compiled at build time; generated C# lands under obj/. -->
+    <Antlr4 Include="Grammar/Ccgnf.g4">
+      <Listener>false</Listener>
+      <Visitor>true</Visitor>
+      <Package>Ccgnf.Grammar</Package>
+    </Antlr4>
   </ItemGroup>
 
 </Project>

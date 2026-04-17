@@ -112,7 +112,7 @@ Card CoverageCard {
     Static(
       modifies: Characteristic(self, ramparts, layer: 2),
       check_at: continuously,
-      rule: If(self.counters.charge > 0, add(+1), no change)),
+      rule: If(self.counters.charge > 0, IncCounter(self, ramparts, 1), NoOp)),
 
     // D.2 Triggered — event-sourced.
     Triggered(
