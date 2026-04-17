@@ -1,0 +1,74 @@
+// =============================================================================
+// Resonance — Setup
+// =============================================================================
+// Setup is a single Triggered ability on the Game entity, fired by
+// Event.GameStart (emitted by the host harness at game kick-off). Every step
+// is a declarative Effect term, composed via Sequence and named macros.
+// No procedural loops.
+
+Game.abilities += Triggered(
+  on:       Event.GameStart,
+  check_at: event_emission,
+  apply_at: after_event,
+  effect:   SetupSequence())
+
+define SetupSequence() = Sequence([
+  ChooseFirstPlayer,
+  InitializeConduits,
+  InitializeDecks,
+  InitialDraws,
+  MulliganPhase,
+  StartFirstRound
+])
+
+define ChooseFirstPlayer = Sequence([
+  RandomChoose(value: {Player1, Player2}, bind: Game.first_player),
+  EmitEvent(Event.FirstPlayerChosen(player: Game.first_player))
+])
+
+define InitializeConduits =
+  ForEach((p, a) ∈ {Player1, Player2} × {Left, Center, Right},
+    InstantiateEntity(
+      kind:             Conduit,
+      owner:            p,
+      arena:            a,
+      initial_counters: { integrity: 7 }))
+
+define InitializeDecks =
+  ForEach(p ∈ {Player1, Player2},
+    Shuffle(p.Arsenal))
+
+define InitialDraws = Sequence([
+  Draw(Game.first_player,               amount: 5),
+  Draw(other_player(Game.first_player), amount: 6)
+])
+
+// Mulligan: two optional passes per player, in turn order from the first
+// player. Each Mulligan returns >= 1 card, bottom-stacks them in chooser-
+// determined order, and re-draws one fewer card than returned (minimum 0).
+define MulliganPhase =
+  ForEach(p ∈ TurnOrderFrom(Game.first_player),
+    Repeat(Game.max_mulligans,
+      Choice(chooser: p, options: {
+        pass:     NoOp,
+        mulligan: PerformMulligan(p)
+      })))
+
+define PerformMulligan(p) = Sequence([
+  Target(
+    selector: cards -> cards ⊆ p.Hand ∧ |cards| >= 1,
+    chooser:  p,
+    bind:     returned_cards),
+  Target(
+    selector: ordering -> IsPermutationOf(ordering, returned_cards),
+    chooser:  p,
+    bind:     bottom_order,
+    effect:   ForEach(c ∈ bottom_order in index_order,
+                MoveTo(c, bottom_of(p.Arsenal)))),
+  Draw(p, amount: Max(0, |returned_cards| - 1))
+])
+
+define StartFirstRound = Sequence([
+  SetCounter(Game, round, 1),
+  EmitEvent(Event.PhaseBegin(phase: Rise, player: Game.first_player))
+])

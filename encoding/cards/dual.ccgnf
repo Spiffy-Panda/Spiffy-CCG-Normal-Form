@@ -1,0 +1,26 @@
+// =============================================================================
+// Resonance — Dual-Faction cards
+// =============================================================================
+
+Card AshrootWhelp {
+  factions: {EMBER, THORN}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: U
+  keywords: [ Blitz, Rally, DeploymentSickness ]
+  abilities: []
+  // text: Blitz. Rally. (Pushes both EMBER and THORN.)
+  // Push semantics: single Echo with factions = {EMBER, THORN}, counts once
+  // toward each.
+}
+
+Card TidecallersHollow {
+  factions: {TIDE, HOLLOW}, type: Maneuver, cost: 3, rarity: R
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Sequence([
+          MoveTo(target, target.owner.Hand),
+          RandomExileFromHand(target.owner, count: 1)
+        ])))
+  ]
+  // text: Return target Unit to its owner's hand, then that player exiles a
+  //       card from their hand at random.
+}

@@ -1,0 +1,97 @@
+// =============================================================================
+// CCGNF — Effect Combinators (Reference)
+// =============================================================================
+// Framework-level combinators available in any Effect position. These are
+// implemented in the interpreter's Builtins layer, not declared via `define`.
+// This file documents them for authors and the Validator.
+//
+// --- Sequencing
+//
+//   Sequence(list)
+//     Execute list[0], then list[1], ..., in order. No parallelism.
+//
+//   Repeat(n, effect)
+//     Run `effect` n times in sequence. `n` may be a constant or a query.
+//
+// --- Iteration
+//
+//   ForEach(binder, effect)
+//     `binder` is either a range `i ∈ [1..N]` or a selector `x -> predicate`.
+//     Run `effect` once per bound value, sequentially in selection order.
+//
+//   ForEach((a, b) ∈ S × T, effect)
+//     Cartesian product form. Binds both variables per iteration.
+//
+// --- Conditional
+//
+//   If(pred, then_effect, else_effect)
+//     Standard branch. Both branches are evaluated lazily.
+//
+//   When(pred, effect, check_at: W, apply_at: W)
+//     Like If with no else; pred is checked at the named window, effect
+//     applied at the apply window. No-op if pred is false.
+//
+//   Cond([(pred, effect), ...])
+//     First matching branch fires. Arms are evaluated in list order. Use
+//     `Default` as the final predicate to catch "none of the above."
+//
+//   Switch(value, { tag: effect, tag: effect, ... })
+//     Dispatch on the value's tag. Must be exhaustive or include `Default`.
+//
+// --- Choice (interactive)
+//
+//   Choice(chooser: p, options: { tag: effect, tag: effect, ... })
+//     Prompts player `p` to select one tag; the corresponding effect fires.
+//     Tags are authored-readable labels (`pass`, `mulligan`, etc.), not
+//     user-facing text — UI rendering is the host's concern.
+//
+//   Target(selector: pred, chooser: p, effect: e)
+//   Target(selector: pred, chooser: p, bind: name, effect: e)
+//     Prompts player `p` for a value satisfying `selector`, then runs `e`
+//     with `target` bound to the chosen value (or with `name` bound to the
+//     chosen value when `bind` is supplied).
+//
+// --- Binding
+//
+//   let NAME = expr in body
+//     Introduces a local binding visible only in `body`.
+//
+// --- Game-state atoms
+//
+// These are not combinators but are used throughout. They are built in:
+//
+//   DealDamage(target, amount)
+//   Heal(target, amount, cap: ...)
+//   Draw(player, amount)
+//   Mill(player, amount)
+//   MoveTo(entity, zone)
+//   PayAether(player, amount)
+//   IncCounter(entity, counter_name, delta)
+//   SetCounter(entity, counter_name, value)
+//   ClearCounter(entity, counter_name)
+//   SetState(entity, state, duration: ...)
+//   ClearState(entity, state)
+//   SetCharacteristic(entity, field, value)
+//   SetFlag(entity, flag, value)
+//   CreateToken(template, zone, owner, controller)
+//   InstantiateEntity(kind, ..., bind: name)
+//   DestroyEntity(entity)
+//   EmitEvent(event)
+//   ScheduleAt(window, effect)
+//   Guard(predicate, on_fail: effect)
+//   NoOp
+//
+// --- Host-driven atoms
+//
+//   RandomChoose(value, bind)
+//   Shuffle(zone)
+//   Reveal(player, zone, count)
+//   RevealHand(player)
+//
+// --- Diagnostic constants
+//
+//   Default     — catch-all in Cond / Switch.
+//   NoOp        — identity effect; does nothing.
+//   Unbound     — placeholder value for fields not yet set.
+//   None        — explicit absence.
+//   true, false — booleans.

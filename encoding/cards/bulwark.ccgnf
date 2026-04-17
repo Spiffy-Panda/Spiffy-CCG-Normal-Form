@@ -1,0 +1,127 @@
+// =============================================================================
+// Resonance — BULWARK cards
+// =============================================================================
+
+Card Palisade {
+  factions: {BULWARK}, type: Unit, cost: 1, force: 0, ramparts: 3, rarity: C
+  keywords: [ Sentinel, DeploymentSickness ]
+  abilities: []
+  // text: Sentinel.
+}
+
+Card WardenInitiate {
+  factions: {BULWARK}, type: Unit, cost: 2, force: 2, ramparts: 3, rarity: C
+  keywords: [ Fortify(1), DeploymentSickness ]
+  abilities: []
+  // text: Fortify 1.
+}
+
+Card SealTheBreach {
+  factions: {BULWARK}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind == Conduit,
+        Tiers([
+          (Resonance(BULWARK, 3), Heal(target, 5, cap: starting_integrity)),
+          (Default,               Heal(target, 3, cap: starting_integrity))
+        ])))
+  ]
+  // text: Heal target Conduit 3. BULWARK 3: Heal 5 instead.
+}
+
+Card HoldTheLine {
+  factions: {BULWARK}, type: Maneuver, cost: 2, rarity: C
+  keywords: [ Interrupt ]
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        PreventIncoming(arena: target, side: self.controller,
+                        amount_cap: 4, duration: until_end_of_turn)))
+  ]
+  // text: Prevent up to 4 Incoming in one Arena this turn.
+  // (Cost 2 -> 4 Debt when played on opponent turn.)
+}
+
+Card CohortCaptain {
+  factions: {BULWARK}, type: Unit, cost: 3, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    // Static ongoing grant: another BULWARK Unit entering this Arena gets
+    // Fortify 1 while Cohort Captain is in play.
+    OnArenaEnter(
+      filter: u -> BULWARK ∈ u.factions ∧ u.type == Unit ∧ u.controller == self.controller,
+      effect: GrantKeyword(target, Fortify(1), duration: while_source_in_play(self)))
+  ]
+  // text: When another BULWARK Unit enters this Arena, it gains Fortify 1
+  //       while Cohort Captain is in play.
+}
+
+Card Reconstitute {
+  factions: {BULWARK}, type: Maneuver, cost: 4, rarity: U
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit ∧ c.owner == self.controller,
+        If(not collapsed_for(self.controller, target.arena),
+           Heal(target, amount: starting_integrity_of(target), cap: starting_integrity),
+           // Un-collapse: restore Conduit at 3 integrity, clear Collapsed flag.
+           Sequence([
+             SetCounter(target, integrity, 3),
+             SetFlag(Arena[target.arena].collapsed_for[self.controller], false)
+             // Units lost at collapse are NOT returned (explicit in card text).
+           ]))))
+  ]
+  // text: Heal target friendly Conduit to starting Integrity. If Conduit is
+  //       destroyed, restore at 3 Integrity and un-Collapse your side.
+  //       Units lost are not returned.
+}
+
+Card TheQuietWall {
+  factions: {BULWARK}, type: Standard, subtype: attaches_to_player, cost: 5, rarity: R
+  abilities: [
+    // Global: all controller's Units gain Sentinel (layer 3).
+    Static(
+      modifies: KeywordSet(unit),
+      check_at: continuously,
+      rule: ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+              GrantKeyword(u, Sentinel))),
+    // Peak BULWARK: Units project 1 Force each at Clash despite Sentinel.
+    Static(
+      modifies: ClashContribution(unit),
+      check_at: continuously,
+      rule: When(Peak(BULWARK),
+        ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+          OverrideContribution(u, projected_force: 1))))
+  ]
+  // text: All your Units have Sentinel. Peak BULWARK: Your Units Project 1
+  //       Force each at Clash despite Sentinel.
+}
+
+Card Vaen_ArchitectOfTheLastHour {
+  factions: {BULWARK}, type: Unit, cost: 6, force: 2, ramparts: 7, rarity: M, unique: true
+  keywords: [ Mend(3), Sentinel, Unique, DeploymentSickness ]
+  abilities: [
+    // BULWARK 4: while this tier is satisfied, friendly Units in Vaen's
+    // Arena have +2 Ramparts.
+    Static(
+      modifies: Characteristic(target_unit, ramparts, layer: 2),
+      check_at: continuously,
+      rule: When(Resonance(BULWARK, 4),
+        ForEach(u -> u.arena == self.arena
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit,
+          add(+2)))),
+    // Peak BULWARK: Conduits cannot be reduced below 1 Integrity by opposing
+    // effects. Lost if Vaen leaves play (ability attached to Vaen, so
+    // naturally deregisters).
+    Static(
+      modifies: DamageReduction(Conduit, by_opposing),
+      check_at: continuously,
+      rule: When(Peak(BULWARK),
+        ForEach(c -> c.kind == Conduit ∧ c.owner == self.controller,
+          Floor(c.integrity, min: 1, source_filter: e -> e.controller != self.controller))))
+  ]
+  // text: Mend 3. Sentinel.
+  //       BULWARK 4: while satisfied, friendly Units in Vaen's Arena have +2 Ramparts.
+  //       Peak BULWARK: Your Conduits cannot be reduced below 1 Integrity by
+  //       opposing effects.
+}

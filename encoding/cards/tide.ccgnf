@@ -1,0 +1,136 @@
+// =============================================================================
+// Resonance — TIDE cards
+// =============================================================================
+
+Card Ripplekin {
+  factions: {TIDE}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: []
+  // text: Drift.
+}
+
+Card Refract {
+  factions: {TIDE}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        MoveTo(target, target.owner.Hand)))
+  ]
+  // text: Return target Unit (yours or opponent's) to its owner's hand.
+}
+
+Card Brinescribe {
+  factions: {TIDE}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: C
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: [
+    OnEnter(Draw(self.controller, 1))
+  ]
+  // text: When you play this, draw a card. Drift.
+}
+
+Card ReshapeTheCurrent {
+  factions: {TIDE}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    // Reshape is announcement-window; applies before the Push at step 6.
+    OnResolve(Reshape(2))
+  ]
+  // text: Reshape twice.
+}
+
+Card Harborkeeper {
+  factions: {TIDE}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    // Redirect-to-adjacent replacement ability.
+    Replacement(
+      on:    Event.EnterPlay(target=u),
+      guard: u.controller == self.controller
+           ∧ u.type == Unit
+           ∧ u.intended_arena is collapsed_for(self.controller)
+           ∧ exists a ∈ adjacent(u.intended_arena)
+                with not collapsed_for(self.controller, a),
+      replace_with:
+        Target(a -> a ∈ adjacent(u.intended_arena)
+                  ∧ not collapsed_for(self.controller, a),
+          chooser: self.controller,
+          effect:  Event.EnterPlay(target=u, arena=a)))
+  ]
+  // text: When another of your Units would enter a Collapsed Arena of yours,
+  //       it may enter an adjacent non-Collapsed Arena of yours instead.
+}
+
+Card Undertow {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        Tiers([
+          (Resonance(TIDE, 4),
+            // Any reassignment: for each Unit in target arena, choose a
+            // destination Arena.
+            ForEach(u -> u.arena == target,
+              Target(dest -> dest.kind == Arena
+                           ∧ not collapsed_for(u.controller, dest),
+                chooser: self.controller,
+                effect:  MoveUnitToArena(u, dest)))),
+          (Default,
+            // Shift all left or right (per Unit choice), edge stays.
+            ForEach(u -> u.arena == target,
+              Target(dir -> dir ∈ {left, right},
+                chooser: self.controller,
+                effect:  If(exists neighbor = shift(u.arena, dir),
+                            MoveUnitToArena(u, neighbor),
+                            NoOp))))
+        ])))
+  ]
+  // text: Move each Unit in target Arena one Arena left or right. Edge-stops stay.
+  //       TIDE 4: Instead, choose any reassignment.
+}
+
+Card TheStandingWave {
+  factions: {TIDE}, type: Standard, subtype: attaches_to_player, cost: 4, rarity: R
+  abilities: [
+    // When the controller plays a card, may Reshape once.
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller,
+      effect: Reshape(1)),
+    // Peak TIDE: also may move one Unit to a new Arena.
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller,
+      effect: When(Peak(TIDE),
+        Choice(self.controller, {
+          pass: NoOp,
+          move: Target(u -> u.controller == self.controller ∧ u.type == Unit,
+                  Target(a -> a.kind == Arena ∧ not collapsed_for(self.controller, a),
+                    MoveUnitToArena(u, a)))
+        })))
+  ]
+  // text: When you play a card, you may Reshape once.
+  //       Peak TIDE: also may move one Unit to a new Arena.
+}
+
+Card Thessa_WhoReturns {
+  factions: {TIDE}, type: Unit, cost: 5, force: 3, ramparts: 4, rarity: M, unique: true
+  keywords: [ Drift, Recur, Unique, DeploymentSickness ]
+  abilities: [
+    // TIDE 3: once per turn, when you play a TIDE card, may return a
+    // non-Unique TIDE card from your Cache to your hand. The
+    // once_per_turn: true annotation gates firing and auto-clears at Rise
+    // (see common/02-lifecycle.ccgnf).
+    OnCardPlayed(
+      filter:        c -> c.controller == self.controller ∧ TIDE ∈ c.factions,
+      once_per_turn: true,
+      effect: When(Resonance(TIDE, 3),
+        Choice(self.controller, {
+          pass: NoOp,
+          take: Target(card -> card ∈ self.controller.Cache
+                             ∧ TIDE ∈ card.factions
+                             ∧ not (Unique ∈ card.keywords),
+                  MoveTo(target, self.controller.Hand))
+        }),
+        check_at: announcement,
+        apply_at: after_event))
+  ]
+  // text: Drift. Recur. TIDE 3: When you play a TIDE card, you may return a
+  //       non-Unique TIDE card from your Cache to your hand. Once per turn.
+}

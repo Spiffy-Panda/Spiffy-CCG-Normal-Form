@@ -1,0 +1,221 @@
+// =============================================================================
+// Resonance — Keyword Macros
+// =============================================================================
+// One macro per keyword. Card declarations reference these by name in their
+// `keywords` array.
+
+// -----------------------------------------------------------------------------
+// EMBER
+// -----------------------------------------------------------------------------
+
+// Surge: this card costs 1 less if another EMBER Echo was Pushed this turn.
+// Check at cost_computation (play protocol step 2).
+define Keyword.Surge() =
+  Static(
+    modifies: Characteristic(self, effective_cost),
+    check_at: cost_computation,
+    rule: if (Count(self.controller.pushes_this_turn,
+                    e -> e.card != self ∧ EMBER ∈ e.factions) >= 1)
+          then subtract 1 (floor: 0)
+          else no change)
+
+// Blitz: ignores Deployment Sickness on the turn it is deployed.
+define Keyword.Blitz() =
+  Static(
+    modifies: DeploymentSickness(self),
+    rule: never_applies)
+
+// Ignite X: start-of-turn damage to opposing Units with low Ramparts in this Arena.
+define Keyword.Ignite(X) =
+  StartOfYourTurn(
+    ForEach(
+      u -> u.arena == self.arena
+         ∧ u.controller != self.controller
+         ∧ u.current_ramparts <= 2,
+      DealDamage(u, X)))
+
+// -----------------------------------------------------------------------------
+// BULWARK
+// -----------------------------------------------------------------------------
+
+// Fortify X: +X Ramparts while controller's Conduit in this Arena has >= 4 Integrity.
+// Suppresses (not destroys) when Conduit drops below 4; returns if healed back.
+define Keyword.Fortify(X) =
+  Static(
+    modifies: Characteristic(self, ramparts, layer: 2),
+    rule: if (self.controller.Conduit(self.arena).integrity >= 4)
+          then add X
+          else no change)
+
+// Mend X: on entering play, heal the Conduit in this Arena by X (capped at starting).
+// Fizzles if Arena is Collapsed for controller.
+define Keyword.Mend(X) =
+  OnEnter(
+    If(self.controller.Conduit(self.arena) exists
+       ∧ not collapsed_for(self.controller, self.arena),
+       Heal(self.controller.Conduit(self.arena), X, cap: starting_integrity),
+       NoOp))
+
+// Sentinel: this Unit contributes 0 Force to Projected Force; its Force is
+// instead added to controller's Fortification in this Arena.
+define Keyword.Sentinel() =
+  Static(
+    modifies: ClashContribution(self),
+    rule: { projected_force: 0, fortification_bonus: self.force })
+
+// -----------------------------------------------------------------------------
+// TIDE
+// -----------------------------------------------------------------------------
+
+// Drift: optional move to an adjacent non-collapsed Arena at end of your turn.
+define Keyword.Drift() =
+  EndOfYourTurn(
+    Choice(self.controller, {
+      pass:  NoOp,
+      drift: Target(a -> a ∈ adjacent(self.arena)
+                        ∧ not collapsed_for(self.controller, a),
+                    MoveUnitToArena(self, target))
+    }))
+
+// Recur: replaces destroy-to-Cache with destroy-to-bottom-of-Arsenal.
+// Does not fire if destruction is prevented or redirected to exile.
+// Per R-1, this also fires on conduit_collapse destruction events.
+define Keyword.Recur() =
+  Replacement(
+    on:           Event.Destroy(target=self, destination: self.owner.Cache),
+    replace_with: MoveTo(self, bottom_of(self.owner.Arsenal)))
+
+// Reshape: swap two adjacent Echoes on own ResonanceField. Appears on
+// Maneuvers as an at-announcement option; repeats the swap n times.
+define Reshape(n) =
+  Repeat(n,
+    Choice(self.controller, {
+      pass: NoOp,
+      swap: Target(e -> e ∈ self.controller.ResonanceField,
+              Target(dir -> dir ∈ {left, right},
+                SwapEchoPosition(target_e, direction: dir, distance: 1)))
+    }),
+    check_at: announcement,
+    apply_at: announcement)
+
+// -----------------------------------------------------------------------------
+// THORN
+// -----------------------------------------------------------------------------
+
+// Rally: triggers when another friendly Unit enters this Unit's Arena.
+define Keyword.Rally() =
+  OnArenaEnter(
+    filter: u -> u.type == Unit ∧ u.controller == self.controller,
+    effect: ModifyCharacteristic(self, force, +1, duration: end_of_turn, layer: 2))
+
+// Sprawl X: create X 1/1 Sapling tokens in self.arena. Tokens do not Push.
+// Per R-3, when invoked from a card without an intrinsic arena (Maneuver),
+// the card-level invocation supplies the target arena explicitly.
+define Keyword.Sprawl(X) =
+  ForEach(i ∈ [1..X],
+    CreateToken(
+      template:   ThornSapling,
+      zone:       self.arena,
+      owner:      self.controller,
+      controller: self.controller))
+
+// Kindle (on Standards only): counter accumulation with fire-and-reset at 3.
+// The on-fire effect is supplied per-card via Kindle(effect: ...).
+define Keyword.Kindle(effect_on_fire) =
+  Sequence([
+    StartOfYourTurn(IncCounter(self, kindle, 1)),
+    Static(
+      modifies: nothing,
+      check_at: counter_change(self, kindle),
+      trigger_effect_if: self.counters.kindle >= 3,
+      then: Sequence([
+        effect_on_fire,
+        ResetCounter(self, kindle, 0)
+      ]))
+  ])
+
+// -----------------------------------------------------------------------------
+// HOLLOW
+// -----------------------------------------------------------------------------
+
+// Phantom: at Start of Clash, controller may declare. If declared, Unit
+// contributes 0 Force AND 0 Fortification this Clash, returns to hand at
+// End of Clash, and its base cost is permanently reduced by 1 (min 0,
+// persistent across zones).
+define Keyword.Phantom() =
+  StartOfClash(
+    Choice(self.controller, {
+      pass: NoOp,
+      fade: Sequence([
+        SetState(self, Phantoming, duration: until_end_of_clash),
+        ScheduleAt(end_of_clash,
+          Sequence([
+            MoveTo(self, self.owner.Hand),
+            ReduceBaseCost(1, floor: 0),
+            EmitEvent(Event.PhantomReturn(target: self))
+          ]))
+      ])
+    }))
+
+// Shroud: cannot be the chosen target of opposing effects; sweepers and
+// self-targeted effects are unaffected.
+define Keyword.Shroud() =
+  Static(
+    modifies: TargetLegality(self),
+    rule: if (targeting_ability.controller != self.controller
+           ∧ targeting_ability.selection_mode == explicit_target)
+          then illegal
+          else legal)
+
+// Pilfer X: opponent reveals hand; you choose up to X cards to exile
+// to the bottom of their Arsenal.
+define Pilfer(X) =
+  Sequence([
+    RevealHand(opponent_of(self.controller)),
+    Target(
+      selector: cards -> cards ⊆ opponent_of(self.controller).Hand
+                       ∧ |cards| <= X,
+      chooser:  self.controller,
+      effect:   ForEach(c ∈ target_cards,
+                  MoveTo(c, bottom_of(opponent_of(self.controller).Arsenal),
+                         visibility: exiled)))
+  ])
+
+// -----------------------------------------------------------------------------
+// Universal
+// -----------------------------------------------------------------------------
+
+// Deployment Sickness: state set when a Unit enters an Arena via play.
+// Cleared at the start of controller's next Rise phase. Suppressed by Blitz.
+// Read by the Clash resolution (engine/09-clash.ccgnf) to force
+// projected_force to 0.
+define Keyword.DeploymentSickness() =
+  Sequence([
+    Triggered(
+      on:     Event.EnterPlay(target=self),
+      guard:  not has_keyword(self, Blitz),
+      effect: SetState(self, DeploymentSickness)),
+    Triggered(
+      on:     Event.PhaseBegin(phase=Rise, player=self.controller),
+      effect: ClearState(self, DeploymentSickness))
+  ])
+
+// Interrupt: marks a Maneuver playable on either player's turn during
+// Channel, in response to a declared card or trigger, before it resolves.
+// Debt accrual handled by the play protocol (engine/08-play.ccgnf).
+define Keyword.Interrupt() =
+  Static(
+    modifies: PlayWindows(self),
+    rule: { opponent_turn_channel: allowed,
+            response_to_pending:   allowed })
+
+// Unique: controller may have only one Entity with this name-key.
+// Duplicate entering play is sent to Cache immediately.
+define Keyword.Unique() =
+  Replacement(
+    on:           Event.EnterPlay(target=self),
+    guard:        exists other: other.name == self.name
+                             ∧ other.controller == self.controller
+                             ∧ other != self
+                             ∧ other.zone is battlefield,
+    replace_with: MoveTo(self, self.owner.Cache))

@@ -1,0 +1,68 @@
+// =============================================================================
+// Resonance — Turn Structure
+// =============================================================================
+// Five phases per turn: Rise, Channel, Clash, Fall, Pass. Transitions are
+// Events emitted by the Game entity. Rules are Triggered abilities on Game.
+// A round consists of the first player's turn then the second player's turn;
+// the round counter increments when control returns to the first player.
+
+// Rise phase.
+// Per R-4: Ramparts healing lives at end of Fall, not here.
+Game.abilities += Triggered(
+  on:     Event.PhaseBegin(phase=Rise, player=p),
+  effect: Sequence([
+    // Aether refresh, adjusted by Debt from any Interrupts we played off-turn.
+    RefillAether(p,
+      amount: Max(0, p.aether_cap_schedule[Game.round - 1] - p.debt)),
+    SetCounter(p, debt, 0),
+
+    // Reset once-per-turn activation flags on p's permanents' abilities.
+    ForEach(a -> a ∈ abilities_of_permanents(p) ∧ a.once_per_turn == true,
+      ClearCounter(a, used_this_turn)),
+
+    // Draw; empty Arsenal => lose.
+    If(|p.Arsenal| == 0,
+       EmitEvent(Event.Lose(player=p, reason: "deck_out")),
+       Draw(p, 1)),
+
+    // "Start of your turn" window opens; start-of-turn triggers queue here.
+    OpenTimingWindow(start_of_turn, owner=p),
+    DrainTriggersFor(window=start_of_turn)
+  ]))
+
+// Channel phase — main phase. Play protocol lives in engine/08-play.ccgnf.
+Game.abilities += Triggered(
+  on:     Event.PhaseBegin(phase=Channel, player=p),
+  effect: EnterMainPhase(p))
+
+// Clash phase — see engine/09-clash.ccgnf for the declarative resolution.
+Game.abilities += Triggered(
+  on:     Event.PhaseBegin(phase=Clash, player=p),
+  effect: ResolveClashPhase(active_player: p))
+
+// Fall phase. End-of-Fall is where Ramparts heal (per GameRules §7.3 / R-4).
+Game.abilities += Triggered(
+  on:     Event.PhaseBegin(phase=Fall, player=p),
+  effect: Sequence([
+    OpenTimingWindow(end_of_turn, owner=p),
+    DrainTriggersFor(window=end_of_turn),
+    DiscardDownTo(p, cap: 10),   // excess cards go to Cache
+    ClearCounter(p, pushes_this_turn),
+    // Heal Ramparts on all of p's Units to their current maximum.
+    ForEach(u -> u.controller == p ∧ u.type == Unit ∧ u.zone ∈ battlefield,
+      SetCounter(u, current_ramparts, max_ramparts_of(u)))
+  ]))
+
+// Pass — hand off to opponent; advance round when control returns to first.
+Game.abilities += Triggered(
+  on:     Event.PhaseBegin(phase=Pass, player=p),
+  effect: Sequence([
+    If(other_player(p) == Game.first_player,
+       IncCounter(Game, round, 1),
+       NoOp),
+    BeginPhase(Rise, player=other_player(p))
+  ]))
+
+// Note: there is NO turn-1 first-player draw-skip. GameRules §4 designates
+// the second-player's draw-6 as "the sole compensation for going second";
+// no further asymmetry exists. The first player draws normally on Round 1 Rise.

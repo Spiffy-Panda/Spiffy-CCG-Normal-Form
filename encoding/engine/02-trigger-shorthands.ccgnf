@@ -1,0 +1,53 @@
+// =============================================================================
+// Resonance — Trigger Shorthand Macros
+// =============================================================================
+// Common triggered-ability patterns, macro-ized for card-author brevity.
+// All expand to Triggered(...) with the appropriate event and windows.
+
+define OnEnter(effect) =
+  Triggered(
+    on:     Event.EnterPlay(target=self),
+    effect: effect)
+
+define OnPlayed(effect) =
+  Triggered(
+    on:       Event.CardPlayed(card=self),
+    check_at: announcement,
+    apply_at: before_resolution,
+    effect:   effect)
+
+define StartOfYourTurn(effect) =
+  Triggered(
+    on:       Event.PhaseBegin(phase=Rise, player=self.controller),
+    apply_at: after_rise_draw,   // per GameRules §5.1 "start of your turn"
+    effect:   effect)
+
+define EndOfYourTurn(effect) =
+  Triggered(
+    on:     Event.PhaseBegin(phase=Fall, player=self.controller),
+    effect: effect)
+
+define StartOfClash(effect) =
+  Triggered(
+    on:     Event.PhaseBegin(phase=Clash),
+    effect: effect)
+
+define EndOfClash(effect) =
+  Triggered(
+    on:     Event.PhaseEnd(phase=Clash),
+    effect: effect)
+
+// "When another X enters my Arena..."
+define OnArenaEnter(filter, effect) =
+  Triggered(
+    on:     Event.EnterPlay(target -> target != self
+                          ∧ target.arena == self.arena
+                          ∧ filter(target)),
+    effect: effect)
+
+// "When you play a card of type T/faction F..."
+define OnCardPlayed(filter, effect) =
+  Triggered(
+    on:       Event.CardPlayed(c -> c.controller == self.controller ∧ filter(c)),
+    check_at: announcement,
+    effect:   effect)

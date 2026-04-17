@@ -1,0 +1,134 @@
+// =============================================================================
+// Resonance — HOLLOW cards
+// =============================================================================
+
+Card Veilslip {
+  factions: {HOLLOW}, type: Unit, cost: 1, force: 2, ramparts: 1, rarity: C
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: []
+  // text: Phantom.
+}
+
+Card PrivateThought {
+  factions: {HOLLOW}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Sequence([
+        Reveal(self.controller, opponent_of(self.controller).Hand, count: 2),
+        Target(c -> c ∈ revealed_set,
+          chooser: self.controller,
+          effect:  MoveTo(target, bottom_of(opponent_of(self.controller).Arsenal),
+                         visibility: exiled))
+      ]))
+  ]
+  // text: Opponent reveals two cards from their hand; you exile one to the
+  //       bottom of their Arsenal.
+}
+
+Card Greyface {
+  factions: {HOLLOW}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ Shroud, DeploymentSickness ]
+  abilities: []
+  // text: Shroud.
+}
+
+Card Unmake {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: C
+  abilities: [
+    OnResolve(
+      let force_threshold = Tiers([
+          (Resonance(HOLLOW, 3), 4),
+          (Default,              3)
+        ])
+      in Target(u -> u.type == Unit ∧ u.force <= force_threshold,
+           Destroy(target)))
+  ]
+  // text: Destroy target Unit with Force 3 or less. HOLLOW 3: Force 4 or less.
+}
+
+Card TheLastWhisper {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: U
+  keywords: [ Interrupt ]
+  abilities: [
+    // Target is a PlayBinding currently inside the post_tier_interrupt
+    // window (i.e., a Maneuver that has had its cost paid and tiers bound,
+    // but not yet resolved). We counter it and override its Push to HOLLOW.
+    // Per R-2 the countered card still Pushes at Step 6 of its play chain.
+    OnResolve(
+      Target(
+        selector: b -> b.kind == PlayBinding
+                     ∧ b.card.type == Maneuver
+                     ∧ b.countered == false
+                     ∧ in_post_tier_interrupt_window(b),
+        chooser:  self.controller,
+        effect:   Sequence([
+          CounterCard(b),                              // engine/08-play.ccgnf
+          SetPushOverride(b, factions: {HOLLOW})       // engine/08-play.ccgnf
+        ])))
+  ]
+  // text: Counter target Maneuver. Its caster Pushes a HOLLOW Echo instead
+  //       of its printed faction.
+  // (Cost 3 -> 6 Debt when played on opponent turn.)
+}
+
+Card BlankfaceCultist {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    // When this Phantom-returns to hand (specifically via the Phantom effect
+    // at End of Clash), Pilfer 1.
+    Triggered(
+      on:     Event.PhantomReturn(target=self),
+      effect: Pilfer(1))
+  ]
+  // text: Phantom. When this returns to your hand via Phantom, Pilfer 1.
+}
+
+Card TheUnreadPage {
+  factions: {HOLLOW}, type: Standard, subtype: attaches_to_opponent, cost: 4, rarity: R
+  abilities: [
+    // Opponent chooses: hand_cap := 5, or aether_refresh -= 1.
+    // Peak HOLLOW: both apply, no choice.
+    OnEnter(
+      If(Peak(HOLLOW),
+         // Both apply from now until this leaves play.
+         Sequence([
+           SetModifier(opponent_of(self.controller), hand_cap,
+                       value: 5, while_source: self),
+           SetModifier(opponent_of(self.controller), aether_refresh_delta,
+                       value: -1, while_source: self)
+         ]),
+         // Opponent chooses at enter-play; choice is locked.
+         Choice(opponent_of(self.controller), {
+           cap:  SetModifier(opponent_of(self.controller), hand_cap,
+                             value: 5, while_source: self),
+           tax:  SetModifier(opponent_of(self.controller), aether_refresh_delta,
+                             value: -1, while_source: self)
+         }))),
+    // If Peak status changes later, re-evaluate to force both.
+    Static(
+      modifies: ActiveModifiers(self),
+      check_at: continuously,
+      rule: If(Peak(HOLLOW),
+        EnsureModifiers({hand_cap_5, aether_minus_1})))
+  ]
+  // text: Your opponent chooses: max hand size 5, or starting Aether -1.
+  //       Peak HOLLOW: both apply.
+}
+
+Card Oreth_TheUnseenAuthor {
+  factions: {HOLLOW}, type: Unit, cost: 6, force: 4, ramparts: 3, rarity: M, unique: true
+  keywords: [ Shroud, Phantom, Unique, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      When(Resonance(HOLLOW, 4),
+        Pilfer(2))),
+    Triggered(
+      on:     Event.PhantomReturn(target=self),
+      effect: When(Peak(HOLLOW),
+        RandomExileFromHand(opponent_of(self.controller), count: 1)))
+  ]
+  // text: Shroud. Phantom. HOLLOW 4: When Oreth enters play, Pilfer 2.
+  //       Peak HOLLOW: When Oreth returns to your hand via Phantom, opponent
+  //       exiles a card from hand at random.
+}

@@ -1,0 +1,254 @@
+// =============================================================================
+// Resonance — Playing a Card (Event Chain)
+// =============================================================================
+// Playing a card is an Activated ability on Player. It emits a chain of
+// events; each event transition is a Game-level Triggered ability that does
+// its step's work and emits the next event. No top-level procedure — the
+// protocol IS the sum of these abilities.
+//
+// The PlayBinding entity (declared in engine/04-entities.ccgnf) carries
+// per-play state across the chain.
+
+// -----------------------------------------------------------------------------
+// Player-facing ability
+// -----------------------------------------------------------------------------
+
+Player.abilities += Activated(
+  name:  "PlayCard",
+  args:  { c: Card, targets: List, arena: Arena | None },
+  guard: And([
+    c ∈ self.Hand,
+    Or([
+      // Normal play: own turn, Channel phase.
+      Game.active_player == self ∧ Game.current_phase == Channel,
+      // Reactive play: Interrupt, either player's Channel phase, inside an
+      // open interrupt window (announcement or post_tier_interrupt).
+      has_keyword(c, Interrupt)
+        ∧ Game.current_phase == Channel
+        ∧ in_any_interrupt_window(Game)
+    ])
+  ]),
+  cost:  NoOp,     // Aether cost is paid at the CostPaid step of the chain.
+  effect: Sequence([
+    InstantiateEntity(
+      kind:        PlayBinding,
+      player:      self,
+      card:        c,
+      targets:     targets,
+      arena:       arena,
+      play_source: from_hand,
+      bind:        b),
+    EmitEvent(Event.PlayCard.Announced(binding: b))
+  ]))
+
+// -----------------------------------------------------------------------------
+// Event chain
+// -----------------------------------------------------------------------------
+
+// Step 1 -> Step 2: drain announcement-window triggers (OnPlayed, interrupts).
+Game.abilities += Triggered(
+  on:     Event.PlayCard.Announced(binding: b),
+  effect: Sequence([
+    OpenTimingWindow(announcement, binding: b),
+    DrainTriggersFor(window: announcement),
+    EmitEvent(Event.PlayCard.CostComputationBegan(binding: b))
+  ]))
+
+// Step 2: compute effective cost.
+Game.abilities += Triggered(
+  on:     Event.PlayCard.CostComputationBegan(binding: b),
+  effect: Sequence([
+    OpenTimingWindow(cost_computation, binding: b),
+    SetCharacteristic(b, effective_cost,
+      Max(0, b.card.printed_cost + sum_of_cost_modifiers(b.card, b.player))),
+    EmitEvent(Event.PlayCard.CostComputed(binding: b))
+  ]))
+
+// Step 3: pay cost. Dispatches on normal-Aether vs off-turn-Debt vs free-copy.
+Game.abilities += Triggered(
+  on:     Event.PlayCard.CostComputed(binding: b),
+  effect: Cond([
+    // Copy-effect plays are cost-free.
+    (b.play_source == from_copy,
+      EmitEvent(Event.PlayCard.CostPaid(binding: b))),
+
+    // Off-turn Interrupt: accrue Debt = 2 * PRINTED cost (R-5).
+    (has_keyword(b.card, Interrupt) ∧ Game.active_player != b.player,
+      Sequence([
+        Guard(
+          predicate:
+            b.player.debt + 2 * b.card.printed_cost
+              <= next_rise_refresh(b.player),       // R-6
+          on_fail: AbortPlay(b, reason: debt_exceeds_next_refresh)),
+        IncCounter(b.player, debt, 2 * b.card.printed_cost),
+        EmitEvent(Event.PlayCard.CostPaid(binding: b))
+      ])),
+
+    // Normal play: pay Aether directly.
+    (Default,
+      Sequence([
+        Guard(
+          predicate: b.player.aether >= b.effective_cost,
+          on_fail:   AbortPlay(b, reason: insufficient_aether)),
+        PayAether(b.player, b.effective_cost),
+        EmitEvent(Event.PlayCard.CostPaid(binding: b))
+      ]))
+  ]))
+
+// Step 4: bind tiers against the current Resonance Field (card not yet Pushed).
+Game.abilities += Triggered(
+  on:     Event.PlayCard.CostPaid(binding: b),
+  effect: Sequence([
+    OpenTimingWindow(tier_binding, binding: b),
+    SetCharacteristic(b, tier_snapshot,
+      EvaluateAllTiers(card: b.card, field: b.player.ResonanceField)),
+    EmitEvent(Event.PlayCard.TierBound(binding: b))
+  ]))
+
+// Step 4.5: post-tier Interrupt window.
+Game.abilities += Triggered(
+  on:     Event.PlayCard.TierBound(binding: b),
+  effect: Sequence([
+    OpenTimingWindow(post_tier_interrupt, binding: b),
+    DrainTriggersFor(window: post_tier_interrupt),
+    EmitEvent(Event.PlayCard.InterruptWindowClosed(binding: b))
+  ]))
+
+// Step 5a: normal resolution when not countered.
+Game.abilities += Triggered(
+  on:     Event.PlayCard.InterruptWindowClosed(binding: b),
+  guard:  b.countered == false,
+  effect: Sequence([
+    OpenTimingWindow(card_resolving, binding: b),
+    ResolveCardByType(b),
+    SetCharacteristic(b, resolved, true),
+    EmitEvent(Event.PlayCard.Resolved(binding: b))
+  ]))
+
+// Step 5b: skip resolution when countered (still proceed to Push per R-2).
+Game.abilities += Triggered(
+  on:     Event.PlayCard.InterruptWindowClosed(binding: b),
+  guard:  b.countered == true,
+  effect: Sequence([
+    // Countered Maneuvers go to caster's Cache without resolving.
+    If(b.card.type == Maneuver,
+       MoveTo(b.card, b.player.Cache),
+       NoOp),
+    EmitEvent(Event.PlayCard.Resolved(binding: b))
+  ]))
+
+// Card-type dispatch for Step 5a.
+define ResolveCardByType(b) = Switch(b.card.type, {
+  Unit: Sequence([
+    InstantiateUnit(
+      card:           b.card,
+      owner:          b.player,
+      controller:     b.player,
+      arena:          b.arena,
+      initial_states: { DeploymentSickness: not has_keyword(b.card, Blitz) }),
+    ApplyOnEnterTriggers(b.card)
+  ]),
+  Maneuver: Sequence([
+    FireOnResolve(card: b.card, tier: b.tier_snapshot, targets: b.targets),
+    MoveTo(b.card, b.player.Cache)
+  ]),
+  Standard: Sequence([
+    InstantiateStandard(
+      card:            b.card,
+      owner:           b.player,
+      controller:      b.player,
+      attachment_spec: b.card.subtype,
+      attachment_arg:  b.arena_or_player),
+    ApplyOnEnterTriggers(b.card)
+  ])
+})
+
+// Step 6: Push. Fires regardless of b.countered (R-2). Exception: copy-effect
+// plays never Push (the original play already did).
+Game.abilities += Triggered(
+  on:     Event.PlayCard.Resolved(binding: b),
+  effect: Sequence([
+    If(ShouldPush(b),
+       Sequence([
+         PushEchoTo(
+           player:   b.player,
+           factions: Coalesce(b.push_faction_override, b.card.factions)),
+         Append(b.player.pushes_this_turn,
+           { card:     b.card,
+             factions: Coalesce(b.push_faction_override, b.card.factions) })
+       ]),
+       NoOp),
+    EmitEvent(Event.PlayCard.Pushed(binding: b))
+  ]))
+
+// Ephemeral binding teardown.
+Game.abilities += Triggered(
+  on:     Event.PlayCard.Pushed(binding: b),
+  effect: DestroyEntity(b))
+
+// -----------------------------------------------------------------------------
+// Supporting predicates and effects
+// -----------------------------------------------------------------------------
+
+// A card from hand Pushes unless explicitly marked non-Pushing (Baseline).
+// Copies and tokens never Push.
+define ShouldPush(b) =
+  b.card.pushes_echo == true
+  ∧ b.play_source == from_hand
+
+// Counter action: an Interrupt that counters calls this on the target binding.
+// It sets countered=true so Step 5a is suppressed. The counter's own
+// OnResolve then handles its printed effect (e.g., The Last Whisper's Push
+// override) via SetPushOverride on the target binding.
+define CounterCard(target_binding) =
+  SetCharacteristic(target_binding, countered, true)
+
+define SetPushOverride(target_binding, factions) =
+  SetCharacteristic(target_binding, push_faction_override, factions)
+
+// A copy-effect play (Eremis Peak) spawns a fresh binding and jumps the chain.
+define PlayAsCopy(player, original_card, targets, arena) = Sequence([
+  InstantiateEntity(
+    kind:        PlayBinding,
+    player:      player,
+    card:        original_card,   // same Card entity; characteristics shared
+    targets:     targets,
+    arena:       arena,
+    play_source: from_copy,
+    bind:        copy_b),
+  // Jump straight to CostComputed (cost is skipped) — the chain's
+  // CostComputed handler sees play_source==from_copy and emits CostPaid
+  // unconditionally.
+  SetCharacteristic(copy_b, effective_cost, 0),
+  EmitEvent(Event.PlayCard.CostComputed(binding: copy_b))
+])
+
+// -----------------------------------------------------------------------------
+// next_rise_refresh — R-6
+// -----------------------------------------------------------------------------
+// The aether refresh the player will receive at their NEXT Rise, before Debt
+// deductions. Depends on whether the player is first or second in turn order.
+
+define next_rise_refresh(p) =
+  let next_turn_round =
+    If(Game.active_player == p,
+       // p is mid-turn; their next Rise is next round.
+       Game.round + 1,
+       // p is non-active; their next Rise is this round if they come after
+       // the active player in turn order, otherwise next round.
+       If(comes_after_in_turn_order(p, Game.active_player),
+          Game.round,
+          Game.round + 1))
+  in p.aether_cap_schedule[next_turn_round - 1]
+
+// -----------------------------------------------------------------------------
+// PushEchoTo — used by Step 6
+// -----------------------------------------------------------------------------
+// Appends a new Echo to the named player's ResonanceField. The Zone's
+// on_overflow: EvictLeftmost rule automatically drops the oldest Echo once
+// capacity is exceeded.
+
+define PushEchoTo(player, factions) =
+  MoveTo(
+    NewEcho(factions: factions),
+    player.ResonanceField)

@@ -1,0 +1,80 @@
+// =============================================================================
+// CCGNF — Ability Lifecycle & Timing Windows
+// =============================================================================
+// Every ability has up to five checkpoints:
+//   register, check, cost (Activated only), apply, deregister.
+//
+// Default timings per kind:
+//
+//   Static       register: on entering active zone
+//                check   : continuously, on-demand during any state query
+//                apply   : continuously, by rewriting the query's answer
+//                deregister: on leaving active zone
+//
+//   Triggered    register: on entering active zone
+//                check   : event_emission — the instant a matching Event emits
+//                apply   : after_event — after the triggering action completes,
+//                          queued into the current timing window
+//                deregister: on leaving, or on apply if one-shot
+//
+//   OnResolve    register: on announcement (play protocol step 1)
+//                check   : card_resolving (play protocol step 5)
+//                apply   : card_resolving
+//                deregister: after one apply
+//
+//   Replacement  register: on entering active zone
+//                check   : event_pending — before event commits to stream
+//                apply   : event_commit — in place of the triggering event
+//                deregister: on leaving, or when per-lifetime budget exhausted
+//
+//   Activated    register: on entering active zone
+//                check   : activation_declared
+//                apply   : after_cost_paid
+//                deregister: on leaving
+//
+// --- Timing windows (first-class)
+//
+// windows := { announcement, cost_computation, cost_payment, tier_binding,
+//              post_tier_interrupt, card_resolving, resolution,
+//              start_of_turn, end_of_turn, start_of_clash, end_of_clash,
+//              event_emission, event_pending, event_commit, after_event,
+//              activation_declared, after_cost_paid,
+//              continuously, immediate }
+//
+// Any ability may override its default `check_at` / `apply_at` by naming
+// a window explicitly.
+//
+// --- Triggered-vs-Replacement test
+//
+// If the triggering event still occurs in full after the ability fires -> Triggered.
+// If the event is replaced or prevented -> Replacement.
+//
+// --- Guards at apply
+//
+// Default: guard checked at `check_at` only.
+// To re-check at apply (the MTG "intervening-if" pattern), annotate `recheck: true`.
+//
+// --- Once-per-turn annotations (harness contract)
+//
+// An ability may be annotated:
+//
+//   once_per_turn: true
+//     The ability cannot fire a second time this turn. The harness auto-
+//     increments `used_this_turn` on fire and suppresses further fires while
+//     it is >= 1. Cleared at the controller's Rise (see engine/06-turn.ccgnf).
+//
+//   once_per_turn_per_trigger_subject: <expr>
+//     Same gate, keyed by the value of <expr> in the triggering event
+//     (e.g., `event.card`). A subject already seen this turn cannot trigger
+//     again; new subjects trigger normally.
+//
+// No other gating modes exist in the current card set. New modes are harness-
+// level changes, not card-level ones.
+//
+// --- Resonance tier binding (play protocol)
+//
+// Tiers evaluate at `tier_binding` (play protocol step 4, BEFORE Push).
+// Result is stored in the PlayBinding.tier_snapshot characteristic. The effect
+// at `card_resolving` (step 5) reads that snapshot, NOT the live
+// ResonanceField. This isolates card resolution from Interrupts that fire
+// between steps 4 and 5 and alter the Field.

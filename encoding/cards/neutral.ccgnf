@@ -1,0 +1,45 @@
+// =============================================================================
+// Resonance — NEUTRAL cards
+// =============================================================================
+
+Card Baseline {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  pushes_echo: false   // format-specific: Baseline explicitly does not Push,
+                       // even a Neutral Echo
+  keywords: [ DeploymentSickness ]
+  abilities: []
+  // text: (Draft-only filler. Does not Push any Echo.)
+}
+
+Card ConduitTender {
+  factions: {NEUTRAL}, type: Unit, cost: 2, force: 1, ramparts: 3, rarity: C
+  keywords: [ Mend(1), DeploymentSickness ]
+  abilities: []
+  // text: Mend 1.
+}
+
+Card ScavengedBlade {
+  factions: {NEUTRAL}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        If(BannerExists(),
+           DealDamage(target, 3),
+           DealDamage(target, 2),
+           check_at: tier_binding,
+           apply_at: card_resolving)))
+  ]
+  // text: Deal 2 damage to a Unit. If your Banner exists: Deal 3 instead.
+}
+
+Card Wayfarer {
+  factions: {NEUTRAL}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(BannerExists(),
+         Draw(self.controller, 1),
+         NoOp))
+  ]
+  // text: When you play this, if your Banner exists, draw a card.
+}

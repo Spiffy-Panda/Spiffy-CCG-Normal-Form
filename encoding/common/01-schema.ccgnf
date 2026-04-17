@@ -1,0 +1,51 @@
+// =============================================================================
+// CCGNF — Schema Reference
+// =============================================================================
+// The six primitives and their metadata. All other constructs in the encoding
+// reduce to these primitives. Reference material for the Validator.
+//
+// --- Primitives
+//
+// Entity
+//   Identified bundle of Characteristics, DerivedCharacteristics, Counters,
+//   Tags, a Zone, owner/controller, and Abilities.
+//   Kinds: Card, Player, Zone, Phase, Game, Arena, Conduit, Echo, Token,
+//          Standard, ContinuousModifier, PlayBinding (ephemeral).
+//
+// Zone
+//   Structured collection of Entities.
+//   Parameters:
+//     - capacity     : int | unlimited
+//     - order        : unordered | LIFO | FIFO | sequential
+//     - on_overflow  : reject | EvictLeftmost | EvictOldest
+//     - visibility   : public | private_to_owner | face_down
+//     - adjacency    : optional relation to other zones
+//
+// Event
+//   Typed record: { type, source, target, payload, phase, timestamp }
+//
+// Effect
+//   Algebraic term over atomic ops and combinators.
+//   Atomic ops: DealDamage, Heal, Draw, Mill, MoveTo, PayAether, SetState,
+//               ClearState, IncCounter, CreateToken, EmitEvent, NoOp, ...
+//   Combinators: Sequence, Choice, ForEach, Target, If, When, Cond,
+//                ChooseHighest, ScheduleAt, Replace, Prevent, Repeat, Switch,
+//                let..in.
+//
+// Ability
+//   (kind, trigger, guard, cost, effect) tuple attached to an Entity.
+//   Kinds: Static, Triggered, OnResolve, Replacement, Activated.
+//
+// Predicate / Selector
+//   Expressions over game state and events. Lambda syntax: `x -> x.cost <= 3`.
+//
+// --- Characteristic layering
+//
+// Three layers, applied in order:
+//   1. Base / Copy       — initial characteristic values; Copy(other) effects.
+//   2. Stat modifiers    — +N/+N, Fortify, ongoing +Force, Ramparts reductions.
+//   3. Ability grants    — "gains Sentinel", "loses all abilities".
+//
+// Queries against a characteristic run through all three layers before
+// returning a value. Static abilities can sit at any layer; Triggered and
+// OnResolve abilities produce concrete one-shot modifiers at layer 2.

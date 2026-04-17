@@ -1,0 +1,97 @@
+// =============================================================================
+// Resonance — Clash (Declarative Resolution)
+// =============================================================================
+// Clash is a single Triggered ability on Game. Per-Arena math lives on the
+// Arena entities as derived characteristics (continuously recomputed). The
+// Clash phase ability opens windows, applies damage using those derived
+// values, and closes windows. No simulation loop.
+
+// -----------------------------------------------------------------------------
+// Per-Unit Clash contributions
+// -----------------------------------------------------------------------------
+// Each Unit has two derived characteristics that keyword Statics layer over.
+
+Unit.derived += {
+  // Force contributed to Projected Force at Clash.
+  clash_projected_force: int =
+    Cond([
+      (self has Phantoming,                                        0),
+      (self has DeploymentSickness ∧ not has_keyword(self, Blitz), 0),
+      (self has Sentinel,                                          0),
+      (Default,                                                    self.force)
+    ]),
+
+  // Contribution to Fortification at Clash.
+  clash_fortification: int =
+    Cond([
+      (self has Phantoming, 0),
+      (self has Sentinel,   self.force + self.current_ramparts),
+      (Default,             self.current_ramparts)
+    ])
+}
+
+// Keywords that alter Clash contributions (Sentinel, Phantom, Deployment
+// Sickness) are read here rather than in Clash's orchestration, so adding a
+// new contribution-altering keyword is a one-line Static on the Unit, not a
+// Clash-procedure patch.
+
+// -----------------------------------------------------------------------------
+// Per-Arena derived values
+// -----------------------------------------------------------------------------
+
+Arena[pos].derived += {
+  projected_force[side]: int =
+    Sum(u ∈ self.units[side], u.clash_projected_force),
+
+  fortification[side]: int =
+    Sum(u ∈ self.units[side], u.clash_fortification)
+      + sum_of_fortification_modifiers_from_standards_and_effects(self, side),
+
+  incoming[side]: int =
+    Max(0, self.projected_force[other_player(side)] - self.fortification[side])
+}
+
+// The `fortification` summation includes any effect-based Fortification
+// bonuses (e.g., Hold the Line's Prevent-Incoming registers here as a
+// damage-reduction on the Arena for this turn).
+
+// -----------------------------------------------------------------------------
+// Clash phase ability (invoked from engine/06-turn.ccgnf)
+// -----------------------------------------------------------------------------
+
+define ResolveClashPhase(active_player) = Sequence([
+  EmitEvent(Event.Clash.Begin(active_player: active_player)),
+
+  // Start-of-Clash window: Phantom declarations, last-second Interrupts, etc.
+  OpenTimingWindow(start_of_clash),
+  DrainTriggersFor(window: start_of_clash),
+
+  // Apply damage to Conduits simultaneously across all Arenas.
+  ApplyClashDamage(),
+  EmitEvent(Event.Clash.DamageApplied),
+
+  // End-of-Clash window: Phantom returns, cost-reduction accounting, etc.
+  OpenTimingWindow(end_of_clash),
+  DrainTriggersFor(window: end_of_clash),
+
+  EmitEvent(Event.Clash.End)
+])
+
+define ApplyClashDamage() =
+  ForEach((arena, side) ∈ {Left, Center, Right} × {Player1, Player2},
+    If(Conduit[side, arena] exists ∧ not collapsed_for(side, arena),
+       DealDamageToConduit(
+         target: Conduit[side, arena],
+         amount: Arena[arena].incoming[side],
+         source: clash)))
+
+// -----------------------------------------------------------------------------
+// Notes on damage events
+// -----------------------------------------------------------------------------
+// - Clash damage does not touch Unit Ramparts. Clash Incoming targets the
+//   defending Conduit directly; Fortification is absorbed into `incoming`
+//   before any damage is dealt.
+// - Damage to Units comes only from Maneuvers, abilities, and passive
+//   keywords like Ignite. Those pathways use the general DealDamage(target,
+//   amount) atom, which reduces current_ramparts.
+// - Ramparts heal at end of Fall (see engine/06-turn.ccgnf), not at Rise.

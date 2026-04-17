@@ -1,0 +1,48 @@
+// =============================================================================
+// Resonance — Rulings
+// =============================================================================
+// Design decisions that resolve ambiguities in design/GameRules.md. These are
+// authoritative for the encoding. The Validator cross-references these during
+// semantic analysis.
+//
+// R-1 — Recur vs Conduit Collapse
+//   When a Conduit is destroyed, its controller's Units in that Arena are
+//   destroyed (not merely moved). The destruction emits
+//     Event.Destroy(target=u, reason: conduit_collapse)
+//   for each such Unit. Recur, being a Replacement on destruction, fires and
+//   redirects the Unit to the bottom of the Arsenal. Matches GameRules §7.2
+//   which lists Conduit-collapse as a removal path equivalent to destruction.
+//
+// R-2 — Countered Maneuver Push
+//   A countered Maneuver still Pushes its Echo. "Playing a card" is
+//   established at announcement and committed at cost-paid; Push is a
+//   consequence of that commitment, not of successful resolution. Step 6 of
+//   the play protocol fires regardless of whether Step 5 was replaced by a
+//   counter. This is also required for The Last Whisper's
+//   push_faction_override to do anything meaningful.
+//
+// R-3 — Sprawl from a Maneuver
+//   GameRules §11 says Sprawl creates Saplings "in this Arena," which is
+//   only well-defined for Units and Arena-attached Standards. When Sprawl
+//   fires from a Maneuver (no intrinsic Arena), the Maneuver's controller
+//   targets a non-Collapsed Arena at resolution time; Saplings enter there.
+//
+// R-4 — Damage heal timing
+//   GameRules §5 Rise says "clear all damage from your Units" and §7.3 says
+//   "Ramparts heal at end of Fall." These are contradictory windows. This
+//   encoding follows §7.3 (end of Fall) as canonical because it is the more
+//   specific rule; §5 Rise's clear-damage line becomes a no-op in practice.
+//   A single heal point means damage from an opponent's turn persists
+//   through your own next turn of play, which matches design intent.
+//
+// R-5 — Interrupt Debt uses *printed* cost
+//   Debt is 2 * printed_cost, never 2 * effective_cost. Future Interrupts
+//   with cost modifiers (Surge, Phantom discounts) pay their modifier
+//   benefit in the current play but do not reduce the Debt burden.
+//
+// R-6 — Interrupt Debt cap against *next* Rise
+//   The cap is "your next Rise's Aether refresh amount" — specifically
+//   next_rise_refresh(p) (defined in engine/08-play.ccgnf), not the current
+//   round's cap. When you are the first player and take Debt on the second
+//   player's turn, your next Rise is next round and its cap is higher than
+//   this round's.

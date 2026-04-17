@@ -1,0 +1,20 @@
+// =============================================================================
+// Resonance — Token Templates
+// =============================================================================
+// Token templates instantiated by card effects (Sprawl, Bloom, etc.).
+// Tokens do not Push Echoes (they are not played from hand).
+
+Token ThornSapling {
+  characteristics: {
+    name:     "Thorn Sapling",
+    cost:     0,
+    type:     Unit,
+    factions: {NEUTRAL},
+    force:    1,
+    ramparts: 1,
+    rarity:   Token
+  }
+  keywords: [ DeploymentSickness ]   // Saplings gain Force next turn
+  pushes_echo: false
+  abilities: []
+}

@@ -1,0 +1,59 @@
+// =============================================================================
+// Resonance — Resonance, Tiers, Banner macros
+// =============================================================================
+// These macros are the Resonance-specific core. They reference the player's
+// ResonanceField zone, which is declared in engine/04-entities.ccgnf.
+
+// Count of Echoes of faction F in controller's current ResonanceField.
+define CountEcho(F) =
+  Count(self.controller.ResonanceField, e -> F ∈ e.factions)
+
+// Tier predicate, to be evaluated at tier_binding.
+define Resonance(F, N) = (CountEcho(F) >= N)
+
+define Peak(F) = Resonance(F, 5)
+
+define Banner(F) = (self.controller.banner == F)
+
+define BannerExists() = (self.controller.banner != None)
+
+// Tier table: highest-satisfied case wins, others skip.
+// Cases are evaluated in order; first satisfied predicate's effect fires.
+// Evaluated at tier_binding; effect applied at card_resolving.
+define Tiers(cases) =
+  ChooseHighest(
+    cases,
+    check_at: tier_binding,
+    apply_at: card_resolving)
+
+// Independent gated lines: each independently fires if its predicate is met.
+define Lines(lines) =
+  Sequence([
+    When(pred, eff, check_at: tier_binding, apply_at: card_resolving)
+    for (pred, eff) in lines
+  ])
+
+// =============================================================================
+// Cost, target, and card-level conveniences
+// =============================================================================
+
+// Persistent card-attached cost modifier (e.g., Phantom's cumulative -1).
+define ReduceBaseCost(n, floor) =
+  IncCounter(self, base_cost_reduction, n, persistent: true, floor: floor)
+
+// "Destroy" per §7.3: damage-reaching-zero or explicit destroy maps to
+// MoveTo(Cache) by default; Recur Replacement intercepts.
+define Destroy(target) =
+  MoveTo(target, target.owner.Cache)
+
+// Damage to Units reduces current_ramparts counter; to Conduits reduces
+// integrity. Excess is lost.
+define DealDamage(target, amount) =
+  Atomic.DealDamage(target, amount)
+
+// Push-an-echo is a Game-level protocol step, not a card ability. Cards that
+// "push an extra Echo" use this helper:
+define PushEcho(factions) =
+  MoveTo(
+    NewEcho(factions: factions),
+    self.controller.ResonanceField)   // FIFO-5, evicts leftmost

@@ -1,0 +1,48 @@
+// =============================================================================
+// CCGNF — Conventions
+// =============================================================================
+// This file establishes the universal syntactic and semantic conventions for
+// Cardgame Normal Form source files. It contains no declarations; it is a
+// reference section the grammar engine reads to validate other files.
+//
+// --- Syntax
+//
+// - YAML-ish for entity declarations (name-value pairs, nested blocks).
+// - S-expression-ish for abilities and effects: `Kind(arg: value, ...)`, nested.
+// - Macros declared with `define NAME(params) = body` (file-top-level only).
+// - Both named and positional arguments are legal; named is preferred for
+//   anything beyond a single argument.
+//
+// --- Identifiers
+//
+// - `self`  — inside an ability body, the Entity bearing the ability.
+// - `event` — inside a Triggered/Replacement body, the triggering Event.
+// - `target` — inside a Target binding, the bound Target value.
+// - Entity attributes: `self.controller`, `self.owner`, `self.arena`, etc.
+//
+// --- Comments
+//
+// - `//` line comments are non-semantic; stripped by the ANTLR lexer.
+// - `/* ... */` block comments are also non-semantic.
+//
+// --- Natural text
+//
+// - Every Card declaration includes its original English rules text as a
+//   `// text:` comment, for review against the source design docs.
+//
+// --- Unicode operators
+//
+// The grammar accepts both ASCII and Unicode forms:
+//   and   <->  ∧
+//   or    <->  ∨
+//   not   <->  ¬
+//   in    <->  ∈   (for element-of / set membership)
+//   x     <->  ×   (for Cartesian product)
+//   subseteq  <->  ⊆
+//
+// --- Forbidden constructs
+//
+// - `Procedure NAME(args): ...` blocks are not permitted. Game logic is
+//   expressed as abilities on entities, events, and derived characteristics.
+// - Top-level imperative statements are not permitted. Only declarations
+//   (Entity, Card, Token, macro, entity-augment) appear at file top level.

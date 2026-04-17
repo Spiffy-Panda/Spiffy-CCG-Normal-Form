@@ -1,0 +1,99 @@
+// =============================================================================
+// Resonance — Global Entities
+// =============================================================================
+// Game, Arena, Player, Conduit, PlayBinding. These are the fixtures the rules
+// abilities attach to.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  child_zones: { Arena[Left], Arena[Center], Arena[Right] }
+  abilities: []    // populated by engine/05-setup.ccgnf, engine/06-turn.ccgnf,
+                   // engine/07-sba.ccgnf, engine/08-play.ccgnf,
+                   // engine/09-clash.ccgnf
+}
+
+Entity Arena[pos] for pos ∈ {Left, Center, Right} {
+  kind: Arena
+  characteristics: { position: pos }
+  // Adjacency: Left↔Center, Center↔Right. Left and Right are NOT adjacent.
+  adjacency: Switch(pos, {
+    Left:   { Center },
+    Center: { Left, Right },
+    Right:  { Center }
+  })
+  child_zones: {
+    units[Player1],     units[Player2],
+    standards[Player1], standards[Player2],
+    conduit[Player1],   conduit[Player2]
+  }
+  state_flags: {
+    collapsed_for[Player1]: false,
+    collapsed_for[Player2]: false
+  }
+  // Per-arena derived Clash values live in engine/09-clash.ccgnf.
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: {
+    integrity_start:     7,
+    aether_cap_schedule: [3, 4, 5, 6, 7, 8, 9, 10, 10, 10],
+    hand_cap:            10,
+    max_mulligans:       2
+  }
+  counters: {
+    aether:            0,
+    debt:              0,
+    pushes_this_turn:  []   // list of {card, factions}; cleared at Fall
+  }
+  derived: {
+    banner: mode(
+      { e.factions | e ∈ self.ResonanceField ∧ e.factions ≠ {NEUTRAL} },
+      tiebreak:       most_recent,
+      undefined_when: empty)
+  }
+  zones: {
+    Arsenal:        Zone(order: sequential, visibility: face_down_private),
+    Hand:           Zone(capacity: 10, order: unordered,
+                         visibility: private_to_owner,
+                         on_overflow: discard_down_at_end_of_turn),
+    Cache:          Zone(order: FIFO, visibility: public),
+    ResonanceField: Zone(capacity: 5, order: FIFO,
+                         on_overflow: EvictLeftmost,
+                         visibility: public),
+    Void:           Zone(order: unordered, visibility: public)   // "exile"
+  }
+  abilities: []    // player-scoped rules attach here;
+                   // PlayCard Activated ability added in engine/08-play.ccgnf
+}
+
+Entity Conduit[owner, arena] {
+  kind: Conduit
+  owner: owner
+  arena: arena
+  characteristics: { starting_integrity: 7 }
+  counters:        { integrity: 7 }
+  zone: Arena[arena].conduit[owner]
+  // Conduits are NOT Permanents. They are targeted by name: "target Conduit".
+}
+
+// PlayBinding — ephemeral, carries per-play state across the event chain.
+// Instantiated by PlayCard (engine/08-play.ccgnf); destroyed on
+// Event.PlayCard.Pushed.
+Entity PlayBinding {
+  kind: PlayBinding
+  lifetime: ephemeral
+  characteristics: {
+    player:                Player,
+    card:                  Card,
+    targets:               List,
+    arena:                 Arena | None,
+    play_source:           {from_hand, from_copy, from_replay},
+    effective_cost:        int | Unbound,
+    tier_snapshot:         TierSnapshot | Unbound,
+    resolved:              bool = false,
+    countered:             bool = false,
+    push_faction_override: Factions | None = None
+  }
+}

@@ -1,0 +1,121 @@
+// =============================================================================
+// Resonance — EMBER cards
+// =============================================================================
+
+Card Cinderling {
+  factions: {EMBER}, type: Unit, cost: 1, force: 2, ramparts: 1, rarity: C
+  keywords: [ Blitz, DeploymentSickness ]   // DeploymentSickness is universal;
+                                             // Blitz suppresses it
+  abilities: []
+  // text: Blitz.
+}
+
+Card Spark {
+  factions: {EMBER}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Tiers([
+          (Resonance(EMBER, 3), DealDamage(target, 3)),
+          (Default,             DealDamage(target, 2))
+        ])))
+  ]
+  // text: Deal 2 damage to a Unit or Conduit. EMBER 3: Deal 3 instead.
+}
+
+Card EmberhandRaider {
+  factions: {EMBER}, type: Unit, cost: 2, force: 3, ramparts: 2, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+Card Smolder {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Tiers([
+          (Resonance(EMBER, 4), DealDamage(target, 4)),
+          (Default,             DealDamage(target, 2))
+        ])))
+  ]
+  // text: Deal 2 damage to a target Unit or Conduit. EMBER 4: Deal 4 instead.
+}
+
+Card Pyrebrand {
+  factions: {EMBER}, type: Unit, cost: 3, force: 4, ramparts: 2, rarity: U
+  keywords: [ Blitz, DeploymentSickness, Ignite(1) ]
+  abilities: [
+    // EMBER 3: Ignite 2 while this is in play — an ongoing conditional upgrade.
+    Static(
+      modifies: KeywordParameter(self, Ignite),
+      check_at: continuously,
+      rule: If(Resonance(EMBER, 3), set X = 2, leave X = 1))
+  ]
+  // text: Blitz. Ignite 1. EMBER 3: Ignite 2 while this is in play.
+}
+
+Card Stokefire {
+  factions: {EMBER}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Peak(EMBER),   DistributeDamage(amount: 5, chooser: self.controller,
+                                         target_filter: t -> t.kind ∈ {Unit, Conduit})),
+        (Default,       DistributeDamage(amount: 3, chooser: self.controller,
+                                         target_filter: t -> t.kind ∈ {Unit, Conduit}))
+      ]))
+  ]
+  // text: Deal 3 damage, split among any number of targets.
+  //       Peak EMBER: Deal 5, split as you choose.
+}
+
+Card ChoirOfTheBlaze {
+  factions: {EMBER}, type: Standard, subtype: attaches_to_arena, cost: 4, rarity: R
+  abilities: [
+    StartOfYourTurn(
+      Sequence([
+        ForEach(
+          u -> u.arena == self.arena
+             ∧ u.controller != self.controller
+             ∧ u.type == Unit,
+          DealDamage(u, 1)),
+        When(Resonance(EMBER, 4),
+          If(Conduit[other_player(self.controller), self.arena] exists
+             ∧ not collapsed_for(other_player(self.controller), self.arena),
+             DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+             NoOp),
+          check_at: event_emission,
+          apply_at: after_event)
+      ]))
+  ]
+  // text: At start of your turn, deal 1 damage to each opposing Unit in this Arena.
+  //       EMBER 4: Also deal 1 damage to the opposing Conduit in this Arena.
+}
+
+Card Eremis_TheUnfaded {
+  factions: {EMBER}, type: Unit, cost: 5, force: 5, ramparts: 3, rarity: M, unique: true
+  keywords: [ Blitz, DeploymentSickness, Unique ]
+  abilities: [
+    // Peak EMBER: each EMBER Maneuver you play is copied; each card copyable
+    // once per turn. once_per_turn_per_trigger_subject: event.card tells the
+    // harness to gate by the triggering card identity, resetting at the
+    // controller's next Rise.
+    OnCardPlayed(
+      filter:                            c -> c.type == Maneuver ∧ EMBER ∈ c.factions,
+      once_per_turn_per_trigger_subject: event.card,
+      effect: When(Peak(EMBER),
+        PlayAsCopy(
+          player:        self.controller,
+          original_card: event.card,
+          targets:       event.targets,
+          arena:         event.arena),
+        check_at: announcement,
+        apply_at: after_event))
+  ]
+  // text: Blitz. Peak EMBER: When you play an EMBER Maneuver, copy it.
+  //       Each EMBER Maneuver can only be copied this way once per turn.
+  //       (PlayAsCopy is defined in engine/08-play.ccgnf — copies bypass
+  //       cost and Push.)
+}

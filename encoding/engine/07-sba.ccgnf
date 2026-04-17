@@ -1,0 +1,64 @@
+// =============================================================================
+// Resonance — State-Based Actions (SBAs)
+// =============================================================================
+// Checked after every resolved effect and at every window boundary.
+// All SBAs are Static abilities on Game with check_at: continuously.
+
+// SBA: a Unit with current_ramparts <= 0 is destroyed (to Cache by default,
+// Recur intercepts via Replacement).
+Game.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: ForEach(u -> u.type == Unit
+                   ∧ u.zone ∈ battlefield
+                   ∧ u.current_ramparts <= 0,
+          EmitEvent(Event.Destroy(target: u, reason: ramparts_zero))))
+
+// SBA: a Conduit with integrity <= 0 triggers Arena Collapse for its owner.
+// Per R-1, Unit cleanup is a destruction event (so Recur can fire). Standards
+// attached to the collapsing Arena are also destroyed, but Standards are
+// non-Recur'able so we use the generic destroy path for both.
+Game.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: ForEach(c -> c.kind == Conduit
+                   ∧ c.integrity <= 0
+                   ∧ not collapsed_for(c.owner, c.arena),
+          Sequence([
+            SetFlag(Arena[c.arena].collapsed_for[c.owner], true),
+            ForEach(u -> u.controller == c.owner
+                       ∧ u.arena == c.arena
+                       ∧ u.type == Unit,
+              EmitEvent(Event.Destroy(target: u, reason: conduit_collapse))),
+            ForEach(s -> s.controller == c.owner
+                       ∧ s.type == Standard
+                       ∧ s.subtype == attaches_to_arena
+                       ∧ s.attached_arena == c.arena,
+              EmitEvent(Event.Destroy(target: s, reason: conduit_collapse)))
+          ])))
+
+// SBA: if two of a player's Conduits are destroyed, opponent wins.
+Game.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: ForEach(p -> count({c : c.kind == Conduit
+                                ∧ c.owner == p
+                                ∧ c.integrity <= 0}) >= 2,
+          EmitEvent(Event.Lose(player: p, reason: "two_conduits_destroyed"))))
+
+// SBA: simultaneous Lose events => Draw.
+Game.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: If(pending_lose_events_for(Player1) ∧ pending_lose_events_for(Player2),
+           EmitEvent(Event.GameEnd(result: Draw)),
+           ForEach(p -> pending_lose_events_for(p),
+             EmitEvent(Event.GameEnd(result: Win(other_player(p)))))))
+
+// SBA: a destroyed entity with pending Destroy event moves to Cache
+// (after Replacements like Recur have had a chance to intercept).
+Game.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: ForEach(e -> pending_destroy(e),
+          MoveTo(e, e.owner.Cache)))
