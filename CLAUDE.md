@@ -49,6 +49,30 @@ grammar/         Spec for the ANTLR grammar, preprocessor, and interpreter.
 legacy/conduit/  Archived prior iteration.
 ```
 
+## README maintenance
+
+`README.md` at the repo root is the public-facing face of the project (`Spiffy-Panda/Spiffy-CCG-Normal-Form`). Treat it as a living document. It must stay in sync with reality — a stale README is worse than no README because it teaches wrong things about the project.
+
+**Update the README when any of these change:**
+
+- **A component crosses a functionality threshold.** E.g., a target goes from "Skeleton" to "Working", or from "Specified, not scaffolded" to "Skeleton". The Status table is the first place a reader looks; it must not lie.
+- **A new target host is added or removed.** Currently: CLI, REST, Godot.
+- **The top-level directory layout changes.** The Repository Layout section references specific paths; add/remove/rename means update.
+- **A public-facing invariant in the Design Philosophy section is no longer true.** Those are strong claims about the system; honor them or update them.
+- **The Resonance example's identity changes.** Mechanic names, faction count, victory conditions, etc. If the one-sentence pitch or mechanics-at-a-glance bullets drift from `design/GameRules.md`, they need to be reconciled.
+- **Toolchain or build-convention changes.** The Quick Start section references `make ci`, `.NET 8`, the `DOTNET=dotnet.exe` override for WSL. Changes to any of these must propagate.
+- **The documentation index gains or loses a linked document.**
+
+**Do NOT update the README for:**
+
+- Individual card changes in Resonance (those are an implementation detail of the reference encoding).
+- Engine implementation micro-steps that do not cross a status threshold.
+- Internal refactors that do not change public API or layout.
+
+**The rule of thumb:** if a first-time reader arriving at the repo would form a materially different impression after the change, the README needs an update in the same commit. Otherwise leave it alone.
+
+When in doubt, re-read the README Status table and the Repository Layout section. If either reads wrong given your change, fix it now.
+
 ## Conventions for edits
 
 - Keep `design/` (human) and `encoding/` (machine) in sync. When rules change, update both or flag the drift explicitly.
