@@ -18,6 +18,18 @@
 
 The CCGNF encoding (`.ccgnf` files under `encoding/`) will be parsed and interpreted by a purpose-built engine. See `grammar/GrammarSpec.md` for the full spec. Tooling and implementation have not yet been built.
 
+### Host targets
+
+The engine library has three first-class host targets, all C#:
+
+- **CLI** — validate projects and run fixture games from the command line.
+- **REST API** — ASP.NET Core service; exposes validation and game-session endpoints over HTTP for non-.NET front-ends.
+- **Godot** — in-process integration for a Godot 4.x C# front-end; runs the interpreter directly, no IPC.
+
+### Logging
+
+All library projects log via `Microsoft.Extensions.Logging.Abstractions` (`ILogger<T>` constructor injection). No library depends on a concrete logging provider. Each host composes its own: CLI uses `Microsoft.Extensions.Logging.Console`, REST uses ASP.NET Core defaults (optionally Serilog), Godot uses a custom `ILoggerProvider` that routes to `GD.Print` / `GD.PushWarning` / `GD.PushError`. See `grammar/GrammarSpec.md` §9 for conventions.
+
 ## File layout
 
 ```

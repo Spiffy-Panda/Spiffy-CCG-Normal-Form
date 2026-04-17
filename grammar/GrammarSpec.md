@@ -13,7 +13,13 @@ CCGNF ("Cardgame Normal Form") is the encoding language used under `encoding/`. 
 3. **Validates** the AST semantically (types, identifier resolution, ruling compliance).
 4. **Interprets** the AST as a live game, responding to player inputs and emitting events.
 
-The engine is a library; a host application (CLI, Godot integration, web front-end) drives it. The host is out of scope for this spec.
+The engine is a library with three first-class host targets, all C#:
+
+- **CLI** (`Ccgnf.Cli`) — validate a project, run a fixture game, print diagnostics.
+- **REST API** (`Ccgnf.Rest`) — ASP.NET Core service exposing validation and game-session endpoints over HTTP.
+- **Godot runtime** (`Ccgnf.Godot`) — integration shim for a Godot 4.x (C#) front-end.
+
+The library is host-agnostic; each host provides its own logging, serialization, and I/O surface. Host-specific detail lives in §10.3.
 
 ---
 
@@ -448,7 +454,72 @@ These two inputs, plus the validated AST, reproduce any game exactly. This is a 
 
 ---
 
-## 9. Testing
+## 9. Logging and diagnostics
+
+The library emits logs via `Microsoft.Extensions.Logging.Abstractions` — the standard .NET logging abstraction. Every class that logs takes an `ILogger<T>` through constructor injection. The library depends **only on the abstractions package** (version `8.0.x` for .NET 8, track the runtime version); concrete providers are chosen by each host.
+
+This is the right choice for a library whose hosts include ASP.NET Core (uses `ILogger` natively), a CLI built on `Microsoft.Extensions.Hosting` (uses `ILogger` natively), and Godot (accepts any `ILoggerProvider` implementation and routes to `GD.Print` / `GD.PushWarning` / `GD.PushError`).
+
+### 9.1 Package dependency
+
+```xml
+<!-- In every Ccgnf.* library project: -->
+<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.*" />
+```
+
+No library project references `Microsoft.Extensions.Logging` (the composition package), `...Console`, `...Debug`, Serilog, NLog, or any other concrete provider. That concern belongs to hosts.
+
+### 9.2 Injection pattern
+
+Constructor injection, one `ILogger<T>` per class, typed to the class for automatic category naming:
+
+```csharp
+public sealed class Preprocessor {
+    private readonly ILogger<Preprocessor> _log;
+    private readonly MacroTable _macros;
+
+    public Preprocessor(ILogger<Preprocessor> log, MacroTable macros) {
+        _log = log;
+        _macros = macros;
+    }
+
+    public PreprocessedStream Expand(SourceFile file) {
+        _log.LogDebug("Expanding {FileName}: {MacroCount} macros in scope",
+                      file.Path, _macros.Count);
+        // ...
+    }
+}
+```
+
+Classes that are not DI-composed (pure utilities, static helpers) either take an `ILoggerFactory` explicitly or are re-factored to instance form. Static logging is forbidden — it makes testing harder and defeats structured context.
+
+### 9.3 Structured logging conventions
+
+- **Named placeholders, always.** Write `_log.LogInformation("Card {CardName} entered {Arena}", c.Name, a)` — never `$"Card {c.Name} entered {a}"`. Providers rely on structured templates for filtering and indexing.
+- **Categories mirror namespaces.** `Ccgnf.Preprocessor`, `Ccgnf.Validator`, `Ccgnf.Interpreter.Events`, `Ccgnf.Interpreter.Abilities`, etc. With `ILogger<T>` injection this is automatic.
+- **Scopes for request/session context.** The REST host opens a scope per HTTP request (including a session id when applicable); the CLI host opens a scope per fixture run; the Godot host opens a scope per game session. Interpreter and below log inside those scopes without needing to know about them.
+- **Event objects, not string interpolation.** For high-frequency interpreter events (ability fires, effect applications) consider emitting an `EventId` with a stable numeric code so downstream consumers can filter without parsing message templates.
+
+### 9.4 Log-level conventions
+
+| Level         | Use for                                                                 |
+|---------------|-------------------------------------------------------------------------|
+| `Trace`       | Per-event internal detail: ability match attempts, window opens/closes. |
+| `Debug`       | Ability fires, effect applications, preprocessor macro expansions.      |
+| `Information` | Game lifecycle: setup complete, turn transitions, game end.             |
+| `Warning`     | Recoverable issues: deprecated macro use, retry-after-fail conditions.  |
+| `Error`       | Validator errors; interpreter aborts; host request failures.            |
+| `Critical`    | State corruption, deadlock, assertion failures.                         |
+
+A freshly-parsed project with zero diagnostics should log at `Information` or above and produce fewer than 100 lines for a typical game. `Debug` and `Trace` are verbose and intended for fixture authoring and engine debugging.
+
+### 9.5 Test-time logging
+
+Tests inject `NullLogger<T>.Instance` by default; a specific suite that needs to assert on log output uses `Microsoft.Extensions.Logging.Testing.FakeLogger` (from `Microsoft.Extensions.Logging.Testing`) or a hand-rolled capturing logger. No test should rely on console output.
+
+---
+
+## 10. Testing
 
 Three layers:
 
@@ -460,7 +531,7 @@ All three layers use NUnit 3 (or XUnit; pick one and commit). Fixtures live unde
 
 ---
 
-## 10. Project layout (implementation)
+## 11. Project layout (implementation)
 
 ```
 src/
@@ -485,31 +556,130 @@ src/
     Entity.cs, Zone.cs, AbilityInstance.cs, Effect.cs
     EventQueue.cs, TimingWindow.cs, Scheduler.cs
     Builtins.cs              # Sequence, ForEach, If, DealDamage, …
-  Ccgnf.Cli/                 # reference CLI; validates a project, prints diagnostics
+  Ccgnf.Cli/                 # reference CLI host
+  Ccgnf.Rest/                # ASP.NET Core REST host
+  Ccgnf.Godot/               # Godot 4.x C# integration shim
 tests/
   Ccgnf.Grammar.Tests/
   Ccgnf.Validator.Tests/
   Ccgnf.Interpreter.Tests/
+  Ccgnf.Rest.Tests/          # ASP.NET Core integration tests
   fixtures/
 ```
 
-### 10.1 Build
+Every library project (`Ccgnf.Grammar`, `Ccgnf.Preprocessor`, `Ccgnf.Ast`, `Ccgnf.Validator`, `Ccgnf.Interpreter`) depends on `Microsoft.Extensions.Logging.Abstractions` (see §9) and on nothing else concrete outside the Ccgnf family. No library takes `Microsoft.Extensions.Logging` proper, no library takes ASP.NET Core, no library references Godot.
 
-`dotnet` with an `Antlr4.CodeGenerator` MSBuild task, pointed at the 4.13.2 ANTLR tool JAR (vendored under `tools/` or downloaded via the task). Runtime is `Antlr4.Runtime.Standard 4.13.1` from NuGet. Target framework: `net8.0` unless a downstream Godot integration pins otherwise.
+### 11.1 Build
 
-### 10.2 Regeneration
+`dotnet` with an `Antlr4.CodeGenerator` MSBuild task, pointed at the 4.13.2 ANTLR tool JAR (vendored under `tools/` or downloaded via the task). Runtime is `Antlr4.Runtime.Standard 4.13.1` from NuGet. Target framework: `net8.0` for libraries and CLI/REST hosts; the Godot shim targets whatever Godot's C# project is currently on (Godot 4.3 → `net8.0` as of this writing).
+
+### 11.2 Regeneration
 
 The ANTLR-generated C# sources go under `src/Ccgnf.Grammar/generated/` and are gitignored. CI regenerates on every build. Local dev regenerates via `dotnet build`.
 
+### 11.3 Host integration
+
+All three hosts consume the same `Ccgnf.Interpreter` library. They differ in how they compose it, how they serialize state, and how they provide logging.
+
+#### CLI — `Ccgnf.Cli`
+
+```
+Ccgnf.Cli/
+  Program.cs                 # Microsoft.Extensions.Hosting entrypoint
+  Commands/
+    ValidateCommand.cs       # `ccgnf validate <path>`
+    RunCommand.cs            # `ccgnf run <fixture.yaml>`
+  Logging/
+    ConsoleConfig.cs         # honors --log-level
+```
+
+- Uses `Microsoft.Extensions.Hosting.Host.CreateApplicationBuilder` to get a DI container plus logging.
+- Default providers: `Microsoft.Extensions.Logging.Console`, optionally `Microsoft.Extensions.Logging.Debug` in `DEBUG` builds.
+- `--log-level trace|debug|information|warning|error` flag sets the minimum level.
+- Exit code 0 on success, non-zero on diagnostics above `Error`.
+
+#### REST — `Ccgnf.Rest`
+
+ASP.NET Core minimal API or controllers. The REST host exposes the engine over HTTP so a non-.NET front-end can drive it.
+
+```
+Ccgnf.Rest/
+  Program.cs                 # ASP.NET Core entrypoint
+  Endpoints/
+    ProjectsEndpoints.cs     # POST /api/projects/validate
+    SessionsEndpoints.cs     # POST /api/sessions, /{id}/actions, etc.
+    EventsEndpoints.cs       # GET  /api/sessions/{id}/events (SSE)
+  Sessions/
+    SessionStore.cs          # in-memory session registry
+    GameSession.cs           # wraps Ccgnf.Interpreter.GameState + scheduler
+  Serialization/
+    StateDto.cs, EventDto.cs
+```
+
+**Endpoints (canonical shape):**
+
+```
+POST /api/projects/validate
+  Request:  { files: [{ path, content }] }
+  Response: { diagnostics: [{ severity, file, line, column, message, rule? }] }
+
+POST /api/sessions
+  Request:  { project_id, seed?, players: [...] }
+  Response: { session_id, state }
+
+POST /api/sessions/{id}/actions
+  Request:  { player_id, action: "PlayCard", args: {...} }
+  Response: { events: [...], state }
+
+GET /api/sessions/{id}/state
+  Response: serialized GameState
+
+GET /api/sessions/{id}/events  (Server-Sent Events)
+  Stream of Event JSON objects as they emit.
+
+DELETE /api/sessions/{id}
+  Terminate and dispose.
+```
+
+**Design notes:**
+
+- Sessions are in-memory by default; the `SessionStore` is `IScoped` per-server. A stateless mode (serialize full GameState in every request/response) is possible for horizontal scaling but not in v1.
+- Per-session isolation is enforced by creating a new DI scope per `GameSession`; cross-session state leakage is a bug.
+- Logging uses ASP.NET Core's built-in provider. Every request opens a logging scope with `{ RequestId, SessionId? }`; interpreter logs nest inside that scope automatically.
+- Optional: Serilog for structured JSON output to downstream aggregators. The library does not depend on Serilog; only `Ccgnf.Rest/Program.cs` adds it if configured.
+- Authentication, rate limiting, and CORS are host-level concerns and deliberately out of scope for this spec.
+
+#### Godot — `Ccgnf.Godot`
+
+A thin shim consumed by the Godot 4.x C# project. Not a Godot plugin per se; a regular .NET library the Godot project references.
+
+```
+Ccgnf.Godot/
+  GdLoggerProvider.cs        # ILoggerProvider -> GD.Print/GD.PushWarning/GD.PushError
+  GdLogger.cs
+  GdSessionHost.cs           # wraps GameSession for Godot signals
+  Serialization/
+    GdStateMapper.cs         # GameState <-> Godot nodes (if we want native wrappers)
+```
+
+- Registers a custom `ILoggerProvider` that maps log levels to Godot's output surfaces:
+  - `Trace`, `Debug`, `Information` → `GD.Print`
+  - `Warning` → `GD.PushWarning`
+  - `Error`, `Critical` → `GD.PushError`
+- The Godot project builds its own `LoggerFactory` (e.g., in `_Ready` on an autoload singleton) and injects it into the Interpreter.
+- State-to-scene mapping is application-specific; `GdStateMapper` is a starting point, not a prescription.
+- Godot runs the Interpreter **in-process** as a library — no IPC, no subprocess. The REST host exists for web/cloud front-ends, not for Godot.
+
 ---
 
-## 11. Open questions
+## 12. Open questions
 
 These are for the implementation phase, not blockers for this spec:
 
 - **Error recovery** in the parser. ANTLR4's default is good for most constructs; we may want custom recovery for the `entityAugment` and `macroDef` productions to give better error messages when authors omit a comma.
 - **Incremental parsing.** Initial version parses the whole project on every run. If authoring latency becomes painful, add file-level caching keyed by content hash.
-- **Godot integration.** Whether the runtime runs inside Godot as a GDExtension, or as an external process that Godot talks to over JSON. The parent directory is `GodotProj/`, so this will come up; not this spec's problem.
+- **Session persistence in REST.** In-memory is fine for v1. If we need durability (crash recovery, long-running games across deploys), add a pluggable `ISessionStore` with an EF Core backend.
+- **Event streaming transport.** Server-Sent Events is simpler than WebSockets and sufficient for one-way event push. If bidirectional real-time becomes needed (e.g., live spectator interaction), revisit with SignalR.
 - **Card-authoring DX.** The CCGNF syntax is designer-centric. A card-authoring front-end (spreadsheet, GUI form) that emits CCGNF is plausible post-launch. Out of scope here.
 
 ---
