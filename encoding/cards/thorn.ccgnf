@@ -54,11 +54,12 @@ Card Thicketwarden {
     Static(
       modifies: Characteristic(self, force, layer: 2),
       check_at: continuously,
-      rule: If(Count({u : u.arena == self.arena
-                        ∧ u.controller == self.controller
-                        ∧ u.type == Unit}) >= 3,
-               add(+2),
-               no change))
+      rule: If(Count(Filter(AllUnits,
+                            u -> u.arena == self.arena
+                               ∧ u.controller == self.controller
+                               ∧ u.type == Unit)) >= 3,
+               AddToCharacteristic(self, force, 2),
+               NoOp))
   ]
   // text: While there are 3+ friendly Units in this Arena, this Unit has +2 Force.
 }
@@ -125,9 +126,7 @@ Card Myrrhan_KeeperOfGrowth {
       When(Peak(THORN),
         ForEach(a -> a.kind == Arena
                    ∧ not collapsed_for(self.controller, a)
-                   ∧ exists u: u.arena == a
-                             ∧ u.controller == self.controller
-                             ∧ u.type == Unit,
+                   ∧ ArenaHasFriendlyUnit(a, self.controller),
           ForEach(i ∈ [1..2],
             CreateToken(template:   ThornSapling,
                         zone:       a,

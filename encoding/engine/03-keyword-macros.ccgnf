@@ -10,7 +10,7 @@
 
 // Surge: this card costs 1 less if another EMBER Echo was Pushed this turn.
 // Check at cost_computation (play protocol step 2).
-define Keyword.Surge() =
+define Keyword_Surge() =
   Static(
     modifies: Characteristic(self, effective_cost),
     check_at: cost_computation,
@@ -20,13 +20,13 @@ define Keyword.Surge() =
           else no change)
 
 // Blitz: ignores Deployment Sickness on the turn it is deployed.
-define Keyword.Blitz() =
+define Keyword_Blitz() =
   Static(
     modifies: DeploymentSickness(self),
     rule: never_applies)
 
 // Ignite X: start-of-turn damage to opposing Units with low Ramparts in this Arena.
-define Keyword.Ignite(X) =
+define Keyword_Ignite(X) =
   StartOfYourTurn(
     ForEach(
       u -> u.arena == self.arena
@@ -40,7 +40,7 @@ define Keyword.Ignite(X) =
 
 // Fortify X: +X Ramparts while controller's Conduit in this Arena has >= 4 Integrity.
 // Suppresses (not destroys) when Conduit drops below 4; returns if healed back.
-define Keyword.Fortify(X) =
+define Keyword_Fortify(X) =
   Static(
     modifies: Characteristic(self, ramparts, layer: 2),
     rule: if (self.controller.Conduit(self.arena).integrity >= 4)
@@ -49,7 +49,7 @@ define Keyword.Fortify(X) =
 
 // Mend X: on entering play, heal the Conduit in this Arena by X (capped at starting).
 // Fizzles if Arena is Collapsed for controller.
-define Keyword.Mend(X) =
+define Keyword_Mend(X) =
   OnEnter(
     If(self.controller.Conduit(self.arena) exists
        ∧ not collapsed_for(self.controller, self.arena),
@@ -58,7 +58,7 @@ define Keyword.Mend(X) =
 
 // Sentinel: this Unit contributes 0 Force to Projected Force; its Force is
 // instead added to controller's Fortification in this Arena.
-define Keyword.Sentinel() =
+define Keyword_Sentinel() =
   Static(
     modifies: ClashContribution(self),
     rule: { projected_force: 0, fortification_bonus: self.force })
@@ -68,7 +68,7 @@ define Keyword.Sentinel() =
 // -----------------------------------------------------------------------------
 
 // Drift: optional move to an adjacent non-collapsed Arena at end of your turn.
-define Keyword.Drift() =
+define Keyword_Drift() =
   EndOfYourTurn(
     Choice(self.controller, {
       pass:  NoOp,
@@ -80,7 +80,7 @@ define Keyword.Drift() =
 // Recur: replaces destroy-to-Cache with destroy-to-bottom-of-Arsenal.
 // Does not fire if destruction is prevented or redirected to exile.
 // Per R-1, this also fires on conduit_collapse destruction events.
-define Keyword.Recur() =
+define Keyword_Recur() =
   Replacement(
     on:           Event.Destroy(target=self, destination: self.owner.Cache),
     replace_with: MoveTo(self, bottom_of(self.owner.Arsenal)))
@@ -103,7 +103,7 @@ define Reshape(n) =
 // -----------------------------------------------------------------------------
 
 // Rally: triggers when another friendly Unit enters this Unit's Arena.
-define Keyword.Rally() =
+define Keyword_Rally() =
   OnArenaEnter(
     filter: u -> u.type == Unit ∧ u.controller == self.controller,
     effect: ModifyCharacteristic(self, force, +1, duration: end_of_turn, layer: 2))
@@ -111,7 +111,7 @@ define Keyword.Rally() =
 // Sprawl X: create X 1/1 Sapling tokens in self.arena. Tokens do not Push.
 // Per R-3, when invoked from a card without an intrinsic arena (Maneuver),
 // the card-level invocation supplies the target arena explicitly.
-define Keyword.Sprawl(X) =
+define Keyword_Sprawl(X) =
   ForEach(i ∈ [1..X],
     CreateToken(
       template:   ThornSapling,
@@ -121,7 +121,7 @@ define Keyword.Sprawl(X) =
 
 // Kindle (on Standards only): counter accumulation with fire-and-reset at 3.
 // The on-fire effect is supplied per-card via Kindle(effect: ...).
-define Keyword.Kindle(effect_on_fire) =
+define Keyword_Kindle(effect_on_fire) =
   Sequence([
     StartOfYourTurn(IncCounter(self, kindle, 1)),
     Static(
@@ -142,7 +142,7 @@ define Keyword.Kindle(effect_on_fire) =
 // contributes 0 Force AND 0 Fortification this Clash, returns to hand at
 // End of Clash, and its base cost is permanently reduced by 1 (min 0,
 // persistent across zones).
-define Keyword.Phantom() =
+define Keyword_Phantom() =
   StartOfClash(
     Choice(self.controller, {
       pass: NoOp,
@@ -159,7 +159,7 @@ define Keyword.Phantom() =
 
 // Shroud: cannot be the chosen target of opposing effects; sweepers and
 // self-targeted effects are unaffected.
-define Keyword.Shroud() =
+define Keyword_Shroud() =
   Static(
     modifies: TargetLegality(self),
     rule: if (targeting_ability.controller != self.controller
@@ -174,7 +174,7 @@ define Pilfer(X) =
     RevealHand(opponent_of(self.controller)),
     Target(
       selector: cards -> cards ⊆ opponent_of(self.controller).Hand
-                       ∧ |cards| <= X,
+                       ∧ Count(cards) <= X,
       chooser:  self.controller,
       effect:   ForEach(c ∈ target_cards,
                   MoveTo(c, bottom_of(opponent_of(self.controller).Arsenal),
@@ -189,7 +189,7 @@ define Pilfer(X) =
 // Cleared at the start of controller's next Rise phase. Suppressed by Blitz.
 // Read by the Clash resolution (engine/09-clash.ccgnf) to force
 // projected_force to 0.
-define Keyword.DeploymentSickness() =
+define Keyword_DeploymentSickness() =
   Sequence([
     Triggered(
       on:     Event.EnterPlay(target=self),
@@ -203,7 +203,7 @@ define Keyword.DeploymentSickness() =
 // Interrupt: marks a Maneuver playable on either player's turn during
 // Channel, in response to a declared card or trigger, before it resolves.
 // Debt accrual handled by the play protocol (engine/08-play.ccgnf).
-define Keyword.Interrupt() =
+define Keyword_Interrupt() =
   Static(
     modifies: PlayWindows(self),
     rule: { opponent_turn_channel: allowed,
@@ -211,7 +211,7 @@ define Keyword.Interrupt() =
 
 // Unique: controller may have only one Entity with this name-key.
 // Duplicate entering play is sent to Cache immediately.
-define Keyword.Unique() =
+define Keyword_Unique() =
   Replacement(
     on:           Event.EnterPlay(target=self),
     guard:        exists other: other.name == self.name

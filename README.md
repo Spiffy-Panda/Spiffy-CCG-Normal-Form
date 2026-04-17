@@ -52,7 +52,7 @@ CCGNF is pre-alpha. The preprocessor and parser pipeline is live; higher-layer s
 | CCGNF engine — interpreter                 | Not started                   |
 | E2E grammar coverage fixture               | **Complete**; parses clean    |
 | Resonance rules (design docs)              | **Complete**                  |
-| Resonance CCGNF encoding                   | **Complete**; some files contain informal syntax that the v1 parser does not yet accept (tracked for cleanup) |
+| Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — runs preprocess + parse on .ccgnf files |
 | REST host (`Ccgnf.Rest`)                   | Specified; not scaffolded     |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |

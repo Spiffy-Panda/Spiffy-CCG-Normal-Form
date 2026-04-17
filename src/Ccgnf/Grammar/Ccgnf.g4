@@ -27,7 +27,7 @@ declaration
     ;
 
 entityDecl
-    : ENTITY name (LBRACK name RBRACK)? forClause? block
+    : ENTITY name (LBRACK name (COMMA name)* RBRACK)? forClause? block
     ;
 
 cardDecl
@@ -39,8 +39,14 @@ tokenDecl
     ;
 
 // e.g., CoverageGame.abilities += Triggered(...)
+// or  Arena[pos].derived += { ... }
 entityAugment
-    : qualifiedName PLUS_EQ expr
+    : targetPath PLUS_EQ expr
+    ;
+
+// Dotted path optionally indexed at each segment.
+targetPath
+    : name (LBRACK expr RBRACK)? (DOT name (LBRACK expr RBRACK)?)+
     ;
 
 forClause
@@ -78,10 +84,6 @@ typedExpr
     : name EQ expr
     ;
 
-qualifiedName
-    : name (DOT name)+
-    ;
-
 // ---------- Expressions ----------
 
 expr
@@ -101,9 +103,9 @@ postfixExpr
     ;
 
 trailer
-    : DOT name                           # TrailerMember
-    | LBRACK expr RBRACK                 # TrailerIndex
-    | LPAREN argList? RPAREN             # TrailerCall
+    : DOT name                               # TrailerMember
+    | LBRACK expr (COMMA expr)* RBRACK       # TrailerIndex
+    | LPAREN argList? RPAREN                 # TrailerCall
     ;
 
 atom

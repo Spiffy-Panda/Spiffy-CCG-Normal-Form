@@ -15,17 +15,17 @@ Unit.derived += {
   // Force contributed to Projected Force at Clash.
   clash_projected_force: int =
     Cond([
-      (self has Phantoming,                                        0),
-      (self has DeploymentSickness ∧ not has_keyword(self, Blitz), 0),
-      (self has Sentinel,                                          0),
+      (HasState(self, Phantoming),                                        0),
+      (HasState(self, DeploymentSickness) ∧ not has_keyword(self, Blitz), 0),
+      (HasState(self, Sentinel),                                          0),
       (Default,                                                    self.force)
     ]),
 
   // Contribution to Fortification at Clash.
   clash_fortification: int =
     Cond([
-      (self has Phantoming, 0),
-      (self has Sentinel,   self.force + self.current_ramparts),
+      (HasState(self, Phantoming), 0),
+      (HasState(self, Sentinel),   self.force + self.current_ramparts),
       (Default,             self.current_ramparts)
     ])
 }

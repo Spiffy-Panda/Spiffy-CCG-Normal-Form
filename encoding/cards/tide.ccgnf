@@ -46,9 +46,9 @@ Card Harborkeeper {
       on:    Event.EnterPlay(target=u),
       guard: u.controller == self.controller
            ∧ u.type == Unit
-           ∧ u.intended_arena is collapsed_for(self.controller)
-           ∧ exists a ∈ adjacent(u.intended_arena)
-                with not collapsed_for(self.controller, a),
+           ∧ collapsed_for(self.controller, u.intended_arena)
+           ∧ AnyMatch(a ∈ adjacent(u.intended_arena),
+                      not collapsed_for(self.controller, a)),
       replace_with:
         Target(a -> a ∈ adjacent(u.intended_arena)
                   ∧ not collapsed_for(self.controller, a),
@@ -78,7 +78,8 @@ Card Undertow {
             ForEach(u -> u.arena == target,
               Target(dir -> dir ∈ {left, right},
                 chooser: self.controller,
-                effect:  If(exists neighbor = shift(u.arena, dir),
+                effect:  let neighbor = shift(u.arena, dir) in
+                         If(Exists(neighbor),
                             MoveUnitToArena(u, neighbor),
                             NoOp))))
         ])))

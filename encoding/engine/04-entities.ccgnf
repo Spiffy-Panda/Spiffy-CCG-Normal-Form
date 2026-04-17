@@ -48,8 +48,14 @@ Entity Player[i] for i ∈ {1, 2} {
     pushes_this_turn:  []   // list of {card, factions}; cleared at Fall
   }
   derived: {
-    banner: mode(
-      { e.factions | e ∈ self.ResonanceField ∧ e.factions ≠ {NEUTRAL} },
+    // Dominant faction in the Resonance Field, ignoring Neutral Echoes.
+    // Tie-breaking: most-recent Echo among the tied factions.
+    // Undefined when the Field is empty or Neutral-only.
+    banner: Mode(
+      source:         Map(
+                        Filter(self.ResonanceField,
+                               e -> e.factions != {NEUTRAL}),
+                        e -> e.factions),
       tiebreak:       most_recent,
       undefined_when: empty)
   }
@@ -84,16 +90,18 @@ Entity Conduit[owner, arena] {
 Entity PlayBinding {
   kind: PlayBinding
   lifetime: ephemeral
+  // Fields are declared with their initial values. Runtime types are inferred
+  // from assignment sites; the validator may later surface type diagnostics.
   characteristics: {
-    player:                Player,
-    card:                  Card,
-    targets:               List,
-    arena:                 Arena | None,
-    play_source:           {from_hand, from_copy, from_replay},
-    effective_cost:        int | Unbound,
-    tier_snapshot:         TierSnapshot | Unbound,
-    resolved:              bool = false,
-    countered:             bool = false,
-    push_faction_override: Factions | None = None
+    player:                None,
+    card:                  None,
+    targets:               [],
+    arena:                 None,
+    play_source:           from_hand,
+    effective_cost:        Unbound,
+    tier_snapshot:         Unbound,
+    resolved:              false,
+    countered:             false,
+    push_faction_override: None
   }
 }

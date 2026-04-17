@@ -51,7 +51,8 @@ Card Pyrebrand {
     Static(
       modifies: KeywordParameter(self, Ignite),
       check_at: continuously,
-      rule: If(Resonance(EMBER, 3), set X = 2, leave X = 1))
+      rule: SetKeywordParameter(self, Ignite,
+                                If(Resonance(EMBER, 3), 2, 1)))
   ]
   // text: Blitz. Ignite 1. EMBER 3: Ignite 2 while this is in play.
 }
@@ -82,7 +83,7 @@ Card ChoirOfTheBlaze {
              ∧ u.type == Unit,
           DealDamage(u, 1)),
         When(Resonance(EMBER, 4),
-          If(Conduit[other_player(self.controller), self.arena] exists
+          If(Exists(Conduit[other_player(self.controller), self.arena])
              ∧ not collapsed_for(other_player(self.controller), self.arena),
              DealDamage(Conduit[other_player(self.controller), self.arena], 1),
              NoOp),

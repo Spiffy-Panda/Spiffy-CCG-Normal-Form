@@ -344,7 +344,8 @@ public sealed class Preprocessor
         {
             var t = source[i];
 
-            if (t.Kind == PpTokenKind.Ident && macros.TryGet(t.Text, out var macro))
+            if (t.Kind == PpTokenKind.Ident && macros.TryGet(t.Text, out var macro) &&
+                !IsInLabelPosition(source, i))
             {
                 if (expansionStack.Contains(macro.Name))
                 {
@@ -445,6 +446,11 @@ public sealed class Preprocessor
     /// token lists, and reposition the resulting tokens so their SourcePosition
     /// reflects the invocation site (not the define site). This keeps
     /// diagnostics anchored where the author is working.
+    ///
+    /// An identifier that is immediately followed by `:` (i.e., used as a named-
+    /// argument label or field key) is NOT substituted. This preserves label
+    /// text across macro expansion even when the label name collides with a
+    /// parameter name.
     /// </summary>
     private static List<PpToken> SubstituteAndReposition(
         IReadOnlyList<PpToken> body,
@@ -452,9 +458,12 @@ public sealed class Preprocessor
         SourcePosition callerPos)
     {
         var result = new List<PpToken>();
-        foreach (var t in body)
+        for (int idx = 0; idx < body.Count; idx++)
         {
-            if (t.Kind == PpTokenKind.Ident && subs.TryGetValue(t.Text, out var replacement))
+            var t = body[idx];
+            if (t.Kind == PpTokenKind.Ident
+                && subs.TryGetValue(t.Text, out var replacement)
+                && !IsInLabelPosition(body, idx))
             {
                 foreach (var r in replacement)
                 {
@@ -467,6 +476,26 @@ public sealed class Preprocessor
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Returns true when the identifier at tokens[i] is immediately followed by
+    /// `:` (allowing intervening whitespace/comments). Such identifiers are
+    /// label positions — named-arg keys, field names, switch-case keys — and
+    /// must not be macro-expanded or parameter-substituted.
+    /// </summary>
+    private static bool IsInLabelPosition(IReadOnlyList<PpToken> tokens, int i)
+    {
+        for (int j = i + 1; j < tokens.Count; j++)
+        {
+            var k = tokens[j].Kind;
+            if (IsTrivia(k)) continue;
+            // A colon after this identifier marks it as a label.
+            // Other characters (operators, parens) mean it's a value.
+            if (tokens[j].Text == ":" && k == PpTokenKind.Other) return true;
+            return false;
+        }
+        return false;
     }
 
     private static List<PpToken> TrimTrivia(List<PpToken> tokens)

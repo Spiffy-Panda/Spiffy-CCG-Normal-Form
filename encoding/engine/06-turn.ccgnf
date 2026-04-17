@@ -21,7 +21,7 @@ Game.abilities += Triggered(
       ClearCounter(a, used_this_turn)),
 
     // Draw; empty Arsenal => lose.
-    If(|p.Arsenal| == 0,
+    If(Count(p.Arsenal) == 0,
        EmitEvent(Event.Lose(player=p, reason: "deck_out")),
        Draw(p, 1)),
 

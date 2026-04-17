@@ -56,16 +56,16 @@ define MulliganPhase =
 
 define PerformMulligan(p) = Sequence([
   Target(
-    selector: cards -> cards ⊆ p.Hand ∧ |cards| >= 1,
+    selector: cards -> cards ⊆ p.Hand ∧ Count(cards) >= 1,
     chooser:  p,
     bind:     returned_cards),
   Target(
     selector: ordering -> IsPermutationOf(ordering, returned_cards),
     chooser:  p,
     bind:     bottom_order,
-    effect:   ForEach(c ∈ bottom_order in index_order,
+    effect:   ForEach(c ∈ bottom_order,
                 MoveTo(c, bottom_of(p.Arsenal)))),
-  Draw(p, amount: Max(0, |returned_cards| - 1))
+  Draw(p, amount: Max(0, Count(returned_cards) - 1))
 ])
 
 define StartFirstRound = Sequence([

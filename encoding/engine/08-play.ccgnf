@@ -15,7 +15,9 @@
 
 Player.abilities += Activated(
   name:  "PlayCard",
-  args:  { c: Card, targets: List, arena: Arena | None },
+  // Parameters: c = the Card to play; targets = list of Target values;
+  // arena = destination Arena (Unit) or None (Maneuver/player Standard).
+  args:  { c, targets, arena },
   guard: And([
     c ∈ self.Hand,
     Or([
@@ -171,8 +173,8 @@ Game.abilities += Triggered(
     If(ShouldPush(b),
        Sequence([
          PushEchoTo(
-           player:   b.player,
-           factions: Coalesce(b.push_faction_override, b.card.factions)),
+           b.player,
+           Coalesce(b.push_faction_override, b.card.factions)),
          Append(b.player.pushes_this_turn,
            { card:     b.card,
              factions: Coalesce(b.push_faction_override, b.card.factions) })
