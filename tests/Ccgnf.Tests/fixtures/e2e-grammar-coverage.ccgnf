@@ -1,0 +1,370 @@
+// =============================================================================
+// CCGNF — End-to-End Grammar Coverage Fixture
+// =============================================================================
+// This fixture exercises every grammar primitive documented in
+// grammar/GrammarSpec.md. It is NOT a playable game; it is a syntactic
+// reference. When the grammar engine exists, this file must:
+//   1. Pass preprocessor macro expansion.
+//   2. Parse cleanly (zero parser errors).
+//   3. Pass validator semantic checks (zero errors; warnings acceptable).
+//
+// Any change to the grammar that breaks this file is a breaking change and
+// must be explicitly called out in the commit message.
+//
+// Organization: one construct per labeled section.
+
+// -----------------------------------------------------------------------------
+// §A — Comments
+// -----------------------------------------------------------------------------
+// Single-line comments use //
+/* Block comments
+   span multiple
+   lines. */
+
+// -----------------------------------------------------------------------------
+// §B — Macro definitions
+// -----------------------------------------------------------------------------
+
+// B.1 Zero-arg macro
+define ConstantZero = 0
+
+// B.2 Single-arg macro
+define Identity(x) = x
+
+// B.3 Multi-arg macro
+define Sum2(a, b) = a + b
+
+// B.4 Multi-line body, Sequence form
+define TwoStepEffect(target, amount) =
+  Sequence([
+    DealDamage(target, amount),
+    EmitEvent(Event.HitLanded(target: target, amount: amount))
+  ])
+
+// B.5 Macro invoking another macro (recursive expansion).
+define DoubleHit(t, a) = TwoStepEffect(t, Sum2(a, a))
+
+// B.6 Macro returning a predicate (lambda body).
+define IsSmallUnit = u -> u.type == Unit ∧ u.force <= 2
+
+// -----------------------------------------------------------------------------
+// §C — Entity declarations
+// -----------------------------------------------------------------------------
+
+// C.1 Simple entity with every field-value shape.
+Entity CoverageGame {
+  kind: Game
+  characteristics: {
+    int_positive:    42,
+    int_negative:    -5,
+    int_zero:        0,
+    string_literal:  "a string",
+    bool_true:       true,
+    bool_false:      false,
+    none_literal:    None,
+    unbound_literal: Unbound,
+    default_literal: Default,
+    noop_literal:    NoOp,
+    set_empty:       {},
+    set_one:         {1},
+    set_many:        {1, 2, 3},
+    list_empty:      [],
+    list_one:        [10],
+    list_many:       [1, 2, 3, 4, 5],
+    list_of_strings: ["alpha", "beta", "gamma"]
+  }
+  counters: {
+    tick:       0,
+    accumulator: 100
+  }
+  zones: {
+    PublicDeck: Zone(capacity: 60, order: sequential, visibility: public),
+    PrivateHand: Zone(capacity: 10, order: unordered,
+                      visibility: private_to_owner,
+                      on_overflow: EvictOldest)
+  }
+  derived: {
+    // Derived uses a typed name = expression form.
+    is_active: bool = self.counters.tick > 0,
+    doubled:   int  = self.counters.accumulator * 2
+  }
+  abilities: []
+}
+
+// C.2 Parameterized entity (indexed by a typed parameter).
+Entity Slot[pos] for pos ∈ {Left, Center, Right} {
+  kind: Slot
+  characteristics: { position: pos, capacity: 4 }
+  state_flags: { occupied: false, locked: false }
+  abilities: []
+}
+
+// -----------------------------------------------------------------------------
+// §D — Card declaration (covers every ability kind)
+// -----------------------------------------------------------------------------
+
+Card CoverageCard {
+  factions: {TEST}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: C
+  unique: false
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    // D.1 Static — continuously-checked modifier.
+    Static(
+      modifies: Characteristic(self, ramparts, layer: 2),
+      check_at: continuously,
+      rule: If(self.counters.charge > 0, add(+1), no change)),
+
+    // D.2 Triggered — event-sourced.
+    Triggered(
+      on:       Event.EnterPlay(target=self),
+      check_at: event_emission,
+      apply_at: after_event,
+      effect:   SetCounter(self, charge, 1)),
+
+    // D.3 OnResolve — step-5 apply.
+    OnResolve(DealDamage(self, 0)),
+
+    // D.4 Replacement — intercepts a pending event.
+    Replacement(
+      on:           Event.Destroy(target=self),
+      guard:        self.counters.charge > 0,
+      replace_with: Sequence([
+        ClearCounter(self, charge),
+        MoveTo(self, self.owner.Cache)
+      ])),
+
+    // D.5 Activated — player-initiated ability.
+    Activated(
+      name:  "BurnCharge",
+      args:  { targetUnit: Unit },
+      guard: self.counters.charge >= 1 ∧ targetUnit.type == Unit,
+      cost:  PayAether(self.controller, 1),
+      effect: Sequence([
+        IncCounter(self, charge, -1),
+        DealDamage(targetUnit, 2)
+      ]))
+  ]
+  // text: Covers all five ability kinds on a single Card.
+}
+
+// -----------------------------------------------------------------------------
+// §E — Token declaration
+// -----------------------------------------------------------------------------
+
+Token CoverageToken {
+  characteristics: {
+    name:     "Coverage Token",
+    cost:     0,
+    type:     Unit,
+    factions: {TEST},
+    force:    1,
+    ramparts: 1,
+    rarity:   Token
+  }
+  keywords: []
+  pushes_echo: false
+  abilities: []
+}
+
+// -----------------------------------------------------------------------------
+// §F — Entity augmentation
+// -----------------------------------------------------------------------------
+
+CoverageGame.abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: NoOp)
+
+CoverageGame.abilities += Triggered(
+  on:     Event.PhaseBegin(phase: Rise),
+  effect: EmitEvent(Event.RiseObserved))
+
+// -----------------------------------------------------------------------------
+// §G — Expression-zoo macro (every combinator + every atomic op)
+// -----------------------------------------------------------------------------
+
+define ExpressionZoo() = Sequence([
+  // G.1 Atomic ops covering every builtin described in common/03-combinators.
+  DealDamage(self, 1),
+  Heal(self, 2, cap: 10),
+  Draw(self.controller, 1),
+  Mill(self.controller, 2),
+  MoveTo(self, self.owner.Cache),
+  PayAether(self.controller, 3),
+  SetState(self, Staggered, duration: until_end_of_turn),
+  ClearState(self, Staggered),
+  IncCounter(self, charge, 1),
+  SetCounter(self, charge, 5),
+  ClearCounter(self, charge),
+  SetCharacteristic(self, force, 4),
+  SetFlag(self, visible, true),
+  CreateToken(
+    template:   CoverageToken,
+    zone:       CoverageGame.PublicDeck,
+    owner:      self.controller,
+    controller: self.controller),
+  InstantiateEntity(
+    kind:  CoverageToken,
+    owner: self.controller),
+  DestroyEntity(self),
+  EmitEvent(Event.ZooRan(source: self)),
+  ScheduleAt(end_of_turn, NoOp),
+  Guard(predicate: true, on_fail: NoOp),
+  NoOp,
+
+  // G.2 Sequencing combinators.
+  Sequence([NoOp, NoOp, NoOp]),
+  Repeat(3, NoOp),
+
+  // G.3 Iteration combinators.
+  ForEach(i ∈ [1..5], NoOp),
+  ForEach(x -> x.type == Unit, NoOp),
+  ForEach((a, b) ∈ {1, 2} × {3, 4}, NoOp),
+
+  // G.4 Conditional combinators.
+  If(true, NoOp, NoOp),
+  When(self.counters.charge > 0, NoOp,
+       check_at: continuously, apply_at: immediate),
+  Cond([
+    (self.counters.charge > 5, NoOp),
+    (self.counters.charge > 0, NoOp),
+    (Default,                  NoOp)
+  ]),
+  Switch(self.kind, {
+    CoverageToken: NoOp,
+    Default:       NoOp
+  }),
+
+  // G.5 Interactive combinators.
+  Choice(chooser: self.controller, options: {
+    a: NoOp,
+    b: NoOp
+  }),
+  Target(
+    selector: u -> u.type == Unit ∧ u.cost <= 3,
+    chooser:  self.controller,
+    effect:   DealDamage(target, 1)),
+  Target(
+    selector: u -> u.type == Unit,
+    chooser:  self.controller,
+    bind:     picked,
+    effect:   DealDamage(picked, 2))
+])
+
+// -----------------------------------------------------------------------------
+// §H — Let-in expression
+// -----------------------------------------------------------------------------
+
+define ThresholdedDamage(target) =
+  let high = 5 in
+  let low  = 2 in
+  If(self.counters.charge >= high,
+     DealDamage(target, 3),
+     If(self.counters.charge >= low,
+        DealDamage(target, 2),
+        DealDamage(target, 1)))
+
+// -----------------------------------------------------------------------------
+// §I — Operators (binary, unary, Unicode + ASCII forms)
+// -----------------------------------------------------------------------------
+
+// I.1 Arithmetic + grouping.
+define Arithmetic(a, b) =
+  ((a + b) * 2 - (a - b) / 2)
+
+// I.2 Comparisons.
+define Comparisons(a, b) =
+  a == b ∧ a != b ∧ a < b ∧ a > b ∧ a <= b ∧ a >= b
+
+// I.3 Unicode logical operators.
+define LogicUnicode(p, q) =
+  (p ∧ q) ∨ (¬ p ∧ ¬ q)
+
+// I.4 ASCII logical operators (equivalent to I.3).
+define LogicAscii(p, q) =
+  (p and q) or (not p and not q)
+
+// I.5 Set membership, both forms.
+define SetOpsUnicode(x, s, t) = (x ∈ s) ∧ (s ⊆ t)
+define SetOpsAscii(x, s)      = (x in s)
+
+// I.6 Cartesian product in ForEach form (see G.3).
+
+// -----------------------------------------------------------------------------
+// §J — Lambda forms
+// -----------------------------------------------------------------------------
+
+// J.1 Single-param.
+define LambdaSingle = x -> x > 0
+
+// J.2 Multi-param.
+define LambdaMulti  = (x, y) -> x + y > 10
+
+// -----------------------------------------------------------------------------
+// §K — Qualified names, indexing, postfix chains
+// -----------------------------------------------------------------------------
+
+// K.1 Dotted qualified name.
+define DeepRead() = self.controller.zones.PrivateHand
+
+// K.2 Indexed access.
+define IndexedRead() = Slot[Center].characteristics.position
+
+// K.3 Mixed chain: qualified + index + call.
+define Chain() = CoverageGame.counters.tick + 1
+
+// -----------------------------------------------------------------------------
+// §L — Named vs positional arguments
+// -----------------------------------------------------------------------------
+
+define Positional() = DealDamage(self, 3)
+define Named()      = DealDamage(target: self, amount: 3)
+define Mixed()      = CreateToken(
+                         CoverageToken,                        // positional template
+                         zone:       CoverageGame.PublicDeck,  // named zone
+                         owner:      self.controller,          // named owner
+                         controller: self.controller)          // named controller
+
+// -----------------------------------------------------------------------------
+// §M — Invoking ExpressionZoo from an entity augmentation
+// -----------------------------------------------------------------------------
+// This ensures the parser accepts a macro invocation at an expression position
+// inside an entity-augment RHS.
+
+CoverageGame.abilities += Triggered(
+  on:     Event.ZooRequested,
+  effect: ExpressionZoo())
+
+// -----------------------------------------------------------------------------
+// §N — Primitive-by-primitive checklist (for the Validator to cross-check)
+// -----------------------------------------------------------------------------
+// Entity      : §C, §E
+// Zone        : §C.1 (inside `zones:`)
+// Event       : §D.2, §D.4, §F, §G.1, §M  (EnterPlay, Destroy, PhaseBegin,
+//                                            ZooRan, RiseObserved, ZooRequested)
+// Effect
+//   atomic    : §G.1
+//   combinator: §G.2 .. §G.5, §H
+// Ability
+//   Static    : §D.1, §F
+//   Triggered : §D.2, §F, §M
+//   OnResolve : §D.3
+//   Replacement: §D.4
+//   Activated : §D.5
+// Predicate/Selector : §B.6, §G.5, §J
+// Declarations
+//   Entity    : §C.1, §C.2
+//   Card      : §D
+//   Token     : §E
+//   Macro     : §B.1..§B.6, §G, §H, §I, §J, §K, §L
+//   Augment   : §F, §M
+// Expression forms
+//   literals  : §C.1 characteristics block
+//   operators : §I
+//   lambdas   : §J
+//   qualified : §K.1
+//   indexed   : §K.2
+//   calls     : §L
+//
+// If any of the above is missing after a grammar change, this fixture is
+// incomplete and must be extended.

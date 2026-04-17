@@ -12,6 +12,13 @@
 
 **Conduit** is a prior iteration of this project's design that we have since abandoned in favor of Resonance. Its docs (`RULES.md`, `CARDS.md`, `FACTIONS.md`, `7thColorChatLog.md`) live under `legacy/conduit/`. Do not assume Conduit terminology or mechanics when answering questions about "the card game." If a user asks about Conduit by name, the files are there; otherwise treat them as archival only.
 
+## Build conventions
+
+- **Canonical build definition: SDK-style `.csproj` files.** All C# project metadata lives in these. Do not introduce legacy `.csproj` schemas, `packages.config`, or out-of-SDK build logic.
+- **Primary developer interface: `Makefile` at repo root.** Wraps `dotnet` CLI commands (`make build`, `make test`, `make clean`, etc.). Agents and humans should prefer `make <target>` over raw `dotnet` invocations so CI and local dev stay in sync.
+- **Linux is the first-class build target.** GitHub Actions runs Ubuntu. Developers on other platforms may use Linux under WSL or a VM; keeping Linux-green is non-negotiable.
+- **Visual Studio compatibility is a secondary convenience.** A `.sln` file is maintained so VS/Rider can open the project, but Visual Studio is not the build authority. CI never invokes `msbuild` directly.
+
 ## Toolchain
 
 ### Cardgame Normal Form Grammar Engine: ANTLR 4.13.2, C# target via the Antlr4.Runtime.Standard 4.13.1 NuGet package

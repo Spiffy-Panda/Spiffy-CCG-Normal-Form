@@ -10,6 +10,9 @@ desktop.ini
 *.swo
 *~
 
+# Claude Code local settings (user-specific; not shared)
+.claude/settings.local.json
+
 # Godot (added preemptively since parent is GodotProj)
 .godot/
 .import/
@@ -21,3 +24,66 @@ export_presets.cfg
 *.log
 tmp/
 scratch/
+
+# -----------------------------------------------------------------------------
+# .NET build artifacts
+# -----------------------------------------------------------------------------
+bin/
+obj/
+out/
+build/
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+*.pidb
+*.svclog
+*.scc
+*.pdb
+*.dll.config
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
+packages/
+!packages/build/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# -----------------------------------------------------------------------------
+# Test artifacts
+# -----------------------------------------------------------------------------
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage.*.xml
+coverage.*.json
+coverage.*.info
+BenchmarkDotNet.Artifacts/
+
+# -----------------------------------------------------------------------------
+# IDE metadata we don't want tracked
+# -----------------------------------------------------------------------------
+.vs/
+*.rsuser
+*.sublime-workspace
+*.sublime-project
+.fleet/
+
+# -----------------------------------------------------------------------------
+# CCGNF grammar engine — generated and intermediate outputs (future)
+#
+# The grammar is implemented via ANTLR code generation; generated C# sources
+# land under src/Ccgnf/generated/ (gitignored, regenerated per build). The
+# preprocessor and validator produce per-file intermediates; these go to
+# *.ccgnf.expanded siblings or into .ccgnf-cache/.
+# -----------------------------------------------------------------------------
+src/Ccgnf/generated/
+src/Ccgnf/Generated/
+**/generated/antlr/
+*.ccgnf.expanded
+*.ccgnf.validated
+.ccgnf-cache/
