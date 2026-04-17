@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 
 var minLevel = LogLevel.Information;
 var files = new List<string>();
+var dumpPp = false;
 
 for (int i = 0; i < args.Length; i++)
 {
@@ -24,6 +25,11 @@ for (int i = 0; i < args.Length; i++)
     {
         PrintHelp();
         return 0;
+    }
+    if (a == "--dump-pp")
+    {
+        dumpPp = true;
+        continue;
     }
     if (a == "--log-level")
     {
@@ -85,6 +91,13 @@ foreach (var file in files)
     log.LogInformation("Preprocessing {File} ({Length} chars)", file, text.Length);
     var ppResult = preprocessor.Preprocess(source);
     ReportDiagnostics(ppResult.Diagnostics);
+
+    if (dumpPp)
+    {
+        var dumpPath = file + ".expanded";
+        File.WriteAllText(dumpPath, ppResult.ExpandedText);
+        log.LogInformation("Wrote expanded output to {DumpPath}", dumpPath);
+    }
 
     if (ppResult.HasErrors)
     {

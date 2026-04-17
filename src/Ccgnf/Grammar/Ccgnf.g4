@@ -44,9 +44,14 @@ entityAugment
     : targetPath PLUS_EQ expr
     ;
 
-// Dotted path optionally indexed at each segment.
+// Dotted path optionally indexed at each segment. Indexing accepts one or
+// more comma-separated index expressions to match the `trailer` rule.
 targetPath
-    : name (LBRACK expr RBRACK)? (DOT name (LBRACK expr RBRACK)?)+
+    : name indexSuffix? (DOT name indexSuffix?)+
+    ;
+
+indexSuffix
+    : LBRACK expr (COMMA expr)* RBRACK
     ;
 
 forClause
@@ -68,9 +73,10 @@ field
     : fieldKey COLON fieldValue COMMA?
     ;
 
-// Key may optionally be indexed (e.g., collapsed_for[Player1]).
+// Key may optionally be indexed (e.g., collapsed_for[Player1] or
+// collapsed_for[Player1, Player2]).
 fieldKey
-    : name (LBRACK expr RBRACK)?
+    : name indexSuffix?
     ;
 
 fieldValue

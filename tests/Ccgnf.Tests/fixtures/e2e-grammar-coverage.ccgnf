@@ -20,6 +20,9 @@
 /* Block comments
    span multiple
    lines. */
+/**/              // empty block comment
+/* single-line block comment */
+/* Block comment containing // does not start a line comment inside it. */
 
 // -----------------------------------------------------------------------------
 // §B — Macro definitions
@@ -336,6 +339,64 @@ CoverageGame.abilities += Triggered(
   effect: ExpressionZoo())
 
 // -----------------------------------------------------------------------------
+// §M2 — Grammar extensions added after v1 landing
+// -----------------------------------------------------------------------------
+// Constructs below were added to the grammar once the first encoding sweep
+// demanded them. They are exercised here so regressions fail the E2E test.
+
+// M2.1 Entity with multi-parameter indexing.
+Entity Link[owner, slot] for owner ∈ {Player1, Player2} {
+  kind: Link
+  characteristics: { owner: owner, slot: slot }
+  abilities: []
+}
+
+// M2.2 Indexed target-path on the LHS of an entity augment.
+Link[Player1, 0].abilities += Static(
+  modifies: BoardState,
+  check_at: continuously,
+  rule: NoOp)
+
+// M2.3 Multi-argument indexing trailer on an expression.
+CoverageGame.abilities += Triggered(
+  on:     Event.LookupRequested,
+  effect: DealDamage(Link[Player1, 0], 1))
+
+// M2.4 Indexed field key inside a block (e.g., `collapsed_for[Player1]: false`).
+Entity FlagsExample {
+  kind: FlagsExample
+  state_flags: {
+    collapsed_for[Player1]: false,
+    collapsed_for[Player2]: false
+  }
+  abilities: []
+}
+
+// M2.5 Unary plus on a literal.
+define SignedPlus = +1
+
+// M2.6 Block comments in expression position. The parser must treat these as
+// whitespace; the preprocessor must preserve surrounding tokens unchanged.
+CoverageGame.abilities += Triggered(
+  on:     Event.BlockCommentInMiddle,
+  /* comment between fields */
+  effect: Sequence([ /* inline */ NoOp, /**/ NoOp ]))
+
+// M2.7 Block comment inside a macro body, to verify the preprocessor does not
+// eat argument boundaries when comments contain commas or parens.
+define CommentedMacro(a, b) = Sequence([
+  /* first effect; note: comma, paren ) and brace } should not matter inside */
+  DealDamage(a, b),
+  NoOp
+])
+
+// M2.8 Invoke CommentedMacro to force expansion and ensure its body parses
+// cleanly after substitution.
+CoverageGame.abilities += Triggered(
+  on:     Event.CommentedMacroRequested,
+  effect: CommentedMacro(self, 1))
+
+// -----------------------------------------------------------------------------
 // §N — Primitive-by-primitive checklist (for the Validator to cross-check)
 // -----------------------------------------------------------------------------
 // Entity      : §C, §E
@@ -363,8 +424,17 @@ CoverageGame.abilities += Triggered(
 //   operators : §I
 //   lambdas   : §J
 //   qualified : §K.1
-//   indexed   : §K.2
+//   indexed   : §K.2 (single), §M2.3 (multi-arg)
 //   calls     : §L
+//   unary +   : §M2.5
+// Post-v1 grammar extensions
+//   entity multi-param index         : §M2.1
+//   indexed target-path on LHS       : §M2.2
+//   multi-arg index trailer          : §M2.3
+//   indexed field key                : §M2.4
+//   unary plus                       : §M2.5
+//   block comments in positions      : §A (file), §M2.6 (expression),
+//                                      §M2.7 (macro body)
 //
 // If any of the above is missing after a grammar change, this fixture is
 // incomplete and must be extended.

@@ -149,6 +149,97 @@ public class ParserTests
     }
 
     [Fact]
+    public void EntityMultiParamIndex_Parses()
+    {
+        // Grammar extension §M2.1: `Entity Name[a, b] { ... }`.
+        Assert.False(ParseRaw("Entity Link[owner, slot] { kind: Link }").HasErrors);
+    }
+
+    [Fact]
+    public void IndexedTargetPath_Parses()
+    {
+        // Grammar extension §M2.2: `Name[idx].field += expr`.
+        Assert.False(ParseRaw("Link[Player1, 0].abilities += NoOp").HasErrors);
+    }
+
+    [Fact]
+    public void MultiArgIndexTrailer_Parses()
+    {
+        // Grammar extension §M2.3: `Name[a, b]` as an expression atom.
+        Assert.False(ParseRaw("Game.x += DealDamage(Link[Player1, 0], 1)").HasErrors);
+    }
+
+    [Fact]
+    public void IndexedFieldKey_Parses()
+    {
+        // Grammar extension §M2.4: `collapsed_for[Player1]: false`.
+        var r = ParseRaw("""
+            Entity F {
+              state_flags: {
+                collapsed_for[Player1]: false,
+                collapsed_for[Player2]: false
+              }
+            }
+            """);
+        Assert.False(r.HasErrors);
+    }
+
+    [Fact]
+    public void UnaryPlus_Parses()
+    {
+        // Grammar extension §M2.5: `+1` as a unary-plus literal.
+        Assert.False(ParseRaw("Game.x += IncCounter(self, c, +1)").HasErrors);
+    }
+
+    [Fact]
+    public void BlockComment_TopLevel_Stripped()
+    {
+        Assert.False(ParseRaw("/* before */ Entity Foo { /* in block */ kind: Foo }").HasErrors);
+    }
+
+    [Fact]
+    public void BlockComment_MultiLine_Stripped()
+    {
+        Assert.False(ParseRaw("""
+            /* This is a
+               multi-line
+               block comment */
+            Entity Foo { kind: Foo }
+            """).HasErrors);
+    }
+
+    [Fact]
+    public void BlockComment_InsideExpression_Stripped()
+    {
+        Assert.False(ParseRaw("""
+            Game.x += Triggered(
+              on:     Event.X,
+              /* comment between fields */
+              effect: Sequence([ /* inline */ NoOp, /**/ NoOp ]))
+            """).HasErrors);
+    }
+
+    [Fact]
+    public void BlockComment_EmptyAndSingleLine_Stripped()
+    {
+        Assert.False(ParseRaw("/**/Entity/**/Foo/**/{/**/kind:/**/Foo/**/}").HasErrors);
+    }
+
+    [Fact]
+    public void BlockComment_ContainingDoubleSlash_DoesNotStartLineComment()
+    {
+        // Make sure `// ...` inside a block comment doesn't extend the block
+        // to EOL. The block ends at its `*/`.
+        var r = ParseRaw("""
+            Entity Foo {
+              /* contains // tokens and */
+              kind: Foo
+            }
+            """);
+        Assert.False(r.HasErrors);
+    }
+
+    [Fact]
     public void E2EFixture_ParsesWithoutErrors()
     {
         var path = Path.Combine(AppContext.BaseDirectory,

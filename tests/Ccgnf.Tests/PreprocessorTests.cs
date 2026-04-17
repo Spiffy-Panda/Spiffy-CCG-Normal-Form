@@ -182,6 +182,61 @@ public class PreprocessorTests
         Assert.Contains("Takes1", r.ExpandedText);
     }
 
+    [Fact]
+    public void BlockComment_InMacroBody_PreservedAsTrivia()
+    {
+        // A block comment with commas and parens inside a macro body must
+        // not interfere with argument parsing when the macro is expanded.
+        var r = Run("""
+            define Wrap(a, b) = Sequence([
+              /* first, with comma and (paren) inside */
+              DealDamage(a, b),
+              NoOp
+            ])
+            Entity Foo { effect: Wrap(self, 1) }
+            """);
+        Assert.False(r.HasErrors);
+        Assert.Contains("DealDamage(self, 1)", Normalize(r.ExpandedText));
+    }
+
+    [Fact]
+    public void BlockComment_InArgumentList_DoesNotSplitArguments()
+    {
+        // `Macro(a, /* comment */ b)` must pass `a` and `b` as two arguments.
+        var r = Run("""
+            define Pair(x, y) = x + y
+            Entity Foo { value: Pair(1, /* between args */ 2) }
+            """);
+        Assert.False(r.HasErrors);
+        Assert.Contains("1 + 2", Normalize(r.ExpandedText));
+    }
+
+    [Fact]
+    public void BlockComment_WithDoubleSlash_DoesNotExtendToEOL()
+    {
+        // Block comment containing // must end at its closing */.
+        var r = Run("""
+            /* comment // with double-slash inside */
+            Entity Foo { x: 1 }
+            """);
+        Assert.False(r.HasErrors);
+        Assert.Contains("Entity Foo", r.ExpandedText);
+    }
+
+    [Fact]
+    public void NamedArgLabel_IsNotSubstitutedByMacroParam()
+    {
+        // Regression for label-position substitution bug. When a macro
+        // parameter name collides with a named-arg label in the body,
+        // the label must survive expansion.
+        var r = Run("""
+            define Push(factions) = NewEcho(factions: factions)
+            Entity Foo { effect: Push(PYRE) }
+            """);
+        Assert.False(r.HasErrors);
+        Assert.Contains("NewEcho(factions: PYRE)", Normalize(r.ExpandedText));
+    }
+
     private static string Normalize(string s) =>
         System.Text.RegularExpressions.Regex.Replace(s, @"\s+", " ").Trim();
 }
