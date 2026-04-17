@@ -87,3 +87,11 @@ src/Ccgnf/Generated/
 *.ccgnf.expanded
 *.ccgnf.validated
 .ccgnf-cache/
+
+# -----------------------------------------------------------------------------
+# Card-cluster skill working files
+#
+# `working-*.ccgnf` files are in-flight cluster drafts. Only `cluster-*.ccgnf`
+# (finalized archives with a known seed and approved contents) get committed.
+# -----------------------------------------------------------------------------
+encoding-artifacts/working-*.ccgnf

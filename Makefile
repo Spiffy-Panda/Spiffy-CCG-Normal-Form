@@ -15,7 +15,7 @@ RESULTS   := TestResults
 DOTNET    ?= dotnet
 
 .PHONY: all help restore build test clean format ci \
-        ccgnf-lint ccgnf-build
+        ccgnf-lint ccgnf-build card-distribution
 
 all: build
 
@@ -76,3 +76,11 @@ ccgnf-lint:
 ccgnf-build:
 	@echo "ccgnf-build: not yet implemented (see grammar/GrammarSpec.md §4)"
 	@exit 0
+
+# ---------------------------------------------------------------------------
+# Regenerate encoding/cards/DISTRIBUTION.md from the current card files.
+# Safe to run anytime; idempotent.
+# ---------------------------------------------------------------------------
+
+card-distribution:
+	python3 tools/update-card-distribution.py
