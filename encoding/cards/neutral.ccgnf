@@ -43,3 +43,41 @@ Card Wayfarer {
   ]
   // text: When you play this, if your Banner exists, draw a card.
 }
+
+/*
+ * Lodgekeeper [U] (NEUTRAL, Unit) — 3 — 2/4
+ * Mend 2.
+ *
+ * Uncommon-grade ConduitTender. Provides Mend splash to any deck; rewards a
+ * non-Collapsed home Arena.
+ */
+Card Lodgekeeper {
+  factions: {NEUTRAL}, type: Unit, cost: 3, force: 2, ramparts: 4, rarity: U
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: []
+  // text: Mend 2.
+}
+
+/*
+ * Bannerkeeper [U] (NEUTRAL, Unit) — 4 — 3/4
+ * While your Banner exists, this has +1/+1.
+ *
+ * Pure Banner-scaling Neutral glue. Off Banner it's a fair 4-cost 3/4; with a
+ * Banner it's a 4/5 that splashes into any committed deck.
+ */
+Card Bannerkeeper {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(self, {force, ramparts}, layer: 2),
+      check_at: continuously,
+      rule: If(BannerExists(),
+        Sequence([
+          AddToCharacteristic(self, force,    1),
+          AddToCharacteristic(self, ramparts, 1)
+        ]),
+        NoOp))
+  ]
+  // text: While your Banner exists, this has +1/+1.
+}

@@ -137,3 +137,53 @@ Card Myrrhan_KeeperOfGrowth {
   //       Peak THORN: At start of your turn, Sprawl 2 in each Arena you have
   //       a Unit in.
 }
+
+/*
+ * Hardened Growth [C] (THORN, Maneuver) — 2
+ * Target friendly Unit gains +0/+2 until end of turn.
+ * THORN 3: +1/+2 instead.
+ *
+ * Trick that protects a key body through a Clash; at THORN 3 also nudges
+ * Projected Force.
+ */
+Card HardenedGrowth {
+  factions: {THORN}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit ∧ u.controller == self.controller,
+        Tiers([
+          (Resonance(THORN, 3),
+            Sequence([
+              ModifyCharacteristic(target, force,    +1, duration: end_of_turn, layer: 2),
+              ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2)
+            ])),
+          (Default,
+            ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2))
+        ])))
+  ]
+  // text: Target friendly Unit gains +0/+2 until end of turn.
+  //       THORN 3: +1/+2 instead.
+}
+
+/*
+ * Thornseed Planter [U] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 2 in this Arena.
+ *
+ * Hand-based Sprawl source. Three bodies for 3 Aether (self + two Saplings),
+ * though Saplings enter with Deployment Sickness.
+ */
+Card ThornseedPlanter {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         ForEach(i ∈ [1..2],
+           CreateToken(template:   ThornSapling,
+                       zone:       self.arena,
+                       owner:      self.controller,
+                       controller: self.controller)),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 2 in this Arena.
+}

@@ -125,3 +125,43 @@ Card Vaen_ArchitectOfTheLastHour {
   //       Peak BULWARK: Your Conduits cannot be reduced below 1 Integrity by
   //       opposing effects.
 }
+
+/*
+ * Stonewatcher [C] (BULWARK, Unit) — 3 — 3/3
+ * Fortify 1.
+ *
+ * A mid-curve common BULWARK Unit. Grows to 3/4 while the Arena's Conduit is
+ * healthy; weakens when the Conduit falls under 4.
+ */
+Card Stonewatcher {
+  factions: {BULWARK}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: C
+  keywords: [ Fortify(1), DeploymentSickness ]
+  abilities: []
+  // text: Fortify 1.
+}
+
+/*
+ * Warden of the Mended Wall [R] (BULWARK, Unit) — 5 — 3/5
+ * Mend 2.
+ * BULWARK 4: When another friendly BULWARK Unit enters this Arena, Mend 1.
+ *
+ * A slow, Peak-adjacent engine. Enters with a single Mend; at BULWARK 4 each
+ * subsequent BULWARK Unit entering the same Arena topups the Conduit by 1.
+ */
+Card WardenOfTheMendedWall {
+  factions: {BULWARK}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: [
+    OnArenaEnter(
+      filter: u -> u != self
+                 ∧ BULWARK ∈ u.factions
+                 ∧ u.type == Unit
+                 ∧ u.controller == self.controller,
+      effect: When(Resonance(BULWARK, 4),
+        If(not collapsed_for(self.controller, self.arena),
+           Heal(self.controller.Conduit(self.arena), 1, cap: starting_integrity),
+           NoOp)))
+  ]
+  // text: Mend 2. BULWARK 4: When another friendly BULWARK Unit enters this
+  //       Arena, Mend 1.
+}

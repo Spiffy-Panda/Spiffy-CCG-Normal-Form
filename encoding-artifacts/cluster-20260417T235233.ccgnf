@@ -1,0 +1,217 @@
+// =============================================================================
+// Cluster working file
+// Generated: 2026-04-17T23:52:33Z
+// Seed:      1776469953
+// N:         10
+// Factions:  1 EMBER, 2 BULWARK, 2 THORN, 1 HOLLOW, 2 DUAL (THORN/BULWARK),
+//            2 NEUTRAL
+// Rarities:  4 C, 5 U, 1 R, 0 M
+// Bias:      weights tuned away from C/M (over-represented) toward U/R.
+// =============================================================================
+
+/*
+ * Ashcharger [C] (EMBER, Unit) — 3 — 4/3
+ * Surge.
+ *
+ * A mid-curve Surge body. Cost 3 becomes cost 2 the turn it follows any other
+ * EMBER play, giving curve-out EMBER a 4/3 threat that "snaps" onto a push.
+ */
+Card Ashcharger {
+  factions: {EMBER}, type: Unit, cost: 3, force: 4, ramparts: 3, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Bramblewarden [U] (THORN/BULWARK, Unit) — 3 — 3/3
+ * When this enters play, create a 1/1 Sapling in this Arena.
+ *
+ * Pushes both THORN and BULWARK Echoes. Body + immediate Sprawl-1 supports
+ * the THORN/BULWARK Big Mid-range archetype.
+ */
+Card Bramblewarden {
+  factions: {THORN, BULWARK}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, create a 1/1 Sapling in this Arena.
+  //       (Pushes both THORN and BULWARK Echoes.)
+}
+
+/*
+ * Lodgekeeper [U] (NEUTRAL, Unit) — 3 — 2/4
+ * Mend 2.
+ *
+ * Uncommon-grade ConduitTender. Provides Mend splash to any deck; rewards a
+ * non-Collapsed home Arena.
+ */
+Card Lodgekeeper {
+  factions: {NEUTRAL}, type: Unit, cost: 3, force: 2, ramparts: 4, rarity: U
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: []
+  // text: Mend 2.
+}
+
+/*
+ * Warden of the Mended Wall [R] (BULWARK, Unit) — 5 — 3/5
+ * Mend 2.
+ * BULWARK 4: When another friendly BULWARK Unit enters this Arena, Mend 1.
+ *
+ * A slow, Peak-adjacent engine. Enters with a single Mend; at BULWARK 4 each
+ * subsequent BULWARK Unit entering the same Arena topups the Conduit by 1.
+ */
+Card WardenOfTheMendedWall {
+  factions: {BULWARK}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: [
+    OnArenaEnter(
+      filter: u -> u != self
+                 ∧ BULWARK ∈ u.factions
+                 ∧ u.type == Unit
+                 ∧ u.controller == self.controller,
+      effect: When(Resonance(BULWARK, 4),
+        If(not collapsed_for(self.controller, self.arena),
+           Heal(self.controller.Conduit(self.arena), 1, cap: starting_integrity),
+           NoOp)))
+  ]
+  // text: Mend 2. BULWARK 4: When another friendly BULWARK Unit enters this
+  //       Arena, Mend 1.
+}
+
+/*
+ * Thornseed Planter [U] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 2 in this Arena.
+ *
+ * Hand-based Sprawl source. Three bodies for 3 Aether (self + two Saplings),
+ * though Saplings enter with Deployment Sickness.
+ */
+Card ThornseedPlanter {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         ForEach(i ∈ [1..2],
+           CreateToken(template:   ThornSapling,
+                       zone:       self.arena,
+                       owner:      self.controller,
+                       controller: self.controller)),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 2 in this Arena.
+}
+
+/*
+ * Stonewatcher [C] (BULWARK, Unit) — 3 — 3/3
+ * Fortify 1.
+ *
+ * A mid-curve common BULWARK Unit. Grows to 3/4 while the Arena's Conduit is
+ * healthy; weakens when the Conduit falls under 4.
+ */
+Card Stonewatcher {
+  factions: {BULWARK}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: C
+  keywords: [ Fortify(1), DeploymentSickness ]
+  abilities: []
+  // text: Fortify 1.
+}
+
+/*
+ * Hardened Growth [C] (THORN, Maneuver) — 2
+ * Target friendly Unit gains +0/+2 until end of turn.
+ * THORN 3: +1/+2 instead.
+ *
+ * Trick that protects a key body through a Clash; at THORN 3 also nudges
+ * Projected Force.
+ */
+Card HardenedGrowth {
+  factions: {THORN}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit ∧ u.controller == self.controller,
+        Tiers([
+          (Resonance(THORN, 3),
+            Sequence([
+              ModifyCharacteristic(target, force,    +1, duration: end_of_turn, layer: 2),
+              ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2)
+            ])),
+          (Default,
+            ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2))
+        ])))
+  ]
+  // text: Target friendly Unit gains +0/+2 until end of turn.
+  //       THORN 3: +1/+2 instead.
+}
+
+/*
+ * Quiet Theft [U] (HOLLOW, Maneuver) — 3
+ * Pilfer 1.
+ * HOLLOW 3: Pilfer 2 instead.
+ *
+ * A scaling hand-attack Maneuver that rewards sustained HOLLOW commitment.
+ */
+Card QuietTheft {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 3), Pilfer(2)),
+        (Default,              Pilfer(1))
+      ]))
+  ]
+  // text: Pilfer 1. HOLLOW 3: Pilfer 2 instead.
+}
+
+/*
+ * Bannerkeeper [U] (NEUTRAL, Unit) — 4 — 3/4
+ * While your Banner exists, this has +1/+1.
+ *
+ * Pure Banner-scaling Neutral glue. Off Banner it's a fair 4-cost 3/4; with a
+ * Banner it's a 4/5 that splashes into any committed deck.
+ */
+Card Bannerkeeper {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(self, {force, ramparts}, layer: 2),
+      check_at: continuously,
+      rule: If(BannerExists(),
+        Sequence([
+          AddToCharacteristic(self, force,    1),
+          AddToCharacteristic(self, ramparts, 1)
+        ]),
+        NoOp))
+  ]
+  // text: While your Banner exists, this has +1/+1.
+}
+
+/*
+ * Thornwall Bastion [C] (THORN/BULWARK dual, Standard — attaches to Arena) — 3
+ * Your Units in this Arena have Fortify 1.
+ *
+ * A splashable common Standard that rewards committing bodies to one Arena.
+ * The Fortify suppression rule still applies — a below-4 Conduit in this
+ * Arena disables the bonus.
+ */
+Card ThornwallBastion {
+  factions: {THORN, BULWARK}, type: Standard, subtype: attaches_to_arena, cost: 3, rarity: C
+  abilities: [
+    Static(
+      modifies: KeywordSet(unit),
+      check_at: continuously,
+      rule: ForEach(u -> u.controller == self.controller
+                       ∧ u.type == Unit
+                       ∧ u.arena == self.arena,
+              GrantKeyword(u, Fortify(1))))
+  ]
+  // text: Your Units in this Arena have Fortify 1.
+  //       (Pushes both THORN and BULWARK Echoes.)
+}

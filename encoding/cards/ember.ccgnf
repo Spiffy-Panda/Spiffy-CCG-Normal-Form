@@ -120,3 +120,17 @@ Card Eremis_TheUnfaded {
   //       (PlayAsCopy is defined in engine/08-play.ccgnf — copies bypass
   //       cost and Push.)
 }
+
+/*
+ * Ashcharger [C] (EMBER, Unit) — 3 — 4/3
+ * Surge.
+ *
+ * A mid-curve Surge body. Cost 3 becomes cost 2 the turn it follows any other
+ * EMBER play, giving curve-out EMBER a 4/3 threat that "snaps" onto a push.
+ */
+Card Ashcharger {
+  factions: {EMBER}, type: Unit, cost: 3, force: 4, ramparts: 3, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}

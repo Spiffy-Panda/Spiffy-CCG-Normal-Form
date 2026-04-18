@@ -24,3 +24,49 @@ Card TidecallersHollow {
   // text: Return target Unit to its owner's hand, then that player exiles a
   //       card from their hand at random.
 }
+
+/*
+ * Bramblewarden [U] (THORN/BULWARK, Unit) — 3 — 3/3
+ * When this enters play, create a 1/1 Sapling in this Arena.
+ *
+ * Pushes both THORN and BULWARK Echoes. Body + immediate Sprawl-1 supports
+ * the THORN/BULWARK Big Mid-range archetype.
+ */
+Card Bramblewarden {
+  factions: {THORN, BULWARK}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, create a 1/1 Sapling in this Arena.
+  //       (Pushes both THORN and BULWARK Echoes.)
+}
+
+/*
+ * Thornwall Bastion [C] (THORN/BULWARK dual, Standard — attaches to Arena) — 3
+ * Your Units in this Arena have Fortify 1.
+ *
+ * A splashable common Standard that rewards committing bodies to one Arena.
+ * The Fortify suppression rule still applies — a below-4 Conduit in this
+ * Arena disables the bonus.
+ */
+Card ThornwallBastion {
+  factions: {THORN, BULWARK}, type: Standard, subtype: attaches_to_arena, cost: 3, rarity: C
+  abilities: [
+    Static(
+      modifies: KeywordSet(unit),
+      check_at: continuously,
+      rule: ForEach(u -> u.controller == self.controller
+                       ∧ u.type == Unit
+                       ∧ u.arena == self.arena,
+              GrantKeyword(u, Fortify(1))))
+  ]
+  // text: Your Units in this Arena have Fortify 1.
+  //       (Pushes both THORN and BULWARK Echoes.)
+}

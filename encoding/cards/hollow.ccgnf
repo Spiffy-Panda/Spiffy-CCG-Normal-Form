@@ -132,3 +132,22 @@ Card Oreth_TheUnseenAuthor {
   //       Peak HOLLOW: When Oreth returns to your hand via Phantom, opponent
   //       exiles a card from hand at random.
 }
+
+/*
+ * Quiet Theft [U] (HOLLOW, Maneuver) — 3
+ * Pilfer 1.
+ * HOLLOW 3: Pilfer 2 instead.
+ *
+ * A scaling hand-attack Maneuver that rewards sustained HOLLOW commitment.
+ */
+Card QuietTheft {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 3), Pilfer(2)),
+        (Default,              Pilfer(1))
+      ]))
+  ]
+  // text: Pilfer 1. HOLLOW 3: Pilfer 2 instead.
+}
