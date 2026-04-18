@@ -1,5 +1,24 @@
 # Project Notes for LLM Agents
 
+## Planning docs
+
+Waterfall-style planning for the web-app arc lives under
+[`docs/plan/`](docs/plan/). Start at [`docs/plan/INDEX.md`](docs/plan/INDEX.md) —
+it's a small router that points at the specific file relevant to your
+task. Each referenced doc is sized to be read in one pass.
+
+Before starting code work on a step, read:
+
+1. [`docs/plan/00-overview.md`](docs/plan/00-overview.md) — goals, scope, delivery order.
+2. [`docs/plan/01-architecture.md`](docs/plan/01-architecture.md) — system shape.
+3. The [`docs/plan/reference/`](docs/plan/reference/) digest for whichever module you're touching.
+4. The specific [`docs/plan/steps/`](docs/plan/steps/) file for your task.
+
+Append to [`docs/plan/devlog.md`](docs/plan/devlog.md) at the end of each
+session. If you change a public API or file layout, update the matching
+[`docs/plan/reference/`](docs/plan/reference/) doc in the same commit —
+doc drift is the whole thing these docs exist to prevent.
+
 ## Default game target
 
 **Resonance** (also "the echo game") is the active, canonical game for this project. Unless a prompt explicitly names a different target, assume:
