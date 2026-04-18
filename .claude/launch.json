@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ccgnf-rest",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/Ccgnf.Rest", "--no-launch-profile"],
+      "port": 19397
+    }
+  ]
+}
