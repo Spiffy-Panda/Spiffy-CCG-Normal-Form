@@ -1,5 +1,16 @@
 # Project Notes for LLM Agents
 
+## CCGNF language reference
+
+[`docs/ccgnf-language.md`](docs/ccgnf-language.md) is the author-facing
+guide for writing `.ccgnf` files. Read it whenever you are about to
+write encoding files, design a new keyword or ability, or answer a
+user question about what CCGNF can express. It is deliberately
+game-agnostic; Resonance is the reference encoding, not the language.
+
+The companion skill for encoding a new CCG from its rulebook lives at
+[`.claude/skills/encode-ccg/SKILL.md`](.claude/skills/encode-ccg/SKILL.md).
+
 ## Planning docs
 
 Waterfall-style planning for the web-app arc lives under
