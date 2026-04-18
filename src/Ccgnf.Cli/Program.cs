@@ -1,6 +1,8 @@
+using Ccgnf.Ast;
 using Ccgnf.Diagnostics;
 using Ccgnf.Parsing;
 using Ccgnf.Preprocessing;
+using Ccgnf.Validation;
 using Microsoft.Extensions.Logging;
 
 // Ccgnf CLI — smoke driver for the preprocessor -> parser pipeline.
@@ -74,6 +76,8 @@ using var loggerFactory = LoggerFactory.Create(builder =>
 var log = loggerFactory.CreateLogger("Ccgnf.Cli");
 var preprocessor = new Preprocessor(loggerFactory.CreateLogger<Preprocessor>());
 var parser = new CcgnfParser(loggerFactory.CreateLogger<CcgnfParser>());
+var astBuilder = new AstBuilder(loggerFactory.CreateLogger<AstBuilder>());
+var validator = new Validator(loggerFactory.CreateLogger<Validator>());
 
 int errorCount = 0;
 foreach (var file in files)
@@ -115,7 +119,27 @@ foreach (var file in files)
         continue;
     }
 
-    log.LogInformation("OK: {File} parsed successfully", file);
+    log.LogInformation("Building AST for {File}", file);
+    var astResult = astBuilder.Build(parseResult.Tree!, sourceName: file);
+    ReportDiagnostics(astResult.Diagnostics);
+
+    if (astResult.HasErrors || astResult.File is null)
+    {
+        errorCount += astResult.Diagnostics.Count(d => d.Severity == DiagnosticSeverity.Error);
+        continue;
+    }
+
+    log.LogInformation("Validating {File}", file);
+    var validationResult = validator.Validate(astResult.File);
+    ReportDiagnostics(validationResult.Diagnostics);
+
+    if (validationResult.HasErrors)
+    {
+        errorCount += validationResult.Diagnostics.Count(d => d.Severity == DiagnosticSeverity.Error);
+        continue;
+    }
+
+    log.LogInformation("OK: {File} parsed, built, and validated successfully", file);
 }
 
 return errorCount == 0 ? 0 : 1;

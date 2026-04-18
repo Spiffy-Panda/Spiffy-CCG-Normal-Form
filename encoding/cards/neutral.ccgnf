@@ -25,9 +25,7 @@ Card ScavengedBlade {
       Target(u -> u.type == Unit,
         If(BannerExists(),
            DealDamage(target, 3),
-           DealDamage(target, 2),
-           check_at: tier_binding,
-           apply_at: card_resolving)))
+           DealDamage(target, 2))))
   ]
   // text: Deal 2 damage to a Unit. If your Banner exists: Deal 3 instead.
 }

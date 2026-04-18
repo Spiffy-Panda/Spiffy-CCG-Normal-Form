@@ -47,4 +47,4 @@ Target (per `design/Supplement.md §4`, for a 250-card set):
 
 **Grand total: 56 cards.**
 
-Last updated: 2026-04-18T00:02:03Z
+Last updated: 2026-04-18T00:16:31Z

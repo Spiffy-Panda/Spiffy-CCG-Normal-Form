@@ -110,7 +110,8 @@ Card TheUnreadPage {
       modifies: ActiveModifiers(self),
       check_at: continuously,
       rule: If(Peak(HOLLOW),
-        EnsureModifiers({hand_cap_5, aether_minus_1})))
+               EnsureModifiers({hand_cap_5, aether_minus_1}),
+               NoOp))
   ]
   // text: Your opponent chooses: max hand size 5, or starting Aether -1.
   //       Peak HOLLOW: both apply.

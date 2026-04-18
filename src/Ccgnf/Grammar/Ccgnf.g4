@@ -110,7 +110,7 @@ postfixExpr
 
 trailer
     : DOT name                               # TrailerMember
-    | LBRACK expr (COMMA expr)* RBRACK       # TrailerIndex
+    | indexSuffix                            # TrailerIndex
     | LPAREN argList? RPAREN                 # TrailerCall
     ;
 

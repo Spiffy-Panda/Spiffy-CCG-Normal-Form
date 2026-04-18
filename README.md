@@ -40,15 +40,15 @@ See [`grammar/GrammarSpec.md`](grammar/GrammarSpec.md) for the full language spe
 
 ## Status
 
-CCGNF is pre-alpha. The preprocessor and parser pipeline is live; higher-layer stages (AST builder, validator, interpreter) are the next work.
+CCGNF is pre-alpha. The preprocessor → parser → AST → validator pipeline is live; the interpreter is the next work.
 
 | Component                                  | State                         |
 |--------------------------------------------|-------------------------------|
 | CCGNF grammar specification                | **Complete** (§1–§12)         |
 | CCGNF engine — preprocessor                | **Working** — v1              |
 | CCGNF engine — ANTLR grammar               | **Working** — v1              |
-| CCGNF engine — AST builder                 | Not started                   |
-| CCGNF engine — validator                   | Not started                   |
+| CCGNF engine — AST builder                 | **Working** — v1 (typed records over the parse tree) |
+| CCGNF engine — validator                   | **Working** — v1 (duplicate decls, builtin arity, R-5) |
 | CCGNF engine — interpreter                 | Not started                   |
 | E2E grammar coverage fixture               | **Complete**; parses clean    |
 | Resonance rules (design docs)              | **Complete**                  |
