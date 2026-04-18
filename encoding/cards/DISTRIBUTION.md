@@ -13,11 +13,11 @@ Target (per `design/Supplement.md §4`, for a 250-card set):
 
 | Faction  | C | U | R | M | Total |
 |----------|---|---|---|---|-------|
-| EMBER    | 5 | 2 | 1 | 1 |   9   |
-| BULWARK  | 5 | 2 | 2 | 1 |   10   |
-| TIDE     | 4 | 2 | 1 | 1 |   8   |
-| THORN    | 5 | 3 | 1 | 1 |   10   |
-| HOLLOW   | 4 | 3 | 1 | 1 |   9   |
+| EMBER    | 11 | 7 | 6 | 1 |   25   |
+| BULWARK  | 5 | 4 | 5 | 1 |   15   |
+| TIDE     | 9 | 7 | 4 | 1 |   21   |
+| THORN    | 10 | 6 | 3 | 1 |   20   |
+| HOLLOW   | 7 | 5 | 4 | 2 |   18   |
 
 ## Dual-faction
 
@@ -31,20 +31,20 @@ Target (per `design/Supplement.md §4`, for a 250-card set):
 
 | Rarity | Count |
 |--------|-------|
-| C      |   3   |
-| U      |   3   |
-| R      |   0   |
+| C      |   6   |
+| U      |   5   |
+| R      |   2   |
 | M      |   0   |
 
 ## Totals
 
 | Rarity | Mono | Dual | Neutral | Total | Target | Actual |
 |--------|------|------|---------|-------|--------|--------|
-| C      |   23 |    1 |       3 |    27 | 44%    | 48.2%  |
-| U      |   12 |    2 |       3 |    17 | 32%    | 30.4%  |
-| R      |    6 |    1 |       0 |     7 | 18%    | 12.5%  |
-| M      |    5 |    0 |       0 |     5 | 6%     | 8.9%   |
+| C      |   42 |    1 |       6 |    49 | 44%    | 42.2%  |
+| U      |   29 |    2 |       5 |    36 | 32%    | 31.0%  |
+| R      |   22 |    1 |       2 |    25 | 18%    | 21.6%  |
+| M      |    6 |    0 |       0 |     6 | 6%     | 5.2%   |
 
-**Grand total: 56 cards.**
+**Grand total: 116 cards.**
 
-Last updated: 2026-04-18T00:16:31Z
+Last updated: 2026-04-18T05:08:56Z

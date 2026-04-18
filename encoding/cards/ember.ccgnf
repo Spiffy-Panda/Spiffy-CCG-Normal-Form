@@ -134,3 +134,265 @@ Card Ashcharger {
   abilities: []
   // text: Surge.
 }
+
+/*
+ * Coalkin [C] (EMBER, Unit) — 1 — 1/1
+ * Surge.
+ */
+Card Coalkin {
+  factions: {EMBER}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Cinderhound [C] (EMBER, Unit) — 2 — 2/3
+ * Surge.
+ */
+Card Cinderhound {
+  factions: {EMBER}, type: Unit, cost: 2, force: 2, ramparts: 3, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Sparkbearer [C] (EMBER, Unit) — 2 — 1/2
+ * Ignite 1.
+ */
+Card Sparkbearer {
+  factions: {EMBER}, type: Unit, cost: 2, force: 1, ramparts: 2, rarity: C
+  keywords: [ Ignite(1), DeploymentSickness ]
+  abilities: []
+  // text: Ignite 1.
+}
+
+/*
+ * Match Strike [C] (EMBER, Maneuver) — 1
+ * Deal 1 damage to a Unit or Conduit.
+ * EMBER 2: Deal 2 instead.
+ */
+Card MatchStrike {
+  factions: {EMBER}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Tiers([
+          (Resonance(EMBER, 2), DealDamage(target, 2)),
+          (Default,             DealDamage(target, 1))
+        ])))
+  ]
+  // text: Deal 1 damage to a Unit or Conduit. EMBER 2: Deal 2 instead.
+}
+
+/*
+ * Pyrearrow [C] (EMBER, Maneuver) — 2
+ * Deal 1 damage to each opposing Unit and the opposing Conduit in target Arena.
+ * EMBER 3: Deal 2 instead.
+ */
+Card Pyrearrow {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        Tiers([
+          (Resonance(EMBER, 3),
+            ForEach(t -> t.arena == target
+                       ∧ t.controller != self.controller
+                       ∧ (t.type == Unit ∨ t.kind == Conduit),
+              DealDamage(t, 2))),
+          (Default,
+            ForEach(t -> t.arena == target
+                       ∧ t.controller != self.controller
+                       ∧ (t.type == Unit ∨ t.kind == Conduit),
+              DealDamage(t, 1)))
+        ])))
+  ]
+  // text: Deal 1 damage to each opposing Unit and Conduit in target Arena.
+  //       EMBER 3: Deal 2 instead.
+}
+
+/*
+ * Searing Wave [C] (EMBER, Maneuver) — 4
+ * Deal 2 damage to each opposing Unit in target Arena.
+ * EMBER 4: Also deal 2 to the opposing Conduit there.
+ */
+Card SearingWave {
+  factions: {EMBER}, type: Maneuver, cost: 4, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        Sequence([
+          ForEach(u -> u.arena == target
+                     ∧ u.controller != self.controller
+                     ∧ u.type == Unit,
+            DealDamage(u, 2)),
+          When(Resonance(EMBER, 4),
+            If(Exists(Conduit[other_player(self.controller), target])
+               ∧ not collapsed_for(other_player(self.controller), target),
+               DealDamage(Conduit[other_player(self.controller), target], 2),
+               NoOp))
+        ])))
+  ]
+  // text: Deal 2 to each opposing Unit in target Arena.
+  //       EMBER 4: Also deal 2 to the opposing Conduit there.
+}
+
+/*
+ * Quickstrike [U] (EMBER, Maneuver) — 2
+ * Deal 3 damage to a Unit.
+ * EMBER 3: Deal 4 instead.
+ */
+Card Quickstrike {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: U
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Tiers([
+          (Resonance(EMBER, 3), DealDamage(target, 4)),
+          (Default,             DealDamage(target, 3))
+        ])))
+  ]
+  // text: Deal 3 to a Unit. EMBER 3: Deal 4 instead.
+}
+
+/*
+ * Searing Volley [U] (EMBER, Maneuver) — 3
+ * Deal 3 damage, split among any number of Units or Conduits.
+ * EMBER 3: Deal 4 instead.
+ */
+Card SearingVolley {
+  factions: {EMBER}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(EMBER, 3), DistributeDamage(amount: 4, chooser: self.controller,
+                                               target_filter: t -> t.kind ∈ {Unit, Conduit})),
+        (Default,             DistributeDamage(amount: 3, chooser: self.controller,
+                                               target_filter: t -> t.kind ∈ {Unit, Conduit}))
+      ]))
+  ]
+  // text: Deal 3 damage, split among any number of targets. EMBER 3: Deal 4 instead.
+}
+
+/*
+ * Igniting Word [U] (EMBER, Maneuver) — 2
+ * Deal 2 damage to a Unit or Conduit.
+ * EMBER 3: Also draw a card.
+ */
+Card IgnitingWord {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: U
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Sequence([
+          DealDamage(target, 2),
+          When(Resonance(EMBER, 3), Draw(self.controller, 1))
+        ])))
+  ]
+  // text: Deal 2 damage. EMBER 3: Also draw a card.
+}
+
+/*
+ * Coalrunner [U] (EMBER, Unit) — 3 — 3/3
+ * Blitz.
+ */
+Card Coalrunner {
+  factions: {EMBER}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: []
+  // text: Blitz.
+}
+
+/*
+ * Stormcharger [U] (EMBER, Unit) — 4 — 4/3
+ * Blitz.
+ */
+Card Stormcharger {
+  factions: {EMBER}, type: Unit, cost: 4, force: 4, ramparts: 3, rarity: U
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: []
+  // text: Blitz.
+}
+
+/*
+ * War Cry [R] (EMBER, Maneuver) — 3
+ * Friendly Units gain Blitz this turn.
+ */
+Card WarCry {
+  factions: {EMBER}, type: Maneuver, cost: 3, rarity: R
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+        GrantKeyword(u, Blitz, duration: end_of_turn)))
+  ]
+  // text: Friendly Units gain Blitz this turn.
+}
+
+/*
+ * Blazefury [R] (EMBER, Unit) — 4 — 5/3
+ * Blitz. When this enters play, deal 1 damage to each opposing Unit in this Arena.
+ */
+Card Blazefury {
+  factions: {EMBER}, type: Unit, cost: 4, force: 5, ramparts: 3, rarity: R
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      ForEach(u -> u.arena == self.arena
+                 ∧ u.controller != self.controller
+                 ∧ u.type == Unit,
+        DealDamage(u, 1)))
+  ]
+  // text: Blitz. When this enters play, deal 1 damage to each opposing Unit
+  //       in this Arena.
+}
+
+/*
+ * Pyrechampion [R] (EMBER, Unit) — 4 — 5/4
+ * Surge.
+ */
+Card Pyrechampion {
+  factions: {EMBER}, type: Unit, cost: 4, force: 5, ramparts: 4, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Sunfire Marshal [R] (EMBER, Unit) — 5 — 5/4
+ * Surge. When this enters play, deal 2 damage to the opposing Conduit in this Arena.
+ */
+Card SunfireMarshal {
+  factions: {EMBER}, type: Unit, cost: 5, force: 5, ramparts: 4, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 2),
+         NoOp))
+  ]
+  // text: Surge. When this enters play, deal 2 to the opposing Conduit in this Arena.
+}
+
+/*
+ * Roaring Champion [R] (EMBER, Unit) — 5 — 6/3
+ * Surge. Friendly EMBER Units in this Arena have +1/+0.
+ */
+Card RoaringChampion {
+  factions: {EMBER}, type: Unit, cost: 5, force: 6, ramparts: 3, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(target_unit, force, layer: 2),
+      check_at: continuously,
+      rule: ForEach(u -> u.arena == self.arena
+                       ∧ u.controller == self.controller
+                       ∧ u.type == Unit
+                       ∧ EMBER ∈ u.factions
+                       ∧ u != self,
+        AddToCharacteristic(u, force, 1)))
+  ]
+  // text: Surge. Friendly EMBER Units in this Arena have +1/+0.
+}

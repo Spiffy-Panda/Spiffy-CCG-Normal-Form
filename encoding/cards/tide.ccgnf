@@ -135,3 +135,196 @@ Card Thessa_WhoReturns {
   // text: Drift. Recur. TIDE 3: When you play a TIDE card, you may return a
   //       non-Unique TIDE card from your Cache to your hand. Once per turn.
 }
+
+/*
+ * Tidewatcher [C] (TIDE, Unit) — 2 — 2/2
+ * When this enters play, Reshape once.
+ */
+Card Tidewatcher {
+  factions: {TIDE}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(1))
+  ]
+  // text: When this enters play, Reshape once.
+}
+
+/*
+ * Currentkin [C] (TIDE, Unit) — 2 — 2/2
+ * Drift.
+ */
+Card Currentkin {
+  factions: {TIDE}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: []
+  // text: Drift.
+}
+
+/*
+ * Currents Pull [C] (TIDE, Maneuver) — 1
+ * Target friendly Unit Drifts now (move to an adjacent non-Collapsed Arena).
+ */
+Card CurrentsPull {
+  factions: {TIDE}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit ∧ u.controller == self.controller,
+        Target(a -> a ∈ adjacent(u.arena)
+                  ∧ not collapsed_for(u.controller, a),
+          chooser: self.controller,
+          effect:  MoveUnitToArena(u, a))))
+  ]
+  // text: Target friendly Unit moves to an adjacent non-Collapsed Arena.
+}
+
+/*
+ * Tidal Pull [C] (TIDE, Maneuver) — 2
+ * Each friendly Unit in target Arena moves to an adjacent non-Collapsed Arena
+ * (you choose per Unit).
+ */
+Card TidalPull {
+  factions: {TIDE}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        ForEach(u -> u.arena == target
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit,
+          Target(dest -> dest ∈ adjacent(u.arena)
+                       ∧ not collapsed_for(u.controller, dest),
+            chooser: self.controller,
+            effect:  MoveUnitToArena(u, dest)))))
+  ]
+  // text: Each friendly Unit in target Arena moves to an adjacent non-Collapsed Arena.
+}
+
+/*
+ * Returning Wave [C] (TIDE, Maneuver) — 2
+ * Return target non-Unique TIDE card from your Cache to your hand.
+ */
+Card ReturningWave {
+  factions: {TIDE}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(c -> c ∈ self.controller.Cache
+                ∧ TIDE ∈ c.factions
+                ∧ not (Unique ∈ c.keywords),
+        MoveTo(target, self.controller.Hand)))
+  ]
+  // text: Return a non-Unique TIDE card from your Cache to your hand.
+}
+
+/*
+ * Tidalshaper [U] (TIDE, Unit) — 3 — 2/3
+ * When this enters play, Reshape once.
+ */
+Card Tidalshaper {
+  factions: {TIDE}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(1))
+  ]
+  // text: When this enters play, Reshape once.
+}
+
+/*
+ * Spelunker [U] (TIDE, Unit) — 4 — 3/3
+ * Recur. When this enters play, draw a card.
+ */
+Card Spelunker {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: U
+  keywords: [ Recur, DeploymentSickness ]
+  abilities: [
+    OnEnter(Draw(self.controller, 1))
+  ]
+  // text: Recur. When this enters play, draw a card.
+}
+
+/*
+ * Marshlord [U] (TIDE, Unit) — 4 — 3/4
+ * Drift. Recur.
+ */
+Card Marshlord {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ Drift, Recur, DeploymentSickness ]
+  abilities: []
+  // text: Drift. Recur.
+}
+
+/*
+ * Echoing Wave [U] (TIDE, Maneuver) — 3
+ * Return target Unit to its owner's hand. This card has Recur.
+ */
+Card EchoingWave {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  keywords: [ Recur ]
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        MoveTo(target, target.owner.Hand)))
+  ]
+  // text: Return target Unit to its owner's hand. (Recur: this card returns
+  //       to the bottom of your Arsenal instead of your Cache.)
+}
+
+/*
+ * Drifting Mist [U] (TIDE, Maneuver) — 3
+ * Each of your Drift Units may Drift now (per-Unit choice).
+ */
+Card DriftingMist {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller
+                 ∧ u.type == Unit
+                 ∧ Drift ∈ u.keywords,
+        Choice(self.controller, {
+          pass:  NoOp,
+          drift: Target(a -> a ∈ adjacent(u.arena)
+                            ∧ not collapsed_for(u.controller, a),
+                        MoveUnitToArena(u, a))
+        })))
+  ]
+  // text: Each of your Drift Units may Drift now.
+}
+
+/*
+ * Wave-Sage [R] (TIDE, Unit) — 4 — 3/3
+ * When this enters play, Reshape twice.
+ */
+Card WaveSage {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(2))
+  ]
+  // text: When this enters play, Reshape twice.
+}
+
+/*
+ * Tidemoot Elder [R] (TIDE, Unit) — 5 — 3/5
+ * At the start of your turn, Reshape once.
+ */
+Card TidemootElder {
+  factions: {TIDE}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    StartOfYourTurn(Reshape(1))
+  ]
+  // text: At the start of your turn, Reshape once.
+}
+
+/*
+ * Currentmaster [R] (TIDE, Unit) — 5 — 4/4
+ * When you play a TIDE card, Reshape once.
+ */
+Card Currentmaster {
+  factions: {TIDE}, type: Unit, cost: 5, force: 4, ramparts: 4, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller ∧ TIDE ∈ c.factions ∧ c != self,
+      effect: Reshape(1))
+  ]
+  // text: When you play a TIDE card, Reshape once.
+}

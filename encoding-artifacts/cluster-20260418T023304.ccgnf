@@ -1,0 +1,1040 @@
+// =============================================================================
+// Cluster working file
+// Generated: 2026-04-18T02:33:04Z
+// Seed:      1776479584
+// N:         60
+// Factions:  16 EMBER, 13 TIDE, 10 THORN, 9 HOLLOW, 7 NEUTRAL, 5 BULWARK,
+//            0 DUAL (RNG variance — honored per skill rules)
+// Rarities:  22 C, 19 U, 18 R, 1 M (deficit-tilted: R upweighted, M down)
+// Notes:     - Slots 5/45/55/57 rolled Kindle on non-Standards; substituted
+//              Sprawl/Rally-flavored effects per skill keyword/type rule.
+//            - BULWARK light (5 cards); already at faction parity.
+// =============================================================================
+
+// -----------------------------------------------------------------------------
+// EMBER (16)
+// -----------------------------------------------------------------------------
+
+/*
+ * Coalkin [C] (EMBER, Unit) — 1 — 1/1
+ * Surge.
+ */
+Card Coalkin {
+  factions: {EMBER}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Cinderhound [C] (EMBER, Unit) — 2 — 2/3
+ * Surge.
+ */
+Card Cinderhound {
+  factions: {EMBER}, type: Unit, cost: 2, force: 2, ramparts: 3, rarity: C
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Sparkbearer [C] (EMBER, Unit) — 2 — 1/2
+ * Ignite 1.
+ */
+Card Sparkbearer {
+  factions: {EMBER}, type: Unit, cost: 2, force: 1, ramparts: 2, rarity: C
+  keywords: [ Ignite(1), DeploymentSickness ]
+  abilities: []
+  // text: Ignite 1.
+}
+
+/*
+ * Match Strike [C] (EMBER, Maneuver) — 1
+ * Deal 1 damage to a Unit or Conduit.
+ * EMBER 2: Deal 2 instead.
+ */
+Card MatchStrike {
+  factions: {EMBER}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Tiers([
+          (Resonance(EMBER, 2), DealDamage(target, 2)),
+          (Default,             DealDamage(target, 1))
+        ])))
+  ]
+  // text: Deal 1 damage to a Unit or Conduit. EMBER 2: Deal 2 instead.
+}
+
+/*
+ * Pyrearrow [C] (EMBER, Maneuver) — 2
+ * Deal 1 damage to each opposing Unit and the opposing Conduit in target Arena.
+ * EMBER 3: Deal 2 instead.
+ */
+Card Pyrearrow {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        Tiers([
+          (Resonance(EMBER, 3),
+            ForEach(t -> t.arena == target
+                       ∧ t.controller != self.controller
+                       ∧ (t.type == Unit ∨ t.kind == Conduit),
+              DealDamage(t, 2))),
+          (Default,
+            ForEach(t -> t.arena == target
+                       ∧ t.controller != self.controller
+                       ∧ (t.type == Unit ∨ t.kind == Conduit),
+              DealDamage(t, 1)))
+        ])))
+  ]
+  // text: Deal 1 damage to each opposing Unit and Conduit in target Arena.
+  //       EMBER 3: Deal 2 instead.
+}
+
+/*
+ * Searing Wave [C] (EMBER, Maneuver) — 4
+ * Deal 2 damage to each opposing Unit in target Arena.
+ * EMBER 4: Also deal 2 to the opposing Conduit there.
+ */
+Card SearingWave {
+  factions: {EMBER}, type: Maneuver, cost: 4, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        Sequence([
+          ForEach(u -> u.arena == target
+                     ∧ u.controller != self.controller
+                     ∧ u.type == Unit,
+            DealDamage(u, 2)),
+          When(Resonance(EMBER, 4),
+            If(Exists(Conduit[other_player(self.controller), target])
+               ∧ not collapsed_for(other_player(self.controller), target),
+               DealDamage(Conduit[other_player(self.controller), target], 2),
+               NoOp))
+        ])))
+  ]
+  // text: Deal 2 to each opposing Unit in target Arena.
+  //       EMBER 4: Also deal 2 to the opposing Conduit there.
+}
+
+/*
+ * Quickstrike [U] (EMBER, Maneuver) — 2
+ * Deal 3 damage to a Unit.
+ * EMBER 3: Deal 4 instead.
+ */
+Card Quickstrike {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: U
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Tiers([
+          (Resonance(EMBER, 3), DealDamage(target, 4)),
+          (Default,             DealDamage(target, 3))
+        ])))
+  ]
+  // text: Deal 3 to a Unit. EMBER 3: Deal 4 instead.
+}
+
+/*
+ * Searing Volley [U] (EMBER, Maneuver) — 3
+ * Deal 3 damage, split among any number of Units or Conduits.
+ * EMBER 3: Deal 4 instead.
+ */
+Card SearingVolley {
+  factions: {EMBER}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(EMBER, 3), DistributeDamage(amount: 4, chooser: self.controller,
+                                               target_filter: t -> t.kind ∈ {Unit, Conduit})),
+        (Default,             DistributeDamage(amount: 3, chooser: self.controller,
+                                               target_filter: t -> t.kind ∈ {Unit, Conduit}))
+      ]))
+  ]
+  // text: Deal 3 damage, split among any number of targets. EMBER 3: Deal 4 instead.
+}
+
+/*
+ * Igniting Word [U] (EMBER, Maneuver) — 2
+ * Deal 2 damage to a Unit or Conduit.
+ * EMBER 3: Also draw a card.
+ */
+Card IgnitingWord {
+  factions: {EMBER}, type: Maneuver, cost: 2, rarity: U
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        Sequence([
+          DealDamage(target, 2),
+          When(Resonance(EMBER, 3), Draw(self.controller, 1))
+        ])))
+  ]
+  // text: Deal 2 damage. EMBER 3: Also draw a card.
+}
+
+/*
+ * Coalrunner [U] (EMBER, Unit) — 3 — 3/3
+ * Blitz.
+ */
+Card Coalrunner {
+  factions: {EMBER}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: U
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: []
+  // text: Blitz.
+}
+
+/*
+ * Stormcharger [U] (EMBER, Unit) — 4 — 4/3
+ * Blitz.
+ */
+Card Stormcharger {
+  factions: {EMBER}, type: Unit, cost: 4, force: 4, ramparts: 3, rarity: U
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: []
+  // text: Blitz.
+}
+
+/*
+ * War Cry [R] (EMBER, Maneuver) — 3
+ * Friendly Units gain Blitz this turn.
+ */
+Card WarCry {
+  factions: {EMBER}, type: Maneuver, cost: 3, rarity: R
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+        GrantKeyword(u, Blitz, duration: end_of_turn)))
+  ]
+  // text: Friendly Units gain Blitz this turn.
+}
+
+/*
+ * Blazefury [R] (EMBER, Unit) — 4 — 5/3
+ * Blitz. When this enters play, deal 1 damage to each opposing Unit in this Arena.
+ */
+Card Blazefury {
+  factions: {EMBER}, type: Unit, cost: 4, force: 5, ramparts: 3, rarity: R
+  keywords: [ Blitz, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      ForEach(u -> u.arena == self.arena
+                 ∧ u.controller != self.controller
+                 ∧ u.type == Unit,
+        DealDamage(u, 1)))
+  ]
+  // text: Blitz. When this enters play, deal 1 damage to each opposing Unit
+  //       in this Arena.
+}
+
+/*
+ * Pyrechampion [R] (EMBER, Unit) — 4 — 5/4
+ * Surge.
+ */
+Card Pyrechampion {
+  factions: {EMBER}, type: Unit, cost: 4, force: 5, ramparts: 4, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: []
+  // text: Surge.
+}
+
+/*
+ * Sunfire Marshal [R] (EMBER, Unit) — 5 — 5/4
+ * Surge. When this enters play, deal 2 damage to the opposing Conduit in this Arena.
+ */
+Card SunfireMarshal {
+  factions: {EMBER}, type: Unit, cost: 5, force: 5, ramparts: 4, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 2),
+         NoOp))
+  ]
+  // text: Surge. When this enters play, deal 2 to the opposing Conduit in this Arena.
+}
+
+/*
+ * Roaring Champion [R] (EMBER, Unit) — 5 — 6/3
+ * Surge. Friendly EMBER Units in this Arena have +1/+0.
+ */
+Card RoaringChampion {
+  factions: {EMBER}, type: Unit, cost: 5, force: 6, ramparts: 3, rarity: R
+  keywords: [ Surge, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(target_unit, force, layer: 2),
+      check_at: continuously,
+      rule: ForEach(u -> u.arena == self.arena
+                       ∧ u.controller == self.controller
+                       ∧ u.type == Unit
+                       ∧ EMBER ∈ u.factions
+                       ∧ u != self,
+        AddToCharacteristic(u, force, 1)))
+  ]
+  // text: Surge. Friendly EMBER Units in this Arena have +1/+0.
+}
+
+// -----------------------------------------------------------------------------
+// BULWARK (5)
+// -----------------------------------------------------------------------------
+
+/*
+ * Stonewright [U] (BULWARK, Unit) — 4 — 3/4
+ * Fortify 2.
+ */
+Card Stonewright {
+  factions: {BULWARK}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ Fortify(2), DeploymentSickness ]
+  abilities: []
+  // text: Fortify 2.
+}
+
+/*
+ * Reinforce Walls [U] (BULWARK, Maneuver) — 3
+ * Friendly Units in target Arena gain Fortify 1 until end of turn.
+ */
+Card ReinforceWalls {
+  factions: {BULWARK}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        ForEach(u -> u.arena == target
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit,
+          GrantKeyword(u, Fortify(1), duration: end_of_turn))))
+  ]
+  // text: Friendly Units in target Arena gain Fortify 1 until end of turn.
+}
+
+/*
+ * The Mended Vault [R] (BULWARK, Standard — attaches to Arena) — 5
+ * At the start of your turn, Mend 1 in this Arena.
+ * Peak BULWARK: Mend 2 instead.
+ */
+Card TheMendedVault {
+  factions: {BULWARK}, type: Standard, subtype: attaches_to_arena, cost: 5, rarity: R
+  abilities: [
+    StartOfYourTurn(
+      If(Exists(Conduit[self.controller, self.arena])
+         ∧ not collapsed_for(self.controller, self.arena),
+         Tiers([
+           (Peak(BULWARK), Heal(self.controller.Conduit(self.arena), 2,
+                                cap: starting_integrity)),
+           (Default,       Heal(self.controller.Conduit(self.arena), 1,
+                                cap: starting_integrity))
+         ]),
+         NoOp))
+  ]
+  // text: At start of your turn, Mend 1 in this Arena.
+  //       Peak BULWARK: Mend 2 instead.
+}
+
+/*
+ * Wall of Conviction [R] (BULWARK, Maneuver) — 4
+ * Friendly Units gain Fortify 2 until end of turn.
+ */
+Card WallOfConviction {
+  factions: {BULWARK}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+        GrantKeyword(u, Fortify(2), duration: end_of_turn)))
+  ]
+  // text: Friendly Units gain Fortify 2 until end of turn.
+}
+
+/*
+ * Bishop of Mending [R] (BULWARK, Unit) — 5 — 3/5
+ * Mend 2.
+ * BULWARK 3: When you play another BULWARK card, Mend 1.
+ */
+Card BishopOfMending {
+  factions: {BULWARK}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller
+                 ∧ BULWARK ∈ c.factions
+                 ∧ c != self,
+      effect: When(Resonance(BULWARK, 3),
+        If(Exists(Conduit[self.controller, self.arena])
+           ∧ not collapsed_for(self.controller, self.arena),
+           Heal(self.controller.Conduit(self.arena), 1, cap: starting_integrity),
+           NoOp)))
+  ]
+  // text: Mend 2. BULWARK 3: When you play another BULWARK card, Mend 1.
+}
+
+// -----------------------------------------------------------------------------
+// TIDE (13)
+// -----------------------------------------------------------------------------
+
+/*
+ * Tidewatcher [C] (TIDE, Unit) — 2 — 2/2
+ * When this enters play, Reshape once.
+ */
+Card Tidewatcher {
+  factions: {TIDE}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(1))
+  ]
+  // text: When this enters play, Reshape once.
+}
+
+/*
+ * Currentkin [C] (TIDE, Unit) — 2 — 2/2
+ * Drift.
+ */
+Card Currentkin {
+  factions: {TIDE}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: []
+  // text: Drift.
+}
+
+/*
+ * Currents Pull [C] (TIDE, Maneuver) — 1
+ * Target friendly Unit Drifts now (move to an adjacent non-Collapsed Arena).
+ */
+Card CurrentsPull {
+  factions: {TIDE}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit ∧ u.controller == self.controller,
+        Target(a -> a ∈ adjacent(u.arena)
+                  ∧ not collapsed_for(u.controller, a),
+          chooser: self.controller,
+          effect:  MoveUnitToArena(u, a))))
+  ]
+  // text: Target friendly Unit moves to an adjacent non-Collapsed Arena.
+}
+
+/*
+ * Tidal Pull [C] (TIDE, Maneuver) — 2
+ * Each friendly Unit in target Arena moves to an adjacent non-Collapsed Arena
+ * (you choose per Unit).
+ */
+Card TidalPull {
+  factions: {TIDE}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        ForEach(u -> u.arena == target
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit,
+          Target(dest -> dest ∈ adjacent(u.arena)
+                       ∧ not collapsed_for(u.controller, dest),
+            chooser: self.controller,
+            effect:  MoveUnitToArena(u, dest)))))
+  ]
+  // text: Each friendly Unit in target Arena moves to an adjacent non-Collapsed Arena.
+}
+
+/*
+ * Returning Wave [C] (TIDE, Maneuver) — 2
+ * Return target non-Unique TIDE card from your Cache to your hand.
+ */
+Card ReturningWave {
+  factions: {TIDE}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(c -> c ∈ self.controller.Cache
+                ∧ TIDE ∈ c.factions
+                ∧ not (Unique ∈ c.keywords),
+        MoveTo(target, self.controller.Hand)))
+  ]
+  // text: Return a non-Unique TIDE card from your Cache to your hand.
+}
+
+/*
+ * Tidalshaper [U] (TIDE, Unit) — 3 — 2/3
+ * When this enters play, Reshape once.
+ */
+Card Tidalshaper {
+  factions: {TIDE}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(1))
+  ]
+  // text: When this enters play, Reshape once.
+}
+
+/*
+ * Spelunker [U] (TIDE, Unit) — 4 — 3/3
+ * Recur. When this enters play, draw a card.
+ */
+Card Spelunker {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: U
+  keywords: [ Recur, DeploymentSickness ]
+  abilities: [
+    OnEnter(Draw(self.controller, 1))
+  ]
+  // text: Recur. When this enters play, draw a card.
+}
+
+/*
+ * Marshlord [U] (TIDE, Unit) — 4 — 3/4
+ * Drift. Recur.
+ */
+Card Marshlord {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ Drift, Recur, DeploymentSickness ]
+  abilities: []
+  // text: Drift. Recur.
+}
+
+/*
+ * Echoing Wave [U] (TIDE, Maneuver) — 3
+ * Return target Unit to its owner's hand. This card has Recur.
+ */
+Card EchoingWave {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  keywords: [ Recur ]
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        MoveTo(target, target.owner.Hand)))
+  ]
+  // text: Return target Unit to its owner's hand. (Recur: this card returns
+  //       to the bottom of your Arsenal instead of your Cache.)
+}
+
+/*
+ * Drifting Mist [U] (TIDE, Maneuver) — 3
+ * Each of your Drift Units may Drift now (per-Unit choice).
+ */
+Card DriftingMist {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller
+                 ∧ u.type == Unit
+                 ∧ Drift ∈ u.keywords,
+        Choice(self.controller, {
+          pass:  NoOp,
+          drift: Target(a -> a ∈ adjacent(u.arena)
+                            ∧ not collapsed_for(u.controller, a),
+                        MoveUnitToArena(u, a))
+        })))
+  ]
+  // text: Each of your Drift Units may Drift now.
+}
+
+/*
+ * Wave-Sage [R] (TIDE, Unit) — 4 — 3/3
+ * When this enters play, Reshape twice.
+ */
+Card WaveSage {
+  factions: {TIDE}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Reshape(2))
+  ]
+  // text: When this enters play, Reshape twice.
+}
+
+/*
+ * Tidemoot Elder [R] (TIDE, Unit) — 5 — 3/5
+ * At the start of your turn, Reshape once.
+ */
+Card TidemootElder {
+  factions: {TIDE}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    StartOfYourTurn(Reshape(1))
+  ]
+  // text: At the start of your turn, Reshape once.
+}
+
+/*
+ * Currentmaster [R] (TIDE, Unit) — 5 — 4/4
+ * When you play a TIDE card, Reshape once.
+ */
+Card Currentmaster {
+  factions: {TIDE}, type: Unit, cost: 5, force: 4, ramparts: 4, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller ∧ TIDE ∈ c.factions ∧ c != self,
+      effect: Reshape(1))
+  ]
+  // text: When you play a TIDE card, Reshape once.
+}
+
+// -----------------------------------------------------------------------------
+// THORN (10)
+// -----------------------------------------------------------------------------
+
+/*
+ * Bramblepup [C] (THORN, Unit) — 1 — 1/2
+ * Rally.
+ */
+Card Bramblepup {
+  factions: {THORN}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: []
+  // text: Rally.
+}
+
+/*
+ * Sapling Scout [C] (THORN, Unit) — 1 — 1/2
+ * Rally.
+ */
+Card SaplingScout {
+  factions: {THORN}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: []
+  // text: Rally.
+}
+
+/*
+ * Thornpup [C] (THORN, Unit) — 2 — 2/2
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card Thornpup {
+  factions: {THORN}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Briar Watcher [C] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card BriarWatcher {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: Rally. When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Vinegrowth [C] (THORN, Maneuver) — 1
+ * Sprawl 1.
+ * THORN 3: Sprawl 2 instead.
+ */
+Card Vinegrowth {
+  factions: {THORN}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena ∧ not collapsed_for(self.controller, a),
+        Tiers([
+          (Resonance(THORN, 3),
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       a,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            CreateToken(template:   ThornSapling,
+                        zone:       a,
+                        owner:      self.controller,
+                        controller: self.controller))
+        ])))
+  ]
+  // text: Sprawl 1. THORN 3: Sprawl 2 instead.
+}
+
+/*
+ * Tanglevine Druid [U] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card TanglevineDruid {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Thornbrood Patriarch [U] (THORN, Unit) — 4 — 3/4
+ * When this enters play, Sprawl 1 in this Arena.
+ * THORN 3: Sprawl 2 instead.
+ */
+Card ThornbroodPatriarch {
+  factions: {THORN}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+        Tiers([
+          (Resonance(THORN, 3),
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            CreateToken(template:   ThornSapling,
+                        zone:       self.arena,
+                        owner:      self.controller,
+                        controller: self.controller))
+        ]),
+        NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+  //       THORN 3: Sprawl 2 instead.
+}
+
+/*
+ * Cradle Mother [U] (THORN, Unit) — 4 — 3/3
+ * Rally. When this enters play, Sprawl 1 in this Arena.
+ */
+Card CradleMother {
+  factions: {THORN}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: U
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: Rally. When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Vinemother [R] (THORN, Unit) — 5 — 3/4
+ * When this enters play, Sprawl 2 in this Arena.
+ * Peak THORN: Sprawl 3 instead.
+ */
+Card Vinemother {
+  factions: {THORN}, type: Unit, cost: 5, force: 3, ramparts: 4, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+        Tiers([
+          (Peak(THORN),
+            ForEach(i ∈ [1..3],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller)))
+        ]),
+        NoOp))
+  ]
+  // text: When this enters play, Sprawl 2 in this Arena.
+  //       Peak THORN: Sprawl 3 instead.
+}
+
+/*
+ * Thornlord [R] (THORN, Unit) — 5 — 4/4
+ * Rally.
+ * THORN 3: Friendly Units in this Arena have +1/+0.
+ */
+Card Thornlord {
+  factions: {THORN}, type: Unit, cost: 5, force: 4, ramparts: 4, rarity: R
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(target_unit, force, layer: 2),
+      check_at: continuously,
+      rule: When(Resonance(THORN, 3),
+        ForEach(u -> u.arena == self.arena
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit
+                   ∧ u != self,
+          AddToCharacteristic(u, force, 1))))
+  ]
+  // text: Rally. THORN 3: Friendly Units in this Arena have +1/+0.
+}
+
+// -----------------------------------------------------------------------------
+// HOLLOW (9)
+// -----------------------------------------------------------------------------
+
+/*
+ * Whisperthief [C] (HOLLOW, Maneuver) — 2
+ * Pilfer 1.
+ * HOLLOW 3: Pilfer 2 instead.
+ */
+Card Whisperthief {
+  factions: {HOLLOW}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 3), Pilfer(2)),
+        (Default,              Pilfer(1))
+      ]))
+  ]
+  // text: Pilfer 1. HOLLOW 3: Pilfer 2 instead.
+}
+
+/*
+ * Veiled Strike [C] (HOLLOW, Maneuver) — 2
+ * Deal 2 damage to a Unit.
+ * HOLLOW 3: That Unit also gets -1/-0 until end of turn.
+ */
+Card VeiledStrike {
+  factions: {HOLLOW}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Sequence([
+          DealDamage(target, 2),
+          When(Resonance(HOLLOW, 3),
+            ModifyCharacteristic(target, force, -1, duration: end_of_turn, layer: 2))
+        ])))
+  ]
+  // text: Deal 2 to a Unit. HOLLOW 3: That Unit gets -1/-0 until end of turn.
+}
+
+/*
+ * Pale Stalker [C] (HOLLOW, Unit) — 3 — 3/2
+ * Shroud.
+ */
+Card PaleStalker {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 3, ramparts: 2, rarity: C
+  keywords: [ Shroud, DeploymentSickness ]
+  abilities: []
+  // text: Shroud.
+}
+
+/*
+ * Veilwraith [U] (HOLLOW, Unit) — 3 — 3/2
+ * Phantom. When this enters play, Pilfer 1.
+ */
+Card Veilwraith {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 3, ramparts: 2, rarity: U
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    OnEnter(Pilfer(1))
+  ]
+  // text: Phantom. When this enters play, Pilfer 1.
+}
+
+/*
+ * Vanishing Word [U] (HOLLOW, Maneuver) — 3
+ * Target Unit gains Phantom until end of turn.
+ * HOLLOW 3: Also Pilfer 1.
+ */
+Card VanishingWord {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Sequence([
+          GrantKeyword(target, Phantom, duration: end_of_turn),
+          When(Resonance(HOLLOW, 3), Pilfer(1))
+        ])))
+  ]
+  // text: Target Unit gains Phantom until end of turn. HOLLOW 3: Also Pilfer 1.
+}
+
+/*
+ * The Hollow Sovereign [R] (HOLLOW, Unit) — 6 — 4/4
+ * Phantom. When this enters play, Pilfer 2.
+ * Peak HOLLOW: At the start of your turn, Pilfer 1.
+ */
+Card TheHollowSovereign {
+  factions: {HOLLOW}, type: Unit, cost: 6, force: 4, ramparts: 4, rarity: R
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    OnEnter(Pilfer(2)),
+    StartOfYourTurn(
+      When(Peak(HOLLOW), Pilfer(1)))
+  ]
+  // text: Phantom. When this enters play, Pilfer 2.
+  //       Peak HOLLOW: At the start of your turn, Pilfer 1.
+}
+
+/*
+ * Phantom Strike [R] (HOLLOW, Maneuver) — 4
+ * Target Unit Phantoms (returns to its owner's hand at end of clash with a
+ * permanent -1 Aether cost counter, minimum 0).
+ * Peak HOLLOW: It does not return — it is exiled to the bottom of its owner's
+ * Arsenal instead.
+ */
+Card PhantomStrike {
+  factions: {HOLLOW}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Tiers([
+          (Peak(HOLLOW),
+            MoveTo(target, bottom_of(target.owner.Arsenal),
+                   visibility: exiled)),
+          (Default,
+            GrantKeyword(target, Phantom, duration: end_of_turn))
+        ])))
+  ]
+  // text: Target Unit Phantoms. Peak HOLLOW: instead, it is exiled to the
+  //       bottom of its owner's Arsenal.
+}
+
+/*
+ * Devour [R] (HOLLOW, Maneuver) — 4
+ * Pilfer 2.
+ * HOLLOW 4: Pilfer 3 instead.
+ */
+Card Devour {
+  factions: {HOLLOW}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 4), Pilfer(3)),
+        (Default,              Pilfer(2))
+      ]))
+  ]
+  // text: Pilfer 2. HOLLOW 4: Pilfer 3 instead.
+}
+
+/*
+ * The Faceless Verdict [M] (HOLLOW, Maneuver) — 5
+ * Each opposing Unit gains Phantom until end of turn.
+ * Peak HOLLOW: Also opponent exiles a card from their hand at random.
+ */
+Card TheFacelessVerdict {
+  factions: {HOLLOW}, type: Maneuver, cost: 5, rarity: M
+  abilities: [
+    OnResolve(
+      Sequence([
+        ForEach(u -> u.controller != self.controller ∧ u.type == Unit,
+          GrantKeyword(u, Phantom, duration: end_of_turn)),
+        When(Peak(HOLLOW),
+          RandomExileFromHand(opponent_of(self.controller), count: 1))
+      ]))
+  ]
+  // text: Each opposing Unit gains Phantom until end of turn.
+  //       Peak HOLLOW: Opponent exiles a card from their hand at random.
+}
+
+// -----------------------------------------------------------------------------
+// NEUTRAL (7)
+// -----------------------------------------------------------------------------
+
+/*
+ * Vagabond [C] (NEUTRAL, Unit) — 2 — 2/2
+ * Vanilla 2-drop body.
+ */
+Card Vagabond {
+  factions: {NEUTRAL}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: []
+  // text: (No text.)
+}
+
+/*
+ * Camp Cook [C] (NEUTRAL, Unit) — 1 — 1/2
+ * Vanilla 1-drop body.
+ */
+Card CampCook {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: []
+  // text: (No text.)
+}
+
+/*
+ * Patch Job [C] (NEUTRAL, Maneuver) — 1
+ * Heal target Conduit 1.
+ */
+Card PatchJob {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        Heal(target, 1, cap: starting_integrity)))
+  ]
+  // text: Heal target Conduit 1.
+}
+
+/*
+ * Caravan Master [U] (NEUTRAL, Unit) — 4 — 3/4
+ * When this enters play, draw a card.
+ */
+Card CaravanMaster {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Draw(self.controller, 1))
+  ]
+  // text: When this enters play, draw a card.
+}
+
+/*
+ * Stoneglass Watcher [U] (NEUTRAL, Unit) — 4 — 2/5
+ * While your Banner exists, this has +0/+2.
+ */
+Card StoneglassWatcher {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 2, ramparts: 5, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(self, ramparts, layer: 2),
+      check_at: continuously,
+      rule: If(BannerExists(),
+        AddToCharacteristic(self, ramparts, 2),
+        NoOp))
+  ]
+  // text: While your Banner exists, this has +0/+2.
+}
+
+/*
+ * Treasure Hoard [R] (NEUTRAL, Maneuver) — 4
+ * Draw 2 cards. If your Banner exists, draw 3 instead.
+ */
+Card TreasureHoard {
+  factions: {NEUTRAL}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      If(BannerExists(),
+         Draw(self.controller, 3),
+         Draw(self.controller, 2)))
+  ]
+  // text: Draw 2. If your Banner exists, draw 3 instead.
+}
+
+/*
+ * Banner's Edge [R] (NEUTRAL, Maneuver) — 4
+ * Deal 4 damage to a Unit or Conduit. If your Banner exists, deal 6 instead.
+ */
+Card BannersEdge {
+  factions: {NEUTRAL}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        If(BannerExists(),
+           DealDamage(target, 6),
+           DealDamage(target, 4))))
+  ]
+  // text: Deal 4 damage. If your Banner exists, deal 6 instead.
+}

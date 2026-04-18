@@ -165,3 +165,90 @@ Card WardenOfTheMendedWall {
   // text: Mend 2. BULWARK 4: When another friendly BULWARK Unit enters this
   //       Arena, Mend 1.
 }
+
+/*
+ * Stonewright [U] (BULWARK, Unit) — 4 — 3/4
+ * Fortify 2.
+ */
+Card Stonewright {
+  factions: {BULWARK}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ Fortify(2), DeploymentSickness ]
+  abilities: []
+  // text: Fortify 2.
+}
+
+/*
+ * Reinforce Walls [U] (BULWARK, Maneuver) — 3
+ * Friendly Units in target Arena gain Fortify 1 until end of turn.
+ */
+Card ReinforceWalls {
+  factions: {BULWARK}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena,
+        ForEach(u -> u.arena == target
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit,
+          GrantKeyword(u, Fortify(1), duration: end_of_turn))))
+  ]
+  // text: Friendly Units in target Arena gain Fortify 1 until end of turn.
+}
+
+/*
+ * The Mended Vault [R] (BULWARK, Standard — attaches to Arena) — 5
+ * At the start of your turn, Mend 1 in this Arena.
+ * Peak BULWARK: Mend 2 instead.
+ */
+Card TheMendedVault {
+  factions: {BULWARK}, type: Standard, subtype: attaches_to_arena, cost: 5, rarity: R
+  abilities: [
+    StartOfYourTurn(
+      If(Exists(Conduit[self.controller, self.arena])
+         ∧ not collapsed_for(self.controller, self.arena),
+         Tiers([
+           (Peak(BULWARK), Heal(self.controller.Conduit(self.arena), 2,
+                                cap: starting_integrity)),
+           (Default,       Heal(self.controller.Conduit(self.arena), 1,
+                                cap: starting_integrity))
+         ]),
+         NoOp))
+  ]
+  // text: At start of your turn, Mend 1 in this Arena.
+  //       Peak BULWARK: Mend 2 instead.
+}
+
+/*
+ * Wall of Conviction [R] (BULWARK, Maneuver) — 4
+ * Friendly Units gain Fortify 2 until end of turn.
+ */
+Card WallOfConviction {
+  factions: {BULWARK}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      ForEach(u -> u.controller == self.controller ∧ u.type == Unit,
+        GrantKeyword(u, Fortify(2), duration: end_of_turn)))
+  ]
+  // text: Friendly Units gain Fortify 2 until end of turn.
+}
+
+/*
+ * Bishop of Mending [R] (BULWARK, Unit) — 5 — 3/5
+ * Mend 2.
+ * BULWARK 3: When you play another BULWARK card, Mend 1.
+ */
+Card BishopOfMending {
+  factions: {BULWARK}, type: Unit, cost: 5, force: 3, ramparts: 5, rarity: R
+  keywords: [ Mend(2), DeploymentSickness ]
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller
+                 ∧ BULWARK ∈ c.factions
+                 ∧ c != self,
+      effect: When(Resonance(BULWARK, 3),
+        If(Exists(Conduit[self.controller, self.arena])
+           ∧ not collapsed_for(self.controller, self.arena),
+           Heal(self.controller.Conduit(self.arena), 1, cap: starting_integrity),
+           NoOp)))
+  ]
+  // text: Mend 2. BULWARK 3: When you play another BULWARK card, Mend 1.
+}

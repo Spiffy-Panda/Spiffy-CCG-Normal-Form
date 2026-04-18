@@ -79,3 +79,101 @@ Card Bannerkeeper {
   ]
   // text: While your Banner exists, this has +1/+1.
 }
+
+/*
+ * Vagabond [C] (NEUTRAL, Unit) — 2 — 2/2
+ * Vanilla 2-drop body.
+ */
+Card Vagabond {
+  factions: {NEUTRAL}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: []
+  // text: (No text.)
+}
+
+/*
+ * Camp Cook [C] (NEUTRAL, Unit) — 1 — 1/2
+ * Vanilla 1-drop body.
+ */
+Card CampCook {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: []
+  // text: (No text.)
+}
+
+/*
+ * Patch Job [C] (NEUTRAL, Maneuver) — 1
+ * Heal target Conduit 1.
+ */
+Card PatchJob {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        Heal(target, 1, cap: starting_integrity)))
+  ]
+  // text: Heal target Conduit 1.
+}
+
+/*
+ * Caravan Master [U] (NEUTRAL, Unit) — 4 — 3/4
+ * When this enters play, draw a card.
+ */
+Card CaravanMaster {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(Draw(self.controller, 1))
+  ]
+  // text: When this enters play, draw a card.
+}
+
+/*
+ * Stoneglass Watcher [U] (NEUTRAL, Unit) — 4 — 2/5
+ * While your Banner exists, this has +0/+2.
+ */
+Card StoneglassWatcher {
+  factions: {NEUTRAL}, type: Unit, cost: 4, force: 2, ramparts: 5, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(self, ramparts, layer: 2),
+      check_at: continuously,
+      rule: If(BannerExists(),
+        AddToCharacteristic(self, ramparts, 2),
+        NoOp))
+  ]
+  // text: While your Banner exists, this has +0/+2.
+}
+
+/*
+ * Treasure Hoard [R] (NEUTRAL, Maneuver) — 4
+ * Draw 2 cards. If your Banner exists, draw 3 instead.
+ */
+Card TreasureHoard {
+  factions: {NEUTRAL}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      If(BannerExists(),
+         Draw(self.controller, 3),
+         Draw(self.controller, 2)))
+  ]
+  // text: Draw 2. If your Banner exists, draw 3 instead.
+}
+
+/*
+ * Banner's Edge [R] (NEUTRAL, Maneuver) — 4
+ * Deal 4 damage to a Unit or Conduit. If your Banner exists, deal 6 instead.
+ */
+Card BannersEdge {
+  factions: {NEUTRAL}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind ∈ {Unit, Conduit},
+        If(BannerExists(),
+           DealDamage(target, 6),
+           DealDamage(target, 4))))
+  ]
+  // text: Deal 4 damage. If your Banner exists, deal 6 instead.
+}

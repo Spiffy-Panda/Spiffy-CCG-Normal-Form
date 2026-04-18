@@ -152,3 +152,159 @@ Card QuietTheft {
   ]
   // text: Pilfer 1. HOLLOW 3: Pilfer 2 instead.
 }
+
+/*
+ * Whisperthief [C] (HOLLOW, Maneuver) — 2
+ * Pilfer 1.
+ * HOLLOW 3: Pilfer 2 instead.
+ */
+Card Whisperthief {
+  factions: {HOLLOW}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 3), Pilfer(2)),
+        (Default,              Pilfer(1))
+      ]))
+  ]
+  // text: Pilfer 1. HOLLOW 3: Pilfer 2 instead.
+}
+
+/*
+ * Veiled Strike [C] (HOLLOW, Maneuver) — 2
+ * Deal 2 damage to a Unit.
+ * HOLLOW 3: That Unit also gets -1/-0 until end of turn.
+ */
+Card VeiledStrike {
+  factions: {HOLLOW}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Sequence([
+          DealDamage(target, 2),
+          When(Resonance(HOLLOW, 3),
+            ModifyCharacteristic(target, force, -1, duration: end_of_turn, layer: 2))
+        ])))
+  ]
+  // text: Deal 2 to a Unit. HOLLOW 3: That Unit gets -1/-0 until end of turn.
+}
+
+/*
+ * Pale Stalker [C] (HOLLOW, Unit) — 3 — 3/2
+ * Shroud.
+ */
+Card PaleStalker {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 3, ramparts: 2, rarity: C
+  keywords: [ Shroud, DeploymentSickness ]
+  abilities: []
+  // text: Shroud.
+}
+
+/*
+ * Veilwraith [U] (HOLLOW, Unit) — 3 — 3/2
+ * Phantom. When this enters play, Pilfer 1.
+ */
+Card Veilwraith {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 3, ramparts: 2, rarity: U
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    OnEnter(Pilfer(1))
+  ]
+  // text: Phantom. When this enters play, Pilfer 1.
+}
+
+/*
+ * Vanishing Word [U] (HOLLOW, Maneuver) — 3
+ * Target Unit gains Phantom until end of turn.
+ * HOLLOW 3: Also Pilfer 1.
+ */
+Card VanishingWord {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Sequence([
+          GrantKeyword(target, Phantom, duration: end_of_turn),
+          When(Resonance(HOLLOW, 3), Pilfer(1))
+        ])))
+  ]
+  // text: Target Unit gains Phantom until end of turn. HOLLOW 3: Also Pilfer 1.
+}
+
+/*
+ * The Hollow Sovereign [R] (HOLLOW, Unit) — 6 — 4/4
+ * Phantom. When this enters play, Pilfer 2.
+ * Peak HOLLOW: At the start of your turn, Pilfer 1.
+ */
+Card TheHollowSovereign {
+  factions: {HOLLOW}, type: Unit, cost: 6, force: 4, ramparts: 4, rarity: R
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    OnEnter(Pilfer(2)),
+    StartOfYourTurn(
+      When(Peak(HOLLOW), Pilfer(1)))
+  ]
+  // text: Phantom. When this enters play, Pilfer 2.
+  //       Peak HOLLOW: At the start of your turn, Pilfer 1.
+}
+
+/*
+ * Phantom Strike [R] (HOLLOW, Maneuver) — 4
+ * Target Unit Phantoms (returns to its owner's hand at end of clash with a
+ * permanent -1 Aether cost counter, minimum 0).
+ * Peak HOLLOW: It does not return — it is exiled to the bottom of its owner's
+ * Arsenal instead.
+ */
+Card PhantomStrike {
+  factions: {HOLLOW}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Target(u -> u.type == Unit,
+        Tiers([
+          (Peak(HOLLOW),
+            MoveTo(target, bottom_of(target.owner.Arsenal),
+                   visibility: exiled)),
+          (Default,
+            GrantKeyword(target, Phantom, duration: end_of_turn))
+        ])))
+  ]
+  // text: Target Unit Phantoms. Peak HOLLOW: instead, it is exiled to the
+  //       bottom of its owner's Arsenal.
+}
+
+/*
+ * Devour [R] (HOLLOW, Maneuver) — 4
+ * Pilfer 2.
+ * HOLLOW 4: Pilfer 3 instead.
+ */
+Card Devour {
+  factions: {HOLLOW}, type: Maneuver, cost: 4, rarity: R
+  abilities: [
+    OnResolve(
+      Tiers([
+        (Resonance(HOLLOW, 4), Pilfer(3)),
+        (Default,              Pilfer(2))
+      ]))
+  ]
+  // text: Pilfer 2. HOLLOW 4: Pilfer 3 instead.
+}
+
+/*
+ * The Faceless Verdict [M] (HOLLOW, Maneuver) — 5
+ * Each opposing Unit gains Phantom until end of turn.
+ * Peak HOLLOW: Also opponent exiles a card from their hand at random.
+ */
+Card TheFacelessVerdict {
+  factions: {HOLLOW}, type: Maneuver, cost: 5, rarity: M
+  abilities: [
+    OnResolve(
+      Sequence([
+        ForEach(u -> u.controller != self.controller ∧ u.type == Unit,
+          GrantKeyword(u, Phantom, duration: end_of_turn)),
+        When(Peak(HOLLOW),
+          RandomExileFromHand(opponent_of(self.controller), count: 1))
+      ]))
+  ]
+  // text: Each opposing Unit gains Phantom until end of turn.
+  //       Peak HOLLOW: Opponent exiles a card from their hand at random.
+}

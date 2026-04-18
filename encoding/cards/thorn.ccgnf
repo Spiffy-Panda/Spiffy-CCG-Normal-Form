@@ -187,3 +187,211 @@ Card ThornseedPlanter {
   ]
   // text: When this enters play, Sprawl 2 in this Arena.
 }
+
+/*
+ * Bramblepup [C] (THORN, Unit) — 1 — 1/2
+ * Rally.
+ */
+Card Bramblepup {
+  factions: {THORN}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: []
+  // text: Rally.
+}
+
+/*
+ * Sapling Scout [C] (THORN, Unit) — 1 — 1/2
+ * Rally.
+ */
+Card SaplingScout {
+  factions: {THORN}, type: Unit, cost: 1, force: 1, ramparts: 2, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: []
+  // text: Rally.
+}
+
+/*
+ * Thornpup [C] (THORN, Unit) — 2 — 2/2
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card Thornpup {
+  factions: {THORN}, type: Unit, cost: 2, force: 2, ramparts: 2, rarity: C
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Briar Watcher [C] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card BriarWatcher {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: C
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: Rally. When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Vinegrowth [C] (THORN, Maneuver) — 1
+ * Sprawl 1.
+ * THORN 3: Sprawl 2 instead.
+ */
+Card Vinegrowth {
+  factions: {THORN}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(
+      Target(a -> a.kind == Arena ∧ not collapsed_for(self.controller, a),
+        Tiers([
+          (Resonance(THORN, 3),
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       a,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            CreateToken(template:   ThornSapling,
+                        zone:       a,
+                        owner:      self.controller,
+                        controller: self.controller))
+        ])))
+  ]
+  // text: Sprawl 1. THORN 3: Sprawl 2 instead.
+}
+
+/*
+ * Tanglevine Druid [U] (THORN, Unit) — 3 — 2/3
+ * When this enters play, Sprawl 1 in this Arena.
+ */
+Card TanglevineDruid {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Thornbrood Patriarch [U] (THORN, Unit) — 4 — 3/4
+ * When this enters play, Sprawl 1 in this Arena.
+ * THORN 3: Sprawl 2 instead.
+ */
+Card ThornbroodPatriarch {
+  factions: {THORN}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+        Tiers([
+          (Resonance(THORN, 3),
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            CreateToken(template:   ThornSapling,
+                        zone:       self.arena,
+                        owner:      self.controller,
+                        controller: self.controller))
+        ]),
+        NoOp))
+  ]
+  // text: When this enters play, Sprawl 1 in this Arena.
+  //       THORN 3: Sprawl 2 instead.
+}
+
+/*
+ * Cradle Mother [U] (THORN, Unit) — 4 — 3/3
+ * Rally. When this enters play, Sprawl 1 in this Arena.
+ */
+Card CradleMother {
+  factions: {THORN}, type: Unit, cost: 4, force: 3, ramparts: 3, rarity: U
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+         CreateToken(template:   ThornSapling,
+                     zone:       self.arena,
+                     owner:      self.controller,
+                     controller: self.controller),
+         NoOp))
+  ]
+  // text: Rally. When this enters play, Sprawl 1 in this Arena.
+}
+
+/*
+ * Vinemother [R] (THORN, Unit) — 5 — 3/4
+ * When this enters play, Sprawl 2 in this Arena.
+ * Peak THORN: Sprawl 3 instead.
+ */
+Card Vinemother {
+  factions: {THORN}, type: Unit, cost: 5, force: 3, ramparts: 4, rarity: R
+  keywords: [ DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(not collapsed_for(self.controller, self.arena),
+        Tiers([
+          (Peak(THORN),
+            ForEach(i ∈ [1..3],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller))),
+          (Default,
+            ForEach(i ∈ [1..2],
+              CreateToken(template:   ThornSapling,
+                          zone:       self.arena,
+                          owner:      self.controller,
+                          controller: self.controller)))
+        ]),
+        NoOp))
+  ]
+  // text: When this enters play, Sprawl 2 in this Arena.
+  //       Peak THORN: Sprawl 3 instead.
+}
+
+/*
+ * Thornlord [R] (THORN, Unit) — 5 — 4/4
+ * Rally.
+ * THORN 3: Friendly Units in this Arena have +1/+0.
+ */
+Card Thornlord {
+  factions: {THORN}, type: Unit, cost: 5, force: 4, ramparts: 4, rarity: R
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: Characteristic(target_unit, force, layer: 2),
+      check_at: continuously,
+      rule: When(Resonance(THORN, 3),
+        ForEach(u -> u.arena == self.arena
+                   ∧ u.controller == self.controller
+                   ∧ u.type == Unit
+                   ∧ u != self,
+          AddToCharacteristic(u, force, 1))))
+  ]
+  // text: Rally. THORN 3: Friendly Units in this Arena have +1/+0.
+}
