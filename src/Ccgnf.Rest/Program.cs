@@ -1,4 +1,5 @@
 using Ccgnf.Rest.Endpoints;
+using Ccgnf.Rest.Services;
 using Ccgnf.Rest.Sessions;
 
 // -----------------------------------------------------------------------------
@@ -23,6 +24,7 @@ int httpPort = int.TryParse(
 builder.WebHost.UseUrls($"http://localhost:{httpPort}");
 
 builder.Services.AddSingleton<SessionStore>();
+builder.Services.AddSingleton<ProjectCatalog>();
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 {
     o.SerializerOptions.WriteIndented = false;
@@ -37,6 +39,8 @@ app.MapGet("/api/health", () => new { ok = true, service = "ccgnf.rest", port = 
 
 PipelineEndpoints.Map(app);
 SessionEndpoints.Map(app);
+CardsEndpoints.Map(app);
+ProjectEndpoints.Map(app);
 
 app.Run();
 

@@ -18,12 +18,23 @@ public sealed class ProjectLoadResult
 {
     public AstFile? File { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
+
+    /// <summary>
+    /// Names of every <c>define</c> macro surfaced by the preprocessor. Empty
+    /// when preprocessing failed before any directives were collected.
+    /// </summary>
+    public IReadOnlyList<string> MacroNames { get; }
+
     public bool HasErrors { get; }
 
-    public ProjectLoadResult(AstFile? file, IReadOnlyList<Diagnostic> diagnostics)
+    public ProjectLoadResult(
+        AstFile? file,
+        IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyList<string>? macroNames = null)
     {
         File = file;
         Diagnostics = diagnostics;
+        MacroNames = macroNames ?? Array.Empty<string>();
         HasErrors = diagnostics.Any(d => d.Severity == DiagnosticSeverity.Error);
     }
 }
@@ -59,23 +70,23 @@ public sealed class ProjectLoader
         var preprocessor = new Preprocessor(_loggerFactory.CreateLogger<Preprocessor>());
         var pp = preprocessor.Preprocess(sources);
         diagnostics.AddRange(pp.Diagnostics);
-        if (pp.HasErrors) return new ProjectLoadResult(null, diagnostics);
+        if (pp.HasErrors) return new ProjectLoadResult(null, diagnostics, pp.MacroNames);
 
         var parser = new CcgnfParser(_loggerFactory.CreateLogger<CcgnfParser>());
         var parse = parser.Parse(pp.ExpandedText, sourceName);
         diagnostics.AddRange(parse.Diagnostics);
-        if (parse.HasErrors || parse.Tree is null) return new ProjectLoadResult(null, diagnostics);
+        if (parse.HasErrors || parse.Tree is null) return new ProjectLoadResult(null, diagnostics, pp.MacroNames);
 
         var builder = new AstBuilder(_loggerFactory.CreateLogger<AstBuilder>());
         var ast = builder.Build(parse.Tree, sourceName);
         diagnostics.AddRange(ast.Diagnostics);
-        if (ast.HasErrors || ast.File is null) return new ProjectLoadResult(null, diagnostics);
+        if (ast.HasErrors || ast.File is null) return new ProjectLoadResult(null, diagnostics, pp.MacroNames);
 
         var validator = new Validator(_loggerFactory.CreateLogger<Validator>());
         var validation = validator.Validate(ast.File);
         diagnostics.AddRange(validation.Diagnostics);
-        if (validation.HasErrors) return new ProjectLoadResult(null, diagnostics);
+        if (validation.HasErrors) return new ProjectLoadResult(null, diagnostics, pp.MacroNames);
 
-        return new ProjectLoadResult(ast.File, diagnostics);
+        return new ProjectLoadResult(ast.File, diagnostics, pp.MacroNames);
     }
 }

@@ -63,7 +63,7 @@ public sealed class Preprocessor
             "Preprocessor: {MacroCount} macros collected, {DiagnosticCount} diagnostics",
             macros.All.Count, diagnostics.Count);
 
-        return new PreprocessorResult(sb.ToString(), diagnostics);
+        return new PreprocessorResult(sb.ToString(), diagnostics, macros.All.Keys.ToArray());
     }
 
     // -----------------------------------------------------------------------

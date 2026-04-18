@@ -54,10 +54,10 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance rules (design docs)              | **Complete**                  |
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
-| REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, static playground |
+| REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, read-only cards / project data plane, static playground |
 | Web app (`web/`)                           | **Scaffolded** — Vite + TypeScript; playground migrated to `#/interpreter` |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Working** — 109 tests green |
+| Solution + test project                    | **Working** — 118 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
 "v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.
@@ -132,19 +132,24 @@ make rest                     # or: dotnet run --project src/Ccgnf.Rest
 Live endpoints:
 
 ```
-GET  /api/health               service metadata + port
+GET  /api/health                service metadata + port
 
-POST /api/preprocess           macro expansion + diagnostics
-POST /api/parse                ANTLR parse + diagnostics
-POST /api/ast                  parse tree -> typed AST, declaration counts
-POST /api/validate             full pipeline through validator
-POST /api/run                  execute v1 interpreter, return GameState
+POST /api/preprocess            macro expansion + diagnostics
+POST /api/parse                 ANTLR parse + diagnostics
+POST /api/ast                   parse tree -> typed AST, declaration counts
+POST /api/validate              full pipeline through validator
+POST /api/run                   execute v1 interpreter, return GameState
 
-POST /api/sessions             create session from a run, returns id + state
-GET  /api/sessions             list sessions
-GET  /api/sessions/{id}        session metadata
-GET  /api/sessions/{id}/state  current GameState (read-only in v1)
-DELETE /api/sessions/{id}      dispose
+POST /api/sessions              create session from a run, returns id + state
+GET  /api/sessions              list sessions
+GET  /api/sessions/{id}         session metadata
+GET  /api/sessions/{id}/state   current GameState (read-only in v1)
+DELETE /api/sessions/{id}       dispose
+
+GET  /api/cards                 card list projected from the loaded encoding
+POST /api/cards/distribution    aggregate faction / type / cost / rarity counts
+GET  /api/project               files, macros, declarations-by-kind / by-file
+GET  /api/project/file?path=    raw text of one loaded .ccgnf file
 ```
 
 Request body for the pipeline endpoints:

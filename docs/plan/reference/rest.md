@@ -4,12 +4,13 @@ Location: `src/Ccgnf.Rest/`. ASP.NET Core minimal-API host.
 
 ## Program entry
 
-`Program.cs` — 40 lines.
+`Program.cs` — ~45 lines.
 
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://localhost:{httpPort}");  // CCGNF_HTTP_PORT or 19397
 builder.Services.AddSingleton<SessionStore>();
+builder.Services.AddSingleton<ProjectCatalog>();
 
 var app = builder.Build();
 app.UseDefaultFiles();
@@ -17,6 +18,8 @@ app.UseStaticFiles();
 app.MapGet("/api/health", …);
 PipelineEndpoints.Map(app);
 SessionEndpoints.Map(app);
+CardsEndpoints.Map(app);
+ProjectEndpoints.Map(app);
 app.Run();
 
 public partial class Program { }   // exposed for WebApplicationFactory<Program>
@@ -48,6 +51,25 @@ Helpers:
 - `GET /api/sessions/{id}/state` → `GameStateDto` or 404.
 - `DELETE /api/sessions/{id}` → 204 or 404.
 
+### `CardsEndpoints` — `Endpoints/CardsEndpoints.cs`
+
+`internal static`. Registers:
+
+- `GET /api/cards` → `CardDto[]` projected from the catalog.
+- `POST /api/cards/distribution` → `DistributionDto` aggregated over the
+  full pool or an optional `cards` filter.
+
+Helper `CardsFrom(ProjectSnapshot)` is reused by distribution aggregation.
+
+### `ProjectEndpoints` — `Endpoints/ProjectEndpoints.cs`
+
+`internal static`. Registers:
+
+- `GET /api/project` → `ProjectDto` (files, macros, declaration counts +
+  by-file index, snapshot timestamp).
+- `GET /api/project/file?path=...` → raw `text/plain` content, or 400
+  (malformed / traversal path) / 404 (unknown path).
+
 ## Sessions
 
 ### `SessionStore` — `Sessions/SessionStore.cs`
@@ -71,6 +93,38 @@ public sealed class GameSession {
 `ConcurrentDictionary` backed; in-memory only; no TTL (rooms will add TTL
 in a future step — see [../web/rooms-protocol.md](../web/rooms-protocol.md)).
 
+## ProjectCatalog
+
+### `ProjectCatalog` — `Services/ProjectCatalog.cs`
+
+```csharp
+public sealed class ProjectCatalog {
+    ProjectCatalog(ILogger<ProjectCatalog>, ILoggerFactory);
+    ProjectSnapshot Get(bool reload = false);   // lazy; locks; thread-safe
+}
+
+public sealed record ProjectSnapshot(
+    AstFile? File,
+    IReadOnlyDictionary<string, string> RawContent,
+    IReadOnlyList<string> MacroNames,
+    IReadOnlyDictionary<string, DeclarationLocation> CardLocations,
+    IReadOnlyDictionary<string, DeclarationLocation> EntityLocations,
+    IReadOnlyDictionary<string, DeclarationLocation> TokenLocations,
+    DateTimeOffset LoadedAt);
+
+public sealed record DeclarationLocation(string Path, int Line);
+```
+
+Locates the repo by walking up from `AppContext.BaseDirectory` until
+`Ccgnf.sln` is found, then loads every `*.ccgnf` under
+`{repoRoot}/{CCGNF_PROJECT_ROOT ?? "encoding"}`. Paths stored in
+`RawContent` and `*Locations` are repo-relative with forward slashes.
+
+Declaration locations are recovered by regex-scanning the raw content
+(`^\s*(Card|Entity|Token)\s+(\w+)`) because the preprocessor concatenates
+sources before handing a single string to the parser, so AST
+`SourceSpan.File` collapses to `<project>` for every declaration.
+
 ## Serialization
 
 ### `Serialization/Dtos.cs`
@@ -90,6 +144,30 @@ ValidateResponse(Ok, Diagnostics)
 RunResponse(Ok, State, Diagnostics)
 SessionCreateResponse(SessionId, State, Diagnostics)
 ```
+
+### `Serialization/CardDto.cs`
+
+```csharp
+CardDto(Name, Factions, Type, Cost, Rarity, Keywords, Text, SourcePath, SourceLine)
+DistributionRequest(Cards)            // nullable; null filter = full pool
+DistributionDto(Faction, Type, Cost, Rarity)   // all IReadOnlyDictionary<string,int>
+```
+
+### `Serialization/ProjectDto.cs`
+
+```csharp
+ProjectFileDto(Path, Bytes)
+ProjectDeclarationsDto(Counts, ByFile)
+ProjectDto(Files, Macros, Declarations, LoadedAt)   // LoadedAt is ISO-8601 string
+```
+
+### `Serialization/CardMapper.cs`
+
+`public static`. Method `ToDto(AstCardDecl, string? rawContent, string sourcePath, int sourceLine)`
+projects the card block into a `CardDto`. `factions` / `type` / `cost` /
+`rarity` / `keywords` come from walking `Body.Fields`; `text` is
+recovered by scanning `rawContent` from `sourceLine` forward for the
+first `// text:` line inside the card's brace pair.
 
 ### `Serialization/DiagnosticMapper.cs`
 

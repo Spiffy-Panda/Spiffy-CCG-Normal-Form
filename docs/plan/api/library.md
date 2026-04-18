@@ -78,6 +78,7 @@ public sealed class ProjectLoader {
 public sealed class ProjectLoadResult {
     public AstFile? File { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
+    public IReadOnlyList<string> MacroNames { get; }   // preprocessor's collected `define`s
     public bool HasErrors { get; }
 }
 ```

@@ -160,26 +160,41 @@ Current `GameStateDto`. `404` if unknown.
 
 `204 No Content` on success, `404` if unknown.
 
-## Planned (web-app arc)
-
 ### `GET /api/project`
 
-Advertises what's loaded: files, macro names, declaration counts. Backs
-the Raw view and seeds the Interpreter editor.
+Advertises what's loaded: files, preprocessor macros, declaration counts,
+and per-file declaration index. Backs the Raw view and the project tree
+in the Cards and Interpreter pages. Read from a `ProjectCatalog` singleton
+that loads from `encoding/` (override with `CCGNF_PROJECT_ROOT`) lazily
+on first hit; append `?reload=1` to force a re-read.
 
 ```jsonc
 {
   "files": [
-    { "path": "encoding/engine/04-entities.ccgnf", "bytes": 3412, "stage": "validated" }
+    { "path": "encoding/engine/04-entities.ccgnf", "bytes": 3412 }
   ],
   "macros": ["SetupSequence", "ChooseFirstPlayer", …],
-  "declarations": { "Entity": 4, "Augment": 12, "Card": 250 }
+  "declarations": {
+    "counts": { "Entity": 4, "Card": 116, "Augment": 22, "Token": 3 },
+    "byFile": {
+      "encoding/cards/ember.ccgnf": ["Card Spark", "Card Cinderling", …]
+    }
+  },
+  "loadedAt": "2026-04-18T…"
 }
 ```
 
+### `GET /api/project/file?path=...`
+
+Returns the raw text of a single loaded file as `text/plain`. The path
+must be the same repo-relative form returned by `/api/project`
+(e.g. `encoding/engine/04-entities.ccgnf`). `400` for malformed /
+traversal paths, `404` when the path is unknown.
+
 ### `GET /api/cards`
 
-Projection of `AstCardDecl`s into a UI-friendly list.
+Projection of `AstCardDecl`s into a UI-friendly list, sourced from the
+project catalog.
 
 ```jsonc
 [
@@ -191,15 +206,44 @@ Projection of `AstCardDecl`s into a UI-friendly list.
     "rarity": "C",
     "keywords": [],
     "text": "Deal 2 damage to a Unit or Conduit. EMBER 3: Deal 3 instead.",
-    "abilitiesAst": "OnResolve(…)"    // raw .ccgnf expression, source for future pretty-print
+    "sourcePath": "encoding/cards/ember.ccgnf",
+    "sourceLine": 13
   }
 ]
 ```
 
-### `GET /api/cards/distribution?format={name}`
+`text` is recovered from the trailing `// text:` line comment in the raw
+source (the preprocessor strips comments, so the AST alone cannot surface
+it). `sourcePath` / `sourceLine` are recovered by regex-scanning the raw
+source in the catalog — AST spans from the whole-project parse collapse
+to a single `<project>` token stream.
 
-Returns aggregate counts per faction / type / cost / rarity for the
-current card pool, filtered by format. Backs the deck-building stats panel.
+### `POST /api/cards/distribution`
+
+Aggregate counts per faction / type / cost / rarity for the current card
+pool. Backs the deck-building stats panel. Optional `cards` filter limits
+the aggregation to a named subset; a null or omitted filter aggregates
+the full pool.
+
+**Request:**
+```jsonc
+{ "cards": ["Spark", "Cinderling", …] }   // or { "cards": null }
+```
+
+**Response (200):**
+```jsonc
+{
+  "faction": { "EMBER": 30, "BULWARK": 22, … },
+  "type":    { "Unit": 60, "Maneuver": 40, "Standard": 16 },
+  "cost":    { "1": 20, "2": 28, "3": 25, "4": 18, "5": 15, "6+": 10 },
+  "rarity":  { "C": 70, "U": 30, "R": 12, "M": 4 }
+}
+```
+
+Costs of 6 or greater bucket into `"6+"`; cards with no `cost` field
+(e.g. non-playable Tokens) bucket into `"?"`.
+
+## Planned (web-app arc)
 
 ### `POST /api/decks/mock-pool`
 

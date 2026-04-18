@@ -49,6 +49,7 @@ invocations via token substitution until a fixed point.
 class PreprocessorResult {
     string ExpandedText { get; }
     IReadOnlyList<Diagnostic> Diagnostics { get; }
+    IReadOnlyList<string> MacroNames { get; }   // names of every `define` collected
     bool HasErrors { get; }
 }
 ```
