@@ -84,4 +84,4 @@ When in doubt, re-read the README Status table and the Repository Layout section
 
 - Commits are one logical change each. Keep design changes separate from encoding changes when feasible.
 - Before editing `.ccgnf` files, check whether the same rule is described in `design/GameRules.md` — the design doc is the source of truth for intent; the encoding is the source of truth for mechanics.
-- Remote is local only; no push destination is configured.
+- Remote `origin` points at `https://github.com/Spiffy-Panda/Spiffy-CCG-Normal-Form.git`; default branch is `main`. Push only when the user explicitly asks.

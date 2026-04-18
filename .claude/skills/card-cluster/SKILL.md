@@ -34,30 +34,39 @@ Record all inputs in the working file header.
 make build CONFIG=Release
 ```
 
-Fall back to `dotnet build Ccgnf.sln -c Release` if `make` is unavailable. If the build fails, report the error and stop — do not proceed with a broken toolchain.
+Fall back to `dotnet build Ccgnf.sln -c Release` if `make` is unavailable (common on Windows/bash where `make` may not be installed). The `dotnet` fallback is a fully supported path — don't ask the user to install `make`. If the build itself fails, report the error and stop — do not proceed with a broken toolchain.
 
-### 2. Read current distribution
+### 2. Read current distribution and derive rarity weights
 
 Load `encoding/cards/DISTRIBUTION.md`. Note the current counts per faction × rarity and the deficit vs. the §4 target distribution from `design/Supplement.md`:
 
 - Common: 44%, Uncommon: 32%, Rare: 18%, Mythic: 6%
 
-Use deficits to weight later PRNG choices toward what the set needs.
+**Don't pick weights by eye.** Run the helper:
+
+```bash
+python3 tools/cluster-rarity-weights.py
+```
+
+It reads the current Totals table from `DISTRIBUTION.md` and prints `random.choices`-ready weights using `weight = target × clamp(target/current, 0.5, 2.0)` — over-represented rarities get downweighted, under-represented ones get upweighted, with the clamp preventing extreme swings on small sets. Use the printed weights verbatim in step 3's rarity roll (unless the user gave a rarity filter).
+
+If a user-specified theme implies a non-standard distribution (e.g., "give me a mythic cycle"), prefer the user's intent over the helper's tilt.
 
 ### 3. PRNG-driven allocation
 
 All four of these use `python3 -c` with `random.seed(int(seed))`. Invoke each as a separate shell call so the seed stream is deterministic.
 
-**Rarity split** (unless user overrode):
+**Rarity split** (unless user overrode) — use the deficit-tilted weights from step 2, not the raw target ratios:
 
 ```bash
 python3 -c "
 import random, sys
 random.seed(int(sys.argv[1]))
 n = int(sys.argv[2])
+# Weights from: python3 tools/cluster-rarity-weights.py
 print(','.join(random.choices(
     ['C', 'U', 'R', 'M'],
-    weights=[44, 32, 18, 6],
+    weights=[<C>, <U>, <R>, <M>],
     k=n)))
 " <seed> <N>
 ```
@@ -89,7 +98,48 @@ print(','.join(random.choices(
 | NEUTRAL  | 60%  | 35%      | 5%       |
 | DUAL     | 80%  | 15%      | 5%       |
 
-**Keyword selection per faction**: PRNG-pick from the signature keyword set in `design/Supplement.md §1.*`. Avoid re-using the same keyword/mechanic for multiple cards in one cluster unless the user asks for a theme.
+**Keyword selection per faction**: PRNG-pick from the signature keyword set in `design/Supplement.md §2.*`. Avoid re-using the same keyword/mechanic for multiple cards in one cluster unless the user asks for a theme.
+
+Per-faction signature pools:
+
+| Faction  | Signature keywords                        |
+|----------|-------------------------------------------|
+| EMBER    | Surge, Blitz, Ignite                      |
+| BULWARK  | Fortify, Mend, Sentinel                   |
+| TIDE     | Drift, Recur, Reshape                     |
+| THORN    | Rally, Sprawl, Kindle                     |
+| HOLLOW   | Phantom, Shroud, Pilfer                   |
+| NEUTRAL  | (none — Neutral cards are glue, no signature keyword) |
+
+**DUAL slot handling**: a DUAL slot needs *two* PRNG decisions, in this order:
+
+1. **Pick a pair** from the launch-set archetype list in `design/Supplement.md §6.3`:
+   `EMBER/THORN`, `BULWARK/TIDE`, `HOLLOW/TIDE`, `THORN/BULWARK`, `EMBER/HOLLOW`.
+2. **Pick a keyword** from the *union* of both component factions' pools (or pick "no keyword" — many dual cards lean on combined factions and a small effect rather than a marquee keyword).
+
+Sketch:
+
+```python
+random.seed(seed + 300)
+for slot in slots:
+    if slot.faction == 'DUAL':
+        pair = random.choice(DUAL_PAIRS)        # ('EMBER','THORN'), etc.
+        pool = pools[pair[0]] + pools[pair[1]]
+        slot.keyword = random.choice(pool + [None])
+    elif slot.faction == 'NEUTRAL':
+        slot.keyword = None                     # glue, no signature
+    else:
+        slot.keyword = random.choice(pools[slot.faction])
+```
+
+**Keyword/type compatibility**: a few keywords are type-locked. If the PRNG roll lands on an incompatible pair, treat the keyword as a *hint* and substitute a faction-flavored effect — do not force the keyword in.
+
+| Keyword   | Only legal on | If rolled on something else                          |
+|-----------|---------------|------------------------------------------------------|
+| Kindle    | Standard      | Substitute a Sprawl-/Rally-flavored effect (THORN).  |
+| Interrupt | Maneuver      | Substitute a non-Interrupt Maneuver effect.          |
+
+(See `design/Supplement.md §2.4` and `§2.6` for the canonical lists.)
 
 Offsetting seed between calls (`seed`, `seed+100`, `seed+200`, ...) keeps the streams independent.
 
@@ -104,9 +154,17 @@ For each slot, assemble:
 - **Flavor text**: one-liner, LLM-authored.
 - **Check for name collision**: grep the existing `encoding/cards/*.ccgnf` for the proposed name. If taken, re-roll the name (PRNG `seed + offset`).
 
+**Sanity check the rarity × type combo before authoring.** Some combinations are legal-but-unusual; if the PRNG lands on one, pause to confirm the design space is real:
+
+- **Common + Standard** is rare in the existing set (most Standards are U/R). Either keep it intentionally simple (one short ongoing effect, like "your Units in this Arena have Fortify 1") or downgrade the type to Unit/Maneuver for that slot.
+- **Mythic + Maneuver** with no Unit body — possible but should feel game-defining at Peak.
+- **Common + Unique** — disallowed; Uniques are uncommon-and-up by convention. Re-roll type if this happens.
+
 ### 5. Write the working file
 
 Path: `encoding-artifacts/working-<UTC-timestamp>.ccgnf` where timestamp is `date -u +%Y%m%dT%H%M%S`.
+
+**The block comment is the spec, not a scratchpad.** Write the final form on the first pass — no draft notes, no parentheticals like "actually X" or "TODO: rename", no in-comment self-corrections. The block comment is what's read by humans first and copied into `design/Supplement.md`-style references later. Sloppy comments cause sync-check failures in step 7 that you then have to chase.
 
 Layout:
 
@@ -214,9 +272,11 @@ When the user says "looks good" / "ship it" / equivalent:
 
    ```bash
    make card-distribution
+   # or, if make isn't available:
+   python3 tools/update-card-distribution.py
    ```
 
-   (Wraps `python3 tools/update-card-distribution.py`, which scans every faction file, counts rarity × faction, handles dual pairs, and rewrites the table.)
+   The Python script is the real worker; `make card-distribution` is just a wrapper. Either is fine. The script scans every faction file, counts rarity × faction, handles dual pairs, and rewrites the table.
 
 4. **Run the encoding corpus test** to confirm the appended cards still parse cleanly when combined with the rest of the set:
    ```bash
