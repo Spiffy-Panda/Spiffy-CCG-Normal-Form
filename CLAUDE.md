@@ -85,3 +85,7 @@ When in doubt, re-read the README Status table and the Repository Layout section
 - Commits are one logical change each. Keep design changes separate from encoding changes when feasible.
 - Before editing `.ccgnf` files, check whether the same rule is described in `design/GameRules.md` — the design doc is the source of truth for intent; the encoding is the source of truth for mechanics.
 - Remote `origin` points at `https://github.com/Spiffy-Panda/Spiffy-CCG-Normal-Form.git`; default branch is `main`. Push only when the user explicitly asks.
+
+## Recovery recipes
+
+- **REST port already in use.** If `make rest`, `dotnet run --project src/Ccgnf.Rest`, or the preview panel's `ccgnf-rest` server fails with "address already in use" on port 19397, run `tools/kill-rest-port.sh` to terminate the stale listener, then retry. Pass an alternate port as the first argument if `CCGNF_HTTP_PORT` was overridden (`tools/kill-rest-port.sh 19398`). The script is a no-op when nothing is listening.
