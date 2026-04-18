@@ -1,4 +1,9 @@
-export type RouteRenderer = (container: HTMLElement, path: string) => void | Promise<void>;
+export interface RouteMatch {
+  path: string;
+  query: URLSearchParams;
+}
+
+export type RouteRenderer = (container: HTMLElement, match: RouteMatch) => void | Promise<void>;
 
 export interface RouteDef {
   path: string;
@@ -11,15 +16,22 @@ export interface Router {
   mount: (container: HTMLElement) => void;
 }
 
-function currentHashPath(): string {
+function parseHash(): RouteMatch {
   const raw = window.location.hash || "#/interpreter";
-  return raw.startsWith("#") ? raw.slice(1) : raw;
+  const stripped = raw.startsWith("#") ? raw.slice(1) : raw;
+  const qIndex = stripped.indexOf("?");
+  if (qIndex < 0) return { path: stripped, query: new URLSearchParams() };
+  return {
+    path: stripped.slice(0, qIndex),
+    query: new URLSearchParams(stripped.slice(qIndex + 1)),
+  };
 }
 
 export function createRouter(routes: RouteDef[], fallback: RouteRenderer): Router {
-  const match = (path: string): { route: RouteDef | null; path: string } => {
-    const hit = routes.find((r) => r.path === path) ?? null;
-    return { route: hit, path };
+  const match = (): { route: RouteDef | null; routeMatch: RouteMatch } => {
+    const routeMatch = parseHash();
+    const hit = routes.find((r) => r.path === routeMatch.path) ?? null;
+    return { route: hit, routeMatch };
   };
 
   const router: Router = {
@@ -27,9 +39,9 @@ export function createRouter(routes: RouteDef[], fallback: RouteRenderer): Route
     fallback,
     mount(container: HTMLElement) {
       const render = async () => {
-        const { route, path } = match(currentHashPath());
+        const { route, routeMatch } = match();
         const r = route?.render ?? fallback;
-        await r(container, path);
+        await r(container, routeMatch);
       };
       window.addEventListener("hashchange", render);
       if (!window.location.hash) {
@@ -39,4 +51,9 @@ export function createRouter(routes: RouteDef[], fallback: RouteRenderer): Route
     },
   };
   return router;
+}
+
+export function buildHash(path: string, query?: URLSearchParams): string {
+  const qs = query?.toString();
+  return qs ? `#${path}?${qs}` : `#${path}`;
 }

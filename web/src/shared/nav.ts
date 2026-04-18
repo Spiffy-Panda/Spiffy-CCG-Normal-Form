@@ -54,7 +54,9 @@ export function renderShell(root: HTMLElement, links: NavLink[]): HTMLElement {
 }
 
 function updateActiveLink(nav: HTMLElement): void {
-  const current = (window.location.hash || "#/interpreter").replace(/^#/, "");
+  const raw = (window.location.hash || "#/interpreter").replace(/^#/, "");
+  const qIdx = raw.indexOf("?");
+  const current = qIdx < 0 ? raw : raw.slice(0, qIdx);
   nav.querySelectorAll<HTMLAnchorElement>("a").forEach((a) => {
     a.classList.toggle("active", a.dataset.route === current);
   });

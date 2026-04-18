@@ -3,6 +3,32 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — Step 3: Cards + Rules page
+
+Shipped `#/cards` — the first real feature page past the playground.
+Two-tab shell (Cards | Rules). Cards tab: 5 facet groups (faction,
+type, cost bucket, rarity, keyword substring), faceted list with
+AND-across-facets / OR-within, clickable rows → detail pane with
+chips, flavor text, and the raw `Card Foo { … }` block extracted by
+brace matching from `/api/project/file`. URL deep-linking works —
+`#/cards?tab=rules&card=Spark` survives reloads.
+
+Rules tab renders the declaration tree from `/api/project`: Entities
+(5), Cards (116) grouped by faction, Tokens, Augmentations, Macros
+(54). Each leaf lazy-loads its raw source on expand, with a regex
+fallback for entities/tokens whose line offset wasn't pre-indexed.
+
+Router now parses hash query strings into `URLSearchParams`. Added
+shared `chip()` component and CardDto/ProjectDto/DistributionDto
+client types.
+
+No backend changes. 118/118 tests green. Verified Cards + Rules +
+Interpreter in the preview; no console errors.
+
+Next: Step 4 — Decks page.
+
+---
+
 ## 2026-04-18 — Step 2: Cards + Project endpoints
 
 Added the read-only data plane: `GET /api/cards`,

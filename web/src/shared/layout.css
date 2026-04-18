@@ -101,3 +101,43 @@ body {
   flex-direction: column;
   min-height: 0;
 }
+
+.chip {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.chip + .chip {
+  margin-left: 4px;
+}
+
+.chip-faction {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.chip-type {
+  border-color: rgba(22, 163, 74, 0.4);
+  background: rgba(22, 163, 74, 0.1);
+}
+
+.chip-rarity {
+  border-color: rgba(234, 179, 8, 0.5);
+  background: rgba(234, 179, 8, 0.12);
+}
+
+.chip-cost {
+  border-color: rgba(168, 85, 247, 0.4);
+  background: rgba(168, 85, 247, 0.1);
+}
+
+.chip-keyword {
+  opacity: 0.85;
+}

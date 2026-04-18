@@ -77,3 +77,39 @@ export interface SessionSummary {
 }
 
 export type PipelineStage = "preprocess" | "parse" | "ast" | "validate";
+
+export interface CardDto {
+  name: string;
+  factions: string[];
+  type: string;
+  cost: number | null;
+  rarity: string;
+  keywords: string[];
+  text: string;
+  sourcePath: string;
+  sourceLine: number;
+}
+
+export interface ProjectFileDto {
+  path: string;
+  bytes: number;
+}
+
+export interface ProjectDeclarationsDto {
+  counts: Record<string, number>;
+  byFile: Record<string, string[]>;
+}
+
+export interface ProjectDto {
+  files: ProjectFileDto[];
+  macros: string[];
+  declarations: ProjectDeclarationsDto;
+  loadedAt: string;
+}
+
+export interface DistributionDto {
+  faction: Record<string, number>;
+  type: Record<string, number>;
+  cost: Record<string, number>;
+  rarity: Record<string, number>;
+}

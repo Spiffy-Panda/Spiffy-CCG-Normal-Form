@@ -55,7 +55,7 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
 | REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, read-only cards / project data plane, static playground |
-| Web app (`web/`)                           | **Scaffolded** — Vite + TypeScript; playground migrated to `#/interpreter` |
+| Web app (`web/`)                           | **Working v1** — Vite + TypeScript; `#/interpreter` playground + `#/cards` faceted browser + rules tree |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
 | Solution + test project                    | **Working** — 118 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
