@@ -40,7 +40,7 @@ See [`grammar/GrammarSpec.md`](grammar/GrammarSpec.md) for the full language spe
 
 ## Status
 
-CCGNF is pre-alpha. The preprocessor → parser → AST → validator pipeline is live; the interpreter is the next work.
+CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interpreter pipeline executes the reference encoding through Setup and into the first Round-1 Rise phase.
 
 | Component                                  | State                         |
 |--------------------------------------------|-------------------------------|
@@ -49,14 +49,14 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator pipeline i
 | CCGNF engine — ANTLR grammar               | **Working** — v1              |
 | CCGNF engine — AST builder                 | **Working** — v1 (typed records over the parse tree) |
 | CCGNF engine — validator                   | **Working** — v1 (duplicate decls, builtin arity, R-5) |
-| CCGNF engine — interpreter                 | Not started                   |
+| CCGNF engine — interpreter                 | **Skeleton** — v1 (Setup → first Round-1 Rise; seeded RNG; pre-sequenced inputs) |
 | E2E grammar coverage fixture               | **Complete**; parses clean    |
 | Resonance rules (design docs)              | **Complete**                  |
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
-| CLI host (`Ccgnf.Cli`)                     | **Working** — runs preprocess + parse on .ccgnf files |
+| CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
 | REST host (`Ccgnf.Rest`)                   | Specified; not scaffolded     |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Working** — 30 tests green  |
+| Solution + test project                    | **Working** — 99 tests green  |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
 "v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.
@@ -116,7 +116,7 @@ The machine-readable version lives in [`encoding/`](encoding/README.md).
 All three target hosts are C#. Each consumes the same `Ccgnf.Interpreter` library; they differ only in composition and I/O.
 
 ### CLI — `src/Ccgnf.Cli`
-Primary developer-facing target. Validates a CCGNF project, runs fixture games, prints diagnostics. Uses `Microsoft.Extensions.Hosting` + `Microsoft.Extensions.Logging.Console`. **Status: skeleton.**
+Primary developer-facing target. Validates a CCGNF project, runs fixture games, prints diagnostics. Uses `Microsoft.Extensions.Logging.Console`. `--run` drives the v1 interpreter through Setup into the first Round-1 Rise against a list of `.ccgnf` files. **Status: skeleton.**
 
 ### REST — `Ccgnf.Rest` *(planned)*
 ASP.NET Core service exposing validation and game-session endpoints over HTTP. Designed for non-.NET front-ends (web clients, Python bots, tournament platforms). Sessions are in-memory by default. **Status: specified, not scaffolded.**

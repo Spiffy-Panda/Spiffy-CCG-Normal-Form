@@ -1,0 +1,218 @@
+using Ccgnf.Ast;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+
+namespace Ccgnf.Interpreter;
+
+/// <summary>
+/// Configuration for a single interpreter run.
+/// </summary>
+public sealed class InterpreterOptions
+{
+    /// <summary>Seed for the scheduler's <see cref="Random"/>.</summary>
+    public int Seed { get; set; }
+
+    /// <summary>Pre-sequenced host inputs; defaults to empty.</summary>
+    public IHostInputQueue? Inputs { get; set; }
+
+    /// <summary>Cards to seed into each player's Arsenal before Setup.</summary>
+    public int DefaultDeckSize { get; set; } = 30;
+
+    /// <summary>Safety cap on events processed in one run (v1 guard).</summary>
+    public int MaxEventDispatches { get; set; } = 10_000;
+}
+
+/// <summary>
+/// Top-level runtime: assembles a <see cref="GameState"/> from a validated
+/// <see cref="AstFile"/>, emits the initial <c>Event.GameStart</c>, and drives
+/// the event loop until it drains. v1 scope is Setup through the first
+/// player's Round-1 Rise phase (GrammarSpec §8).
+/// </summary>
+public sealed class Interpreter
+{
+    private readonly ILogger<Interpreter> _log;
+    private readonly ILoggerFactory _loggerFactory;
+
+    public Interpreter(ILogger<Interpreter>? log = null, ILoggerFactory? loggerFactory = null)
+    {
+        _log = log ?? NullLogger<Interpreter>.Instance;
+        _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
+    }
+
+    public GameState Run(AstFile file, InterpreterOptions? options = null)
+    {
+        options ??= new InterpreterOptions();
+        var inputs = options.Inputs ?? new QueuedInputs(Array.Empty<RtValue>());
+        var scheduler = new Scheduler(options.Seed, inputs, _loggerFactory.CreateLogger<Scheduler>());
+
+        var builder = new StateBuilder(_loggerFactory.CreateLogger<StateBuilder>());
+        var state = builder.Build(file, scheduler);
+
+        SeedDecks(state, options.DefaultDeckSize);
+
+        var evaluator = new Evaluator(state, scheduler, _loggerFactory.CreateLogger<Evaluator>());
+
+        state.PendingEvents.Enqueue(new GameEvent("GameStart",
+            new Dictionary<string, RtValue>()));
+
+        RunEventLoop(state, evaluator, options.MaxEventDispatches);
+
+        _log.LogInformation(
+            "Interpreter: run halted; {Steps} events dispatched, {Entities} entities",
+            state.StepCount, state.Entities.Count);
+
+        return state;
+    }
+
+    // -------------------------------------------------------------------------
+    // Deck seeding
+    // -------------------------------------------------------------------------
+
+    private static void SeedDecks(GameState state, int deckSize)
+    {
+        foreach (var player in state.Players)
+        {
+            if (!player.Zones.TryGetValue("Arsenal", out var arsenal)) continue;
+            for (int i = 0; i < deckSize; i++)
+            {
+                var card = state.AllocateEntity("Card", $"Deck_{player.DisplayName}_{i}");
+                card.OwnerId = player.Id;
+                arsenal.Contents.Add(card.Id);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Event loop — §8.2 sketch, minus Interrupts / Replacements (not v1).
+    // -------------------------------------------------------------------------
+
+    private void RunEventLoop(GameState state, Evaluator ev, int maxDispatches)
+    {
+        while (!state.GameOver && state.PendingEvents.TryDequeue(out var current))
+        {
+            state.StepCount++;
+            if (state.StepCount > maxDispatches)
+            {
+                _log.LogWarning("Interpreter: event-loop safety cap reached at {Steps} dispatches", state.StepCount);
+                break;
+            }
+
+            _log.LogInformation("Dispatching {Event}", current);
+            DispatchEvent(current, state, ev);
+            RunSbaPass(state, ev);
+
+            if (current.TypeName == "GameEnd") state.GameOver = true;
+        }
+    }
+
+    private void DispatchEvent(GameEvent current, GameState state, Evaluator ev)
+    {
+        var game = state.Game;
+        if (game is null) return;
+
+        // v1: no Replacement handling. Fire each matching Triggered ability on
+        // Game in declaration order.
+        foreach (var ability in game.Abilities)
+        {
+            if (ability.Kind != AbilityKind.Triggered) continue;
+            if (ability.OnPattern is null || ability.Effect is null) continue;
+            if (TryMatchPattern(ability.OnPattern, current, out var bindings))
+            {
+                var env = bindings.Count == 0
+                    ? RtEnv.Empty
+                    : RtEnv.Empty.Extend(bindings);
+                ev.Eval(ability.Effect, env);
+            }
+        }
+    }
+
+    private static void RunSbaPass(GameState state, Evaluator ev)
+    {
+        // v1: wired but inert. Real SBA dispatch walks Game.abilities of kind
+        // Static with check_at: continuously; none fire during Setup, so
+        // leaving this as a no-op keeps the test corpus honest about what's
+        // actually implemented.
+        _ = state; _ = ev;
+    }
+
+    // -------------------------------------------------------------------------
+    // Pattern matching — Event.Foo or Event.Foo(field=value, other=bound).
+    // -------------------------------------------------------------------------
+
+    internal static bool TryMatchPattern(
+        AstExpr pattern,
+        GameEvent current,
+        out List<(string, RtValue)> bindings)
+    {
+        bindings = new();
+
+        if (pattern is AstMemberAccess ma &&
+            ma.Target is AstIdent { Name: "Event" })
+        {
+            return ma.Member == current.TypeName;
+        }
+
+        if (pattern is AstFunctionCall call &&
+            call.Callee is AstMemberAccess ma2 &&
+            ma2.Target is AstIdent { Name: "Event" })
+        {
+            if (ma2.Member != current.TypeName) return false;
+
+            foreach (var a in call.Args)
+            {
+                string? fieldName = null;
+                AstExpr? valueExpr = null;
+                switch (a)
+                {
+                    case AstArgNamed n: fieldName = n.Name; valueExpr = n.Value; break;
+                    case AstArgBinding b: fieldName = b.Name; valueExpr = b.Value; break;
+                }
+                if (fieldName is null || valueExpr is null) continue;
+
+                if (!current.Fields.TryGetValue(fieldName, out var fieldValue))
+                {
+                    return false;
+                }
+
+                if (IsBindingIdent(valueExpr, out var bindName))
+                {
+                    bindings.Add((bindName, fieldValue));
+                    continue;
+                }
+
+                // Literal comparison — a capitalized symbol or other constant.
+                if (valueExpr is AstIdent lit)
+                {
+                    if (fieldValue is RtSymbol sym && sym.Name == lit.Name) continue;
+                    return false;
+                }
+                if (valueExpr is AstStringLit sl)
+                {
+                    if (fieldValue is RtString rs && rs.V == sl.Value) continue;
+                    return false;
+                }
+                if (valueExpr is AstIntLit il)
+                {
+                    if (fieldValue is RtInt ri && ri.V == il.Value) continue;
+                    return false;
+                }
+                // Any other pattern shape — bail conservatively.
+                return false;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsBindingIdent(AstExpr e, out string name)
+    {
+        if (e is AstIdent id && id.Name.Length > 0 && char.IsLower(id.Name[0]))
+        {
+            name = id.Name;
+            return true;
+        }
+        name = "";
+        return false;
+    }
+}

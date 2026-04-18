@@ -345,7 +345,8 @@ public sealed class Preprocessor
             var t = source[i];
 
             if (t.Kind == PpTokenKind.Ident && macros.TryGet(t.Text, out var macro) &&
-                !IsInLabelPosition(source, i))
+                !IsInLabelPosition(source, i) &&
+                !IsAfterMemberDot(source, i))
             {
                 if (expansionStack.Contains(macro.Name))
                 {
@@ -476,6 +477,24 @@ public sealed class Preprocessor
             }
         }
         return result;
+    }
+
+    /// <summary>
+    /// Returns true when the identifier at tokens[i] is immediately preceded by
+    /// a `.` — a member-access path like <c>Event.Destroy</c>. Those identifiers
+    /// are member names on the host object, not macro invocations, so expansion
+    /// here would mis-parse cases like <c>Event.Destroy(target: u, reason: x)</c>
+    /// as a two-argument call to a one-argument macro.
+    /// </summary>
+    private static bool IsAfterMemberDot(IReadOnlyList<PpToken> tokens, int i)
+    {
+        for (int j = i - 1; j >= 0; j--)
+        {
+            var k = tokens[j].Kind;
+            if (IsTrivia(k)) continue;
+            return k == PpTokenKind.Other && tokens[j].Text == ".";
+        }
+        return false;
     }
 
     /// <summary>
