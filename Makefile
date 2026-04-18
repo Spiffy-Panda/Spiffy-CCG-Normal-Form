@@ -14,7 +14,7 @@ RESULTS   := TestResults
 #   make DOTNET=dotnet.exe ci
 DOTNET    ?= dotnet
 
-.PHONY: all help restore build test clean format ci \
+.PHONY: all help restore build test clean format ci rest \
         ccgnf-lint ccgnf-build card-distribution
 
 all: build
@@ -28,6 +28,7 @@ help:
 	@echo "  make clean      $(DOTNET) clean and remove bin/obj/$(RESULTS)/"
 	@echo "  make format     $(DOTNET) format (whitespace + analyzer fixes)"
 	@echo "  make ci         restore + build + test (invoked by GitHub Actions)"
+	@echo "  make rest       run Ccgnf.Rest on http://localhost:19397"
 	@echo ""
 	@echo "  make ccgnf-lint (future) validate all .ccgnf source files"
 	@echo "  make ccgnf-build (future) preprocess .ccgnf into intermediates"
@@ -63,6 +64,10 @@ format:
 	$(DOTNET) format $(SOLUTION)
 
 ci: restore build test
+
+# Start the REST host on the default port. Override CCGNF_HTTP_PORT to change it.
+rest: build
+	$(DOTNET) run --project src/Ccgnf.Rest --no-build
 
 # ---------------------------------------------------------------------------
 # Future targets — will be wired up once the CCGNF grammar engine lands.

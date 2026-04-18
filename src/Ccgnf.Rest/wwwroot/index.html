@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CCGNF Playground</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(320px, 480px) 1fr; min-height: 100vh; }
+    header { grid-column: 1 / -1; padding: 12px 18px; border-bottom: 1px solid rgba(128,128,128,0.3); display: flex; align-items: baseline; gap: 18px; }
+    h1 { font-size: 16px; font-weight: 600; margin: 0; }
+    .muted { opacity: 0.65; font-size: 12px; }
+    aside { padding: 14px 16px; border-right: 1px solid rgba(128,128,128,0.3); display: flex; flex-direction: column; gap: 10px; }
+    main { padding: 14px 16px; overflow: auto; }
+    textarea, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; width: 100%; box-sizing: border-box; }
+    textarea { min-height: 40vh; padding: 8px; border-radius: 4px; border: 1px solid rgba(128,128,128,0.4); background: transparent; color: inherit; resize: vertical; }
+    pre { padding: 10px; border-radius: 4px; background: rgba(128,128,128,0.08); overflow: auto; max-height: 70vh; white-space: pre-wrap; word-break: break-word; margin: 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    button { padding: 6px 10px; border: 1px solid rgba(128,128,128,0.5); border-radius: 4px; background: rgba(128,128,128,0.08); color: inherit; font-size: 12.5px; cursor: pointer; }
+    button:hover { background: rgba(128,128,128,0.18); }
+    button.primary { border-color: #3b82f6; background: #3b82f6; color: white; }
+    label { font-size: 12px; opacity: 0.8; }
+    input[type=number], input[type=text] { padding: 4px 6px; border: 1px solid rgba(128,128,128,0.4); border-radius: 4px; background: transparent; color: inherit; font-family: inherit; font-size: 12.5px; }
+    .stage { margin-bottom: 16px; }
+    .stage h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 6px 0; opacity: 0.75; }
+    .status-ok { color: #16a34a; }
+    .status-err { color: #dc2626; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CCGNF Playground</h1>
+    <span class="muted">port <span id="port">—</span></span>
+    <span class="muted" id="health-status">health: unknown</span>
+  </header>
+
+  <aside>
+    <label for="src">.ccgnf source</label>
+    <textarea id="src" spellcheck="false">Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i &#8712; {1, 2} {
+  kind: Player
+  characteristics: {
+    aether_cap_schedule: [3, 4, 5, 6, 7, 8, 9, 10, 10, 10],
+    max_mulligans: 2
+  }
+  counters: { aether: 0, debt: 0 }
+  zones: {
+    Arsenal: Zone(order: sequential),
+    Hand:    Zone(capacity: 10, order: unordered),
+    Cache:   Zone(order: FIFO),
+    ResonanceField: Zone(capacity: 5, order: FIFO),
+    Void:    Zone(order: unordered)
+  }
+  abilities: []
+}</textarea>
+
+    <div class="row">
+      <label>seed</label>
+      <input id="seed" type="number" value="42" style="width: 70px">
+      <label>inputs</label>
+      <input id="inputs" type="text" value="pass,pass,pass,pass" style="flex: 1; min-width: 120px">
+    </div>
+
+    <div class="row">
+      <button onclick="load('/api/health', 'GET')">Health</button>
+      <button onclick="runStage('preprocess')">Preprocess</button>
+      <button onclick="runStage('parse')">Parse</button>
+      <button onclick="runStage('ast')">AST</button>
+      <button onclick="runStage('validate')">Validate</button>
+      <button class="primary" onclick="runStage('run')">Run</button>
+    </div>
+
+    <div class="row">
+      <button onclick="createSession()">Create session</button>
+      <button onclick="listSessions()">List sessions</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="stage">
+      <h2>Output <span id="status"></span></h2>
+      <pre id="out">idle</pre>
+    </div>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const show = (text, ok = true) => {
+      $('status').textContent = ok ? 'ok' : 'error';
+      $('status').className = ok ? 'status-ok' : 'status-err';
+      $('out').textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+    };
+    const files = () => [{ path: 'playground.ccgnf', content: $('src').value }];
+    const runStage = async (stage) => {
+      try {
+        const payload = stage === 'run'
+          ? { files: files(), seed: parseInt($('seed').value, 10), inputs: $('inputs').value.split(',').map(s => s.trim()).filter(Boolean) }
+          : { files: files() };
+        const r = await fetch('/api/' + stage, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+        const body = await r.json();
+        show(body, body.ok !== false);
+      } catch (e) { show(String(e), false); }
+    };
+    const createSession = async () => {
+      try {
+        const payload = { files: files(), seed: parseInt($('seed').value, 10), inputs: $('inputs').value.split(',').map(s => s.trim()).filter(Boolean) };
+        const r = await fetch('/api/sessions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+        show(await r.json(), r.ok);
+      } catch (e) { show(String(e), false); }
+    };
+    const listSessions = async () => {
+      try {
+        const r = await fetch('/api/sessions');
+        show(await r.json(), r.ok);
+      } catch (e) { show(String(e), false); }
+    };
+    const load = async (url, method) => {
+      try {
+        const r = await fetch(url, { method });
+        show(await r.json(), r.ok);
+      } catch (e) { show(String(e), false); }
+    };
+    fetch('/api/health').then(r => r.json()).then(b => {
+      $('port').textContent = b.port;
+      $('health-status').textContent = 'health: ok';
+    }).catch(() => { $('health-status').textContent = 'health: down'; });
+  </script>
+</body>
+</html>

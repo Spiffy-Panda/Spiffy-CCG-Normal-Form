@@ -54,9 +54,9 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance rules (design docs)              | **Complete**                  |
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
-| REST host (`Ccgnf.Rest`)                   | Specified; not scaffolded     |
+| REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, static playground |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Working** — 99 tests green  |
+| Solution + test project                    | **Working** — 109 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
 "v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.
@@ -118,17 +118,41 @@ All three target hosts are C#. Each consumes the same `Ccgnf.Interpreter` librar
 ### CLI — `src/Ccgnf.Cli`
 Primary developer-facing target. Validates a CCGNF project, runs fixture games, prints diagnostics. Uses `Microsoft.Extensions.Logging.Console`. `--run` drives the v1 interpreter through Setup into the first Round-1 Rise against a list of `.ccgnf` files. **Status: skeleton.**
 
-### REST — `Ccgnf.Rest` *(planned)*
-ASP.NET Core service exposing validation and game-session endpoints over HTTP. Designed for non-.NET front-ends (web clients, Python bots, tournament platforms). Sessions are in-memory by default. **Status: specified, not scaffolded.**
+### REST — `Ccgnf.Rest`
+ASP.NET Core service exposing each pipeline stage independently plus a thin session lifecycle on top of interpreter runs. Designed for non-.NET front-ends (web clients, Python bots, tournament platforms). Sessions are in-memory. Serves a small playground at `/` for browser-driven use. **Status: scaffolded — default HTTP port 19397 (override with `CCGNF_HTTP_PORT`).**
 
-Endpoint shape (from the spec):
+Run it:
+
+```bash
+make rest                     # or: dotnet run --project src/Ccgnf.Rest
+# then open http://localhost:19397
 ```
-POST /api/projects/validate
-POST /api/sessions
-POST /api/sessions/{id}/actions
-GET  /api/sessions/{id}/state
-GET  /api/sessions/{id}/events   (Server-Sent Events)
+
+Live endpoints:
+
 ```
+GET  /api/health               service metadata + port
+
+POST /api/preprocess           macro expansion + diagnostics
+POST /api/parse                ANTLR parse + diagnostics
+POST /api/ast                  parse tree -> typed AST, declaration counts
+POST /api/validate             full pipeline through validator
+POST /api/run                  execute v1 interpreter, return GameState
+
+POST /api/sessions             create session from a run, returns id + state
+GET  /api/sessions             list sessions
+GET  /api/sessions/{id}        session metadata
+GET  /api/sessions/{id}/state  current GameState (read-only in v1)
+DELETE /api/sessions/{id}      dispose
+```
+
+Request body for the pipeline endpoints:
+
+```jsonc
+{ "files": [ { "path": "foo.ccgnf", "content": "..." }, ... ] }
+```
+
+Run / session requests add `seed`, `inputs` (string array pre-sequenced for the host input queue), and `deckSize`. Per-session `actions` and SSE `events` land when the interpreter supports mid-run input.
 
 ### Godot — `Ccgnf.Godot` *(planned)*
 Thin shim consumed by a Godot 4.x C# project. The engine runs in-process as a library — no IPC, no subprocess. A custom `ILoggerProvider` routes logs to `GD.Print` / `GD.PushWarning` / `GD.PushError`. **Status: specified, not scaffolded.**
