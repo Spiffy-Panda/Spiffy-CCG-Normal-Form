@@ -54,10 +54,10 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance rules (design docs)              | **Complete**                  |
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
-| REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, read-only cards / project data plane, static playground |
-| Web app (`web/`)                           | **Working v1** — Vite + TypeScript; `#/interpreter` playground + `#/cards` faceted browser + rules tree |
+| REST host (`Ccgnf.Rest`)                   | **Working v1** — pipeline endpoints, sessions, cards / project data plane, decks mock-pool, rooms with SSE, static playground |
+| Web app (`web/`)                           | **Working v1** — Vite + TypeScript; `#/cards`, `#/decks`, `#/interpreter`, `#/play/lobby`, `#/play/tabletop/{id}`, `#/raw` |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Working** — 118 tests green |
+| Solution + test project                    | **Working** — 130 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
 "v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.
@@ -150,7 +150,23 @@ GET  /api/cards                 card list projected from the loaded encoding
 POST /api/cards/distribution    aggregate faction / type / cost / rarity counts
 GET  /api/project               files, macros, declarations-by-kind / by-file
 GET  /api/project/file?path=    raw text of one loaded .ccgnf file
+POST /api/decks/mock-pool       seeded RNG mock draft pool
+
+POST /api/rooms                 create a room against a loaded project
+GET  /api/rooms                 list rooms (newest first)
+GET  /api/rooms/{id}            room metadata + players
+POST /api/rooms/{id}/join       claim a seat; returns { playerId, token }
+POST /api/rooms/{id}/actions    submit an action (requires token)
+GET  /api/rooms/{id}/state      current GameStateDto
+GET  /api/rooms/{id}/events     server-sent event stream
+DELETE /api/rooms/{id}          close the room
 ```
+
+Room configuration: `CCGNF_ROOM_TTL_SECONDS` (default 600) evicts idle rooms;
+`CCGNF_ROOM_SWEEP_SECONDS` (default 30) controls sweep cadence. v1 runs the
+interpreter synchronously on room start — actions accepted via the HTTP
+surface are appended to a buffered queue for a future async-interpreter
+refactor (see `docs/plan/steps/06-rooms.md` §6c).
 
 Request body for the pipeline endpoints:
 

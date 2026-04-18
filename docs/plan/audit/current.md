@@ -15,7 +15,7 @@ Captured 2026-04-18. Refresh when it drifts from reality.
   drift.
 - **Test coverage is broad where it matters.** Preprocessor, parser, AST,
   validator, corpus of all real `.ccgnf` files, interpreter integration,
-  REST integration. 118 tests.
+  REST integration. 130 tests.
 - **ProjectLoader is the single pipeline orchestrator.** Both CLI and
   REST consume it; no duplicate stage-chaining logic.
 

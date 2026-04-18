@@ -8,6 +8,8 @@ export type RouteRenderer = (container: HTMLElement, match: RouteMatch) => void 
 export interface RouteDef {
   path: string;
   render: RouteRenderer;
+  /** When true, match any path that starts with <c>path + "/"</c>. */
+  prefix?: boolean;
 }
 
 export interface Router {
@@ -30,7 +32,10 @@ function parseHash(): RouteMatch {
 export function createRouter(routes: RouteDef[], fallback: RouteRenderer): Router {
   const match = (): { route: RouteDef | null; routeMatch: RouteMatch } => {
     const routeMatch = parseHash();
-    const hit = routes.find((r) => r.path === routeMatch.path) ?? null;
+    const hit =
+      routes.find((r) => r.path === routeMatch.path) ??
+      routes.find((r) => r.prefix && routeMatch.path.startsWith(`${r.path}/`)) ??
+      null;
     return { route: hit, routeMatch };
   };
 

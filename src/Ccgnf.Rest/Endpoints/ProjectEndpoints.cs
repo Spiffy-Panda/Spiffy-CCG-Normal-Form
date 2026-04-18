@@ -17,9 +17,9 @@ internal static class ProjectEndpoints
         app.MapGet("/api/project/file", GetFile);
     }
 
-    private static IResult GetProject(ProjectCatalog catalog, bool reload = false)
+    private static IResult GetProject(ProjectCatalog catalog, string? reload = null)
     {
-        var snapshot = catalog.Get(reload);
+        var snapshot = catalog.Get(IsTruthy(reload));
 
         var files = snapshot.RawContent
             .Select(kvp => new ProjectFileDto(
@@ -56,12 +56,12 @@ internal static class ProjectEndpoints
             LoadedAt: snapshot.LoadedAt.ToString("o")));
     }
 
-    private static IResult GetFile(string path, ProjectCatalog catalog, bool reload = false)
+    private static IResult GetFile(string path, ProjectCatalog catalog, string? reload = null)
     {
         if (!IsSafePath(path))
             return Results.BadRequest(new { error = "Invalid path." });
 
-        var snapshot = catalog.Get(reload);
+        var snapshot = catalog.Get(IsTruthy(reload));
         if (!snapshot.RawContent.TryGetValue(path, out var content))
             return Results.NotFound();
 
@@ -69,6 +69,13 @@ internal static class ProjectEndpoints
     }
 
     // -------------------------------------------------------------------------
+
+    private static bool IsTruthy(string? v)
+    {
+        if (string.IsNullOrEmpty(v)) return false;
+        return v == "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static bool IsSafePath(string path)
     {

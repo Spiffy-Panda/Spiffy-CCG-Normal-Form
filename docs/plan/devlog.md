@@ -3,6 +3,34 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — Steps 4, 5, 6 landed
+
+Shipped the remaining web-app steps in one batch:
+
+- **Step 4 (Decks).** `POST /api/decks/mock-pool` samples N cards from
+  the catalog, weighted by target rarity (44/32/18/6). Frontend `#/decks`
+  ships a 3-column layout: format selector (Constructed / Draft),
+  searchable pool, deck list with max-copies guard, live distribution
+  bars, and localStorage persistence keyed by `deck:<format>:<name>`.
+  5 new integration tests.
+
+- **Step 5 (Raw).** `#/raw` file tree with a regex syntax highlighter
+  (comments / strings / numbers / keywords / operators). Reload button
+  hits `/api/project?reload=1`. Added a test asserting `loadedAt`
+  advances after a reload. Endpoint parsers now accept `reload=1/true/yes`
+  — ASP.NET Core's `bool` binder rejects `"1"`.
+
+- **Step 6 (Rooms).** Backend: `LiveInputQueue`, `Room`, `RoomStore`,
+  `SseBroadcaster`, `RoomTtlSweeper` HostedService, full `/api/rooms`
+  endpoint surface. Frontend: `#/play/lobby` (create + list) and
+  `#/play/tabletop/{id}` (state snapshot + SSE event log + pass action).
+  v1 runs the interpreter synchronously on start — actions buffer for a
+  future async refactor (6c). 6 new tests.
+
+130/130 green. No console errors in preview.
+
+---
+
 ## 2026-04-18 — Rules tree: Augment source extraction
 
 Follow-up to Step 3. Expanding an Augmentation in the rules tree 404'd

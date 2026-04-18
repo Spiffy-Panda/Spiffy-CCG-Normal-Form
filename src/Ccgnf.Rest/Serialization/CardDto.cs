@@ -24,3 +24,7 @@ public sealed record DistributionDto(
     IReadOnlyDictionary<string, int> Type,
     IReadOnlyDictionary<string, int> Cost,
     IReadOnlyDictionary<string, int> Rarity);
+
+public sealed record MockPoolRequest(string? Format, int Seed = 1234, int Size = 40);
+
+public sealed record MockPoolResponse(string Format, int Seed, IReadOnlyList<string> Cards);

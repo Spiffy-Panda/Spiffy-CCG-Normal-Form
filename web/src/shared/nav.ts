@@ -57,9 +57,16 @@ function updateActiveLink(nav: HTMLElement): void {
   const raw = (window.location.hash || "#/interpreter").replace(/^#/, "");
   const qIdx = raw.indexOf("?");
   const current = qIdx < 0 ? raw : raw.slice(0, qIdx);
+  const currentTop = topSegment(current);
   nav.querySelectorAll<HTMLAnchorElement>("a").forEach((a) => {
-    a.classList.toggle("active", a.dataset.route === current);
+    const route = a.dataset.route ?? "";
+    a.classList.toggle("active", topSegment(route) === currentTop);
   });
+}
+
+function topSegment(path: string): string {
+  const m = path.match(/^\/[^/]+/);
+  return m ? m[0] : path;
 }
 
 export async function refreshHealth(portPill: HTMLElement, healthPill: HTMLElement): Promise<void> {

@@ -17,9 +17,9 @@ internal static class CardsEndpoints
         app.MapPost("/api/cards/distribution", GetDistribution);
     }
 
-    private static IResult GetCards(ProjectCatalog catalog, bool reload = false)
+    private static IResult GetCards(ProjectCatalog catalog, string? reload = null)
     {
-        var snapshot = catalog.Get(reload);
+        var snapshot = catalog.Get(IsTruthy(reload));
         var cards = CardsFrom(snapshot);
         return Results.Ok(cards);
     }
@@ -27,9 +27,9 @@ internal static class CardsEndpoints
     private static IResult GetDistribution(
         DistributionRequest? req,
         ProjectCatalog catalog,
-        bool reload = false)
+        string? reload = null)
     {
-        var snapshot = catalog.Get(reload);
+        var snapshot = catalog.Get(IsTruthy(reload));
         var all = CardsFrom(snapshot);
 
         IEnumerable<CardDto> filtered = all;
@@ -89,4 +89,11 @@ internal static class CardsEndpoints
         >= 6 => "6+",
         _ => cost.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
+
+    private static bool IsTruthy(string? v)
+    {
+        if (string.IsNullOrEmpty(v)) return false;
+        return v == "1" || string.Equals(v, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(v, "yes", StringComparison.OrdinalIgnoreCase);
+    }
 }

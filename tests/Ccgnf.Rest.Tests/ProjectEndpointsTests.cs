@@ -71,4 +71,18 @@ public class ProjectEndpointsTests : IClassFixture<WebApplicationFactory<Program
         var response = await client.GetAsync("/api/project/file?path=encoding/does-not-exist.ccgnf");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Project_Reload_RefreshesLoadedAt()
+    {
+        var client = _factory.CreateClient();
+        var first = await (await client.GetAsync("/api/project")).Content.ReadFromJsonAsync<JsonElement>();
+        // Small delay so the DateTimeOffset.UtcNow moves measurably.
+        await Task.Delay(25);
+        var reloaded = await (await client.GetAsync("/api/project?reload=1")).Content.ReadFromJsonAsync<JsonElement>();
+
+        var firstTs = DateTimeOffset.Parse(first.GetProperty("loadedAt").GetString()!);
+        var reloadedTs = DateTimeOffset.Parse(reloaded.GetProperty("loadedAt").GetString()!);
+        Assert.True(reloadedTs > firstTs, $"Expected reloaded timestamp > first; got {reloadedTs} <= {firstTs}.");
+    }
 }

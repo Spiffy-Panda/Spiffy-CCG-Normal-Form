@@ -118,3 +118,59 @@ export interface DistributionDto {
   cost: Record<string, number>;
   rarity: Record<string, number>;
 }
+
+export interface MockPoolRequest {
+  format: string;
+  seed: number;
+  size: number;
+}
+
+export interface MockPoolResponse {
+  format: string;
+  seed: number;
+  cards: string[];
+}
+
+export interface RoomCreateRequest {
+  files: SourceFileDto[];
+  seed: number;
+  playerSlots?: number;
+  deckSize?: number;
+}
+
+export interface RoomSummaryDto {
+  roomId: string;
+  state: "WaitingForPlayers" | "Active" | "Finished";
+  seed: number;
+  playerSlots: number;
+  occupied: number;
+  createdAt: string;
+}
+
+export interface RoomPlayerDto {
+  playerId: number;
+  name: string;
+  connected: boolean;
+}
+
+export interface RoomDetailDto extends RoomSummaryDto {
+  lastActivityAt: string;
+  players: RoomPlayerDto[];
+}
+
+export interface RoomJoinResponse {
+  playerId: number;
+  token: string;
+  state: unknown;
+}
+
+export interface RoomActionRequest {
+  playerId: number;
+  token: string;
+  action: string;
+}
+
+export interface RoomEventFrame {
+  step: number;
+  event: { type: string; fields: Record<string, string> };
+}

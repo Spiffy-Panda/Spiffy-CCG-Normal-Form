@@ -1,4 +1,5 @@
 using Ccgnf.Rest.Endpoints;
+using Ccgnf.Rest.Rooms;
 using Ccgnf.Rest.Services;
 using Ccgnf.Rest.Sessions;
 
@@ -25,6 +26,8 @@ builder.WebHost.UseUrls($"http://localhost:{httpPort}");
 
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<ProjectCatalog>();
+builder.Services.AddSingleton<RoomStore>();
+builder.Services.AddHostedService<RoomTtlSweeper>();
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
 {
     o.SerializerOptions.WriteIndented = false;
@@ -41,6 +44,8 @@ PipelineEndpoints.Map(app);
 SessionEndpoints.Map(app);
 CardsEndpoints.Map(app);
 ProjectEndpoints.Map(app);
+DecksEndpoints.Map(app);
+RoomEndpoints.Map(app);
 
 app.Run();
 

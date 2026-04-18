@@ -246,19 +246,26 @@ the full pool.
 Costs of 6 or greater bucket into `"6+"`; cards with no `cost` field
 (e.g. non-playable Tokens) bucket into `"?"`.
 
-## Planned (web-app arc)
-
 ### `POST /api/decks/mock-pool`
 
-Returns a synthetic card pool for the Decks page when a format (e.g.
-Draft) needs a pool before a real drafting system exists.
+Returns a synthetic card pool for the Decks page's Draft format. Weighted
+by target rarity (44/32/18/6 for C/U/R/M); sampled without replacement
+against a `Random(seed)`. `size` caps at the full catalog; `0` or omitted
+means 40. `format: "constructed"` returns the full pool untouched.
 
 ```jsonc
 // Request
 { "format": "draft", "seed": 1234, "size": 40 }
-// Response
-{ "cards": [ /* 40 card names from /api/cards */ ] }
+
+// Response 200
+{
+  "format": "draft",
+  "seed": 1234,
+  "cards": [ "Spark", "Cinderling", … ]      // exactly `size` entries
+}
 ```
+
+`400` on unknown format or `size > pool`.
 
 ## Rooms (multi-consumer play)
 
@@ -267,14 +274,20 @@ Endpoint summary:
 
 ```
 POST   /api/rooms                          create room
-GET    /api/rooms                          list rooms (open ones first)
-GET    /api/rooms/{id}                     room metadata
+GET    /api/rooms                          list rooms (newest first)
+GET    /api/rooms/{id}                     room metadata + players
 POST   /api/rooms/{id}/join                claim a seat; returns { playerId, token }
 POST   /api/rooms/{id}/actions             submit an action (requires token)
-GET    /api/rooms/{id}/state               current GameStateDto
+GET    /api/rooms/{id}/state               current GameStateDto (or 204 pre-start)
 GET    /api/rooms/{id}/events              Server-Sent Events stream
-DELETE /api/rooms/{id}                     close (host only)
+DELETE /api/rooms/{id}                     close the room
 ```
+
+v1 runs the interpreter synchronously when the room transitions to
+`Active` (second join); actions are accepted and broadcast as SSE frames
+but do not drive further interpreter steps. See
+[../steps/06-rooms.md](../steps/06-rooms.md) §6c for the deferred async
+refactor.
 
 ## Error conventions
 

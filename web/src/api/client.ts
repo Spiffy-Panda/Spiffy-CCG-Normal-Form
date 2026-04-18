@@ -3,10 +3,17 @@ import type {
   CardDto,
   DistributionDto,
   HealthResponse,
+  MockPoolRequest,
+  MockPoolResponse,
   ParseResponse,
   PreprocessResponse,
   ProjectDto,
   ProjectRequest,
+  RoomActionRequest,
+  RoomCreateRequest,
+  RoomDetailDto,
+  RoomJoinResponse,
+  RoomSummaryDto,
   RunRequest,
   RunResponse,
   SessionCreateRequest,
@@ -52,4 +59,17 @@ export const api = {
     requestText(`/api/project/file?path=${encodeURIComponent(path)}`),
   cardsDistribution: (cards: string[] | null) =>
     postJson<DistributionDto>("/api/cards/distribution", { cards }),
+  mockPool: (req: MockPoolRequest) => postJson<MockPoolResponse>("/api/decks/mock-pool", req),
+
+  createRoom: (req: RoomCreateRequest) => postJson<RoomSummaryDto>("/api/rooms", req),
+  listRooms: () => request<RoomSummaryDto[]>("/api/rooms"),
+  getRoom: (id: string) => request<RoomDetailDto>(`/api/rooms/${encodeURIComponent(id)}`),
+  joinRoom: (id: string, name: string | null) =>
+    postJson<RoomJoinResponse>(`/api/rooms/${encodeURIComponent(id)}/join`, { name }),
+  submitAction: (id: string, req: RoomActionRequest) =>
+    postJson<{ accepted: boolean }>(`/api/rooms/${encodeURIComponent(id)}/actions`, req),
+  roomState: (id: string) =>
+    request<unknown>(`/api/rooms/${encodeURIComponent(id)}/state`),
+  deleteRoom: (id: string) =>
+    fetch(`/api/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
