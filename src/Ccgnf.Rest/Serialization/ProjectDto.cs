@@ -8,9 +8,11 @@ namespace Ccgnf.Rest.Serialization;
 
 public sealed record ProjectFileDto(string Path, int Bytes);
 
+public sealed record ProjectDeclarationEntry(string Label, int Line);
+
 public sealed record ProjectDeclarationsDto(
     IReadOnlyDictionary<string, int> Counts,
-    IReadOnlyDictionary<string, IReadOnlyList<string>> ByFile);
+    IReadOnlyDictionary<string, IReadOnlyList<ProjectDeclarationEntry>> ByFile);
 
 public sealed record ProjectDto(
     IReadOnlyList<ProjectFileDto> Files,

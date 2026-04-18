@@ -3,6 +3,29 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — Rules tree: Augment source extraction
+
+Follow-up to Step 3. Expanding an Augmentation in the rules tree 404'd
+because `ProjectCatalog` only indexed Card/Entity/Token declarations by
+name, and augments like `Game.abilities += Triggered(…)` recur across
+files — name-keyed lookup collapses them.
+
+Replaced the per-kind name → `(path, line)` map with a single
+`FileDeclarations` table (`path → List<FileDeclaration{Kind,Name,Label,Line}>`)
+built from a regex scan that now covers `Card`, `Entity`, `Token`, and
+`Augment` (`target.path +=` / `target.path = …` with at least one `.` or
+`[…]` in the target). `CardLocations` etc. stay as name-keyed views for
+the card list. `/api/project`'s `byFile` shape changes from
+`Record<path, string[]>` to `Record<path, {label, line}[]>` so the rules
+tree can jump straight to each declaration's source. `extractSourceBlock`
+on the client now counts `(){}[]` together so augment expressions
+terminate at their matching `)` instead of bleeding into the next
+declaration.
+
+118/118 tests still green. Augment expansion shows the right block.
+
+---
+
 ## 2026-04-18 — Step 3: Cards + Rules page
 
 Shipped `#/cards` — the first real feature page past the playground.

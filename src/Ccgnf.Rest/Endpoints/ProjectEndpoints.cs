@@ -27,37 +27,32 @@ internal static class ProjectEndpoints
                 Bytes: System.Text.Encoding.UTF8.GetByteCount(kvp.Value)))
             .ToList();
 
+        // Counts come from the AST (authoritative). byFile is produced from
+        // the raw-content regex scan so each entry carries a real file path
+        // and line — AST spans collapse to "<project>" after preprocessing.
         var counts = new SortedDictionary<string, int>(StringComparer.Ordinal);
-        var byFile = new SortedDictionary<string, List<string>>(StringComparer.Ordinal);
-
         if (snapshot.File is not null)
         {
             foreach (var decl in snapshot.File.Declarations)
             {
                 string kind = KindOf(decl);
                 counts[kind] = counts.TryGetValue(kind, out var n) ? n + 1 : 1;
-
-                string path = PathFor(decl, snapshot);
-                if (string.IsNullOrEmpty(path)) path = "<project>";
-                string label = LabelOf(decl);
-                if (!byFile.TryGetValue(path, out var list))
-                {
-                    list = new List<string>();
-                    byFile[path] = list;
-                }
-                list.Add(label);
             }
         }
 
-        var byFileReadOnly = byFile.ToDictionary(
-            kvp => kvp.Key,
-            kvp => (IReadOnlyList<string>)kvp.Value,
+        var byFile = new SortedDictionary<string, IReadOnlyList<ProjectDeclarationEntry>>(
             StringComparer.Ordinal);
+        foreach (var (path, decls) in snapshot.FileDeclarations)
+        {
+            byFile[path] = decls
+                .Select(d => new ProjectDeclarationEntry(d.Label, d.Line))
+                .ToList();
+        }
 
         return Results.Ok(new ProjectDto(
             Files: files,
             Macros: snapshot.MacroNames,
-            Declarations: new ProjectDeclarationsDto(counts, byFileReadOnly),
+            Declarations: new ProjectDeclarationsDto(counts, byFile),
             LoadedAt: snapshot.LoadedAt.ToString("o")));
     }
 
@@ -84,14 +79,6 @@ internal static class ProjectEndpoints
         return true;
     }
 
-    private static string PathFor(AstDeclaration decl, ProjectSnapshot snapshot) => decl switch
-    {
-        AstCardDecl c when snapshot.CardLocations.TryGetValue(c.Name, out var cl) => cl.Path,
-        AstEntityDecl e when snapshot.EntityLocations.TryGetValue(e.Name, out var el) => el.Path,
-        AstTokenDecl t when snapshot.TokenLocations.TryGetValue(t.Name, out var tl) => tl.Path,
-        _ => "",
-    };
-
     private static string KindOf(AstDeclaration decl) => decl switch
     {
         AstEntityDecl => "Entity",
@@ -99,16 +86,5 @@ internal static class ProjectEndpoints
         AstTokenDecl => "Token",
         AstEntityAugment => "Augment",
         _ => "Other",
-    };
-
-    private static string LabelOf(AstDeclaration decl) => decl switch
-    {
-        AstEntityDecl e when e.IndexParams.Count > 0 =>
-            $"Entity {e.Name}[{string.Join(",", e.IndexParams)}]",
-        AstEntityDecl e => $"Entity {e.Name}",
-        AstCardDecl c => $"Card {c.Name}",
-        AstTokenDecl t => $"Token {t.Name}",
-        AstEntityAugment a => $"Augment {a.Target.DisplayPath}",
-        _ => decl.DisplayName,
     };
 }

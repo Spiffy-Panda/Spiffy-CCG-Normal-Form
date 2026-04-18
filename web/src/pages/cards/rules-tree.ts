@@ -2,19 +2,20 @@ import type { CardDto, ProjectDto } from "../../api/dtos";
 import { api } from "../../api/client";
 import { extractSourceBlock } from "./filter";
 
+type Kind = "Entity" | "Card" | "Token" | "Augment";
+
 interface RulesGroup {
-  kind: "Entity" | "Card" | "Token" | "Augment" | "Other";
+  kind: Kind;
   label: string;
   count: number;
   items: RulesItem[];
 }
 
 interface RulesItem {
-  label: string;          // e.g., "Card Spark"
-  name: string;           // e.g., "Spark" — identifier used for lookups
-  path: string;           // source path when known
-  line: number;           // source line when known
-  group: RulesGroup["kind"];
+  kind: Kind;
+  label: string;   // e.g., "Card Spark", "Augment Game.abilities"
+  path: string;    // source path
+  line: number;    // 1-based line of the declaration's opening token
 }
 
 export function renderRulesTree(
@@ -34,7 +35,7 @@ export function renderRulesTree(
     "Declaration tree. Each leaf expands to its raw .ccgnf source; a human-readable render will land in a later step.";
   wrap.appendChild(intro);
 
-  const groups = buildGroups(project, cards);
+  const groups = buildGroups(project);
   for (const group of groups) {
     const section = document.createElement("details");
     section.className = "rules-group";
@@ -48,13 +49,13 @@ export function renderRulesTree(
     if (group.kind === "Card") {
       const byFaction = new Map<string, RulesItem[]>();
       for (const item of group.items) {
-        const card = cards.find((c) => c.name === item.name);
+        const name = item.label.replace(/^Card\s+/, "");
+        const card = cards.find((c) => c.name === name);
         const faction = card?.factions[0] ?? "NEUTRAL";
         if (!byFaction.has(faction)) byFaction.set(faction, []);
         byFaction.get(faction)!.push(item);
       }
-      const factionList = [...byFaction.keys()].sort();
-      for (const faction of factionList) {
+      for (const faction of [...byFaction.keys()].sort()) {
         const items = byFaction.get(faction)!;
         const sub = document.createElement("details");
         sub.className = "rules-subgroup";
@@ -117,18 +118,14 @@ function renderItemList(items: RulesItem[], rawCache: Map<string, string>): HTML
     pre.textContent = item.path ? "(click to load)" : "(no source path)";
     details.appendChild(pre);
 
-    details.addEventListener(
-      "toggle",
-      () => {
-        if (!details.open || pre.dataset.loaded === "1" || !item.path) return;
-        pre.textContent = "(loading…)";
-        void loadSource(item, rawCache).then((src) => {
-          pre.textContent = src;
-          pre.dataset.loaded = "1";
-        });
-      },
-      { once: false },
-    );
+    details.addEventListener("toggle", () => {
+      if (!details.open || pre.dataset.loaded === "1" || !item.path) return;
+      pre.textContent = "(loading…)";
+      void loadSource(item, rawCache).then((src) => {
+        pre.textContent = src;
+        pre.dataset.loaded = "1";
+      });
+    });
 
     li.appendChild(details);
     ul.appendChild(li);
@@ -136,10 +133,7 @@ function renderItemList(items: RulesItem[], rawCache: Map<string, string>): HTML
   return ul;
 }
 
-async function loadSource(
-  item: RulesItem,
-  rawCache: Map<string, string>,
-): Promise<string> {
+async function loadSource(item: RulesItem, rawCache: Map<string, string>): Promise<string> {
   try {
     let content = rawCache.get(item.path);
     if (content === undefined) {
@@ -148,46 +142,15 @@ async function loadSource(
       content = body;
       rawCache.set(item.path, content);
     }
-    const line = item.line > 0 ? item.line : locateDeclaration(content, item);
-    if (line <= 0) return "(declaration block not found in source)";
-    const block = extractSourceBlock(content, line);
+    const block = extractSourceBlock(content, item.line);
     return block || "(declaration block not found in source)";
   } catch (err) {
     return `(error: ${String(err)})`;
   }
 }
 
-function locateDeclaration(content: string, item: RulesItem): number {
-  if (item.group === "Augment") {
-    const pattern = new RegExp(
-      `^\\s*${escapeRegex(item.name)}\\s*(\\+?=)`,
-      "m",
-    );
-    const m = pattern.exec(content);
-    if (!m) return 0;
-    return lineOf(content, m.index);
-  }
-  const pattern = new RegExp(
-    `^\\s*${item.group}\\s+${escapeRegex(item.name)}\\b`,
-    "m",
-  );
-  const m = pattern.exec(content);
-  if (!m) return 0;
-  return lineOf(content, m.index);
-}
-
-function lineOf(content: string, offset: number): number {
-  let line = 1;
-  for (let i = 0; i < offset; i++) if (content[i] === "\n") line++;
-  return line;
-}
-
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function buildGroups(project: ProjectDto, cards: CardDto[]): RulesGroup[] {
-  const kinds: Array<[RulesGroup["kind"], string]> = [
+function buildGroups(project: ProjectDto): RulesGroup[] {
+  const kinds: Array<[Kind, string]> = [
     ["Entity", "Entities"],
     ["Card", "Cards"],
     ["Token", "Tokens"],
@@ -196,55 +159,15 @@ function buildGroups(project: ProjectDto, cards: CardDto[]): RulesGroup[] {
   const groups: RulesGroup[] = [];
   for (const [kind, label] of kinds) {
     const count = project.declarations.counts[kind] ?? 0;
-    const items = itemsFor(kind, project, cards);
+    const items: RulesItem[] = [];
+    for (const [path, entries] of Object.entries(project.declarations.byFile)) {
+      for (const entry of entries) {
+        if (!entry.label.startsWith(`${kind} `)) continue;
+        items.push({ kind, label: entry.label, path, line: entry.line });
+      }
+    }
+    if (kind !== "Card") items.sort((a, b) => a.label.localeCompare(b.label));
     groups.push({ kind, label, count, items });
   }
   return groups;
-}
-
-function itemsFor(
-  kind: RulesGroup["kind"],
-  project: ProjectDto,
-  cards: CardDto[],
-): RulesItem[] {
-  if (kind === "Card") {
-    return cards.map((c) => ({
-      group: kind,
-      label: `Card ${c.name}`,
-      name: c.name,
-      path: c.sourcePath,
-      line: c.sourceLine,
-    }));
-  }
-  const prefix = `${kind} `;
-  const items: RulesItem[] = [];
-  for (const [path, labels] of Object.entries(project.declarations.byFile)) {
-    for (const raw of labels) {
-      if (!raw.startsWith(prefix)) continue;
-      if (raw.startsWith("Card ")) continue;
-      if (kind === "Entity" && raw.startsWith("Augment ")) continue;
-      // Extract a canonical name for lookups: strip the kind prefix; if the
-      // label has a [param] trailer (parametric entity), drop it.
-      const body = raw.slice(prefix.length);
-      const name = body.split("[")[0];
-      items.push({ group: kind, label: raw, name, path, line: 0 });
-    }
-  }
-  if (kind === "Augment") {
-    items.length = 0;
-    for (const [path, labels] of Object.entries(project.declarations.byFile)) {
-      for (const raw of labels) {
-        if (!raw.startsWith("Augment ")) continue;
-        items.push({
-          group: kind,
-          label: raw,
-          name: raw.slice("Augment ".length),
-          path,
-          line: 0,
-        });
-      }
-    }
-  }
-  items.sort((a, b) => a.label.localeCompare(b.label));
-  return items;
 }

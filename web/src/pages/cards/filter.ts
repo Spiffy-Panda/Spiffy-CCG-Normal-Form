@@ -61,10 +61,10 @@ export function extractSourceBlock(content: string, startLine: number): string {
     const line = lines[i];
     out.push(line);
     for (const ch of line) {
-      if (ch === "{") {
+      if (ch === "{" || ch === "[" || ch === "(") {
         depth++;
         seenOpen = true;
-      } else if (ch === "}") {
+      } else if (ch === "}" || ch === "]" || ch === ")") {
         depth--;
       }
     }

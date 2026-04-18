@@ -95,9 +95,14 @@ export interface ProjectFileDto {
   bytes: number;
 }
 
+export interface ProjectDeclarationEntry {
+  label: string;
+  line: number;
+}
+
 export interface ProjectDeclarationsDto {
   counts: Record<string, number>;
-  byFile: Record<string, string[]>;
+  byFile: Record<string, ProjectDeclarationEntry[]>;
 }
 
 export interface ProjectDto {

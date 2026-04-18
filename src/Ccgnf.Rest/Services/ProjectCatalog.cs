@@ -76,10 +76,12 @@ public sealed class ProjectCatalog
         // The preprocessor concatenates source files into one expanded string
         // and the parser tags tokens with its single sourceName ("<project>"),
         // so AST spans cannot carry the originating .ccgnf path. Recover
-        // per-declaration file + line by regex-scanning the raw content.
-        var cardLocations = IndexDeclarations(rawByPath, @"Card");
-        var entityLocations = IndexDeclarations(rawByPath, @"Entity");
-        var tokenLocations = IndexDeclarations(rawByPath, @"Token");
+        // per-declaration path + line by regex-scanning the raw content.
+        var fileDeclarations = IndexFileDeclarations(rawByPath);
+
+        var cardLocations = LocationsForKind(fileDeclarations, "Card");
+        var entityLocations = LocationsForKind(fileDeclarations, "Entity");
+        var tokenLocations = LocationsForKind(fileDeclarations, "Token");
 
         _log.LogInformation(
             "ProjectCatalog: loaded {FileCount} files, {MacroCount} macros, errors={HasErrors}.",
@@ -89,29 +91,82 @@ public sealed class ProjectCatalog
             File: result.File,
             RawContent: rawByPath,
             MacroNames: result.MacroNames,
+            FileDeclarations: fileDeclarations,
             CardLocations: cardLocations,
             EntityLocations: entityLocations,
             TokenLocations: tokenLocations,
             LoadedAt: DateTimeOffset.UtcNow);
     }
 
-    private static IReadOnlyDictionary<string, DeclarationLocation> IndexDeclarations(
-        IDictionary<string, string> rawByPath, string keyword)
-    {
-        var locations = new Dictionary<string, DeclarationLocation>(StringComparer.Ordinal);
-        var regex = new Regex($@"^\s*{keyword}\s+(?<name>\w+)", RegexOptions.Multiline);
+    private static readonly Regex CardRegex =
+        new(@"^\s*Card\s+(?<name>\w+)\s*\{", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex EntityRegex =
+        new(@"^\s*Entity\s+(?<name>\w+)(?<params>\[[^\]]*\])?", RegexOptions.Multiline | RegexOptions.Compiled);
+    private static readonly Regex TokenRegex =
+        new(@"^\s*Token\s+(?<name>\w+)", RegexOptions.Multiline | RegexOptions.Compiled);
+    // Augment: target path (dotted / indexed) then `+=` or ` = `, but not `==`.
+    // Require at least one `.` or `[` in the target so we don't catch bare
+    // assignments like `x = 1` inside macro bodies.
+    private static readonly Regex AugmentRegex = new(
+        @"^(?<target>\w+(?:\.\w+|\[[^\]]*\])+)\s*(?:\+=|=(?!=))",
+        RegexOptions.Multiline | RegexOptions.Compiled);
 
+    private static IReadOnlyDictionary<string, IReadOnlyList<FileDeclaration>> IndexFileDeclarations(
+        IDictionary<string, string> rawByPath)
+    {
+        var byFile = new SortedDictionary<string, IReadOnlyList<FileDeclaration>>(StringComparer.Ordinal);
         foreach (var (path, content) in rawByPath)
         {
-            foreach (Match match in regex.Matches(content))
+            var list = new List<FileDeclaration>();
+            ScanInto(list, content, CardRegex, m =>
+                new FileDeclaration("Card", m.Groups["name"].Value, $"Card {m.Groups["name"].Value}",
+                    LineFromOffset(content, m.Index)));
+            ScanInto(list, content, EntityRegex, m =>
             {
-                string name = match.Groups["name"].Value;
-                if (locations.ContainsKey(name)) continue;
-                int line = LineFromOffset(content, match.Index);
-                locations[name] = new DeclarationLocation(path, line);
+                string name = m.Groups["name"].Value;
+                string parms = m.Groups["params"].Success ? m.Groups["params"].Value : "";
+                return new FileDeclaration("Entity", name, $"Entity {name}{parms}",
+                    LineFromOffset(content, m.Index));
+            });
+            ScanInto(list, content, TokenRegex, m =>
+                new FileDeclaration("Token", m.Groups["name"].Value, $"Token {m.Groups["name"].Value}",
+                    LineFromOffset(content, m.Index)));
+            ScanInto(list, content, AugmentRegex, m =>
+            {
+                string target = m.Groups["target"].Value;
+                return new FileDeclaration("Augment", target, $"Augment {target}",
+                    LineFromOffset(content, m.Index));
+            });
+            list.Sort((a, b) => a.Line.CompareTo(b.Line));
+            byFile[path] = list;
+        }
+        return byFile;
+    }
+
+    private static void ScanInto(
+        List<FileDeclaration> into,
+        string content,
+        Regex regex,
+        Func<Match, FileDeclaration> select)
+    {
+        foreach (Match m in regex.Matches(content)) into.Add(select(m));
+    }
+
+    private static IReadOnlyDictionary<string, DeclarationLocation> LocationsForKind(
+        IReadOnlyDictionary<string, IReadOnlyList<FileDeclaration>> byFile,
+        string kind)
+    {
+        var result = new Dictionary<string, DeclarationLocation>(StringComparer.Ordinal);
+        foreach (var (path, decls) in byFile)
+        {
+            foreach (var d in decls)
+            {
+                if (d.Kind != kind) continue;
+                if (result.ContainsKey(d.Name)) continue;
+                result[d.Name] = new DeclarationLocation(path, d.Line);
             }
         }
-        return locations;
+        return result;
     }
 
     private static int LineFromOffset(string text, int offset)
@@ -139,10 +194,13 @@ public sealed class ProjectCatalog
 
 public sealed record DeclarationLocation(string Path, int Line);
 
+public sealed record FileDeclaration(string Kind, string Name, string Label, int Line);
+
 public sealed record ProjectSnapshot(
     AstFile? File,
     IReadOnlyDictionary<string, string> RawContent,
     IReadOnlyList<string> MacroNames,
+    IReadOnlyDictionary<string, IReadOnlyList<FileDeclaration>> FileDeclarations,
     IReadOnlyDictionary<string, DeclarationLocation> CardLocations,
     IReadOnlyDictionary<string, DeclarationLocation> EntityLocations,
     IReadOnlyDictionary<string, DeclarationLocation> TokenLocations,
@@ -152,6 +210,7 @@ public sealed record ProjectSnapshot(
         File: null,
         RawContent: new Dictionary<string, string>(),
         MacroNames: Array.Empty<string>(),
+        FileDeclarations: new Dictionary<string, IReadOnlyList<FileDeclaration>>(),
         CardLocations: new Dictionary<string, DeclarationLocation>(),
         EntityLocations: new Dictionary<string, DeclarationLocation>(),
         TokenLocations: new Dictionary<string, DeclarationLocation>(),

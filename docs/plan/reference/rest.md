@@ -107,23 +107,32 @@ public sealed record ProjectSnapshot(
     AstFile? File,
     IReadOnlyDictionary<string, string> RawContent,
     IReadOnlyList<string> MacroNames,
+    IReadOnlyDictionary<string, IReadOnlyList<FileDeclaration>> FileDeclarations,
     IReadOnlyDictionary<string, DeclarationLocation> CardLocations,
     IReadOnlyDictionary<string, DeclarationLocation> EntityLocations,
     IReadOnlyDictionary<string, DeclarationLocation> TokenLocations,
     DateTimeOffset LoadedAt);
 
+public sealed record FileDeclaration(string Kind, string Name, string Label, int Line);
 public sealed record DeclarationLocation(string Path, int Line);
 ```
 
 Locates the repo by walking up from `AppContext.BaseDirectory` until
 `Ccgnf.sln` is found, then loads every `*.ccgnf` under
 `{repoRoot}/{CCGNF_PROJECT_ROOT ?? "encoding"}`. Paths stored in
-`RawContent` and `*Locations` are repo-relative with forward slashes.
+`RawContent`, `FileDeclarations`, and `*Locations` are repo-relative with
+forward slashes.
 
-Declaration locations are recovered by regex-scanning the raw content
-(`^\s*(Card|Entity|Token)\s+(\w+)`) because the preprocessor concatenates
-sources before handing a single string to the parser, so AST
-`SourceSpan.File` collapses to `<project>` for every declaration.
+Declarations are recovered by regex-scanning the raw content for `Card`,
+`Entity`, `Token`, and `Augment` forms (the last matches `target.path +=`
+or `target.path = …` where the target contains at least one `.` or
+`[…]`). The preprocessor concatenates sources before handing a single
+string to the parser, so AST `SourceSpan.File` collapses to `<project>`
+for every declaration — the scan is the only way to recover real file +
+line metadata. `CardLocations` / `EntityLocations` / `TokenLocations` are
+name-keyed views derived from the scan; `FileDeclarations` preserves the
+full per-file list, which matters for `Augment` targets that recur
+across files.
 
 ## Serialization
 
@@ -157,7 +166,8 @@ DistributionDto(Faction, Type, Cost, Rarity)   // all IReadOnlyDictionary<string
 
 ```csharp
 ProjectFileDto(Path, Bytes)
-ProjectDeclarationsDto(Counts, ByFile)
+ProjectDeclarationEntry(Label, Line)
+ProjectDeclarationsDto(Counts, ByFile)              // ByFile value: IReadOnlyList<ProjectDeclarationEntry>
 ProjectDto(Files, Macros, Declarations, LoadedAt)   // LoadedAt is ISO-8601 string
 ```
 

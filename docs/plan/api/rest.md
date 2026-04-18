@@ -175,9 +175,12 @@ on first hit; append `?reload=1` to force a re-read.
   ],
   "macros": ["SetupSequence", "ChooseFirstPlayer", …],
   "declarations": {
-    "counts": { "Entity": 4, "Card": 116, "Augment": 22, "Token": 3 },
+    "counts": { "Entity": 5, "Card": 116, "Augment": 23, "Token": 1 },
     "byFile": {
-      "encoding/cards/ember.ccgnf": ["Card Spark", "Card Cinderling", …]
+      "encoding/cards/ember.ccgnf": [
+        { "label": "Card Spark",      "line": 13 },
+        { "label": "Card Cinderling", "line": 27 }
+      ]
     }
   },
   "loadedAt": "2026-04-18T…"
