@@ -89,6 +89,17 @@ src/Ccgnf/Generated/
 .ccgnf-cache/
 
 # -----------------------------------------------------------------------------
+# Web frontend (Vite + TypeScript) under web/.
+#
+# Build artifacts are produced by `make web-build` and copied into
+# src/Ccgnf.Rest/wwwroot/. The web/dist/ directory itself is unused (build
+# writes directly to wwwroot/), but ignore it defensively in case of
+# one-off vite builds without the --outDir override.
+# -----------------------------------------------------------------------------
+web/node_modules/
+web/dist/
+
+# -----------------------------------------------------------------------------
 # Card-cluster skill working files
 #
 # `working-*.ccgnf` files are in-flight cluster drafts. Only `cluster-*.ccgnf`

@@ -55,6 +55,7 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
 | REST host (`Ccgnf.Rest`)                   | **Scaffolded** — per-stage endpoints, sessions, static playground |
+| Web app (`web/`)                           | **Scaffolded** — Vite + TypeScript; playground migrated to `#/interpreter` |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
 | Solution + test project                    | **Working** — 109 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
@@ -180,6 +181,8 @@ legacy/         Archived prior design iterations (Conduit); do not
 src/
   Ccgnf/        The engine library (skeleton).
   Ccgnf.Cli/    The CLI host (skeleton).
+  Ccgnf.Rest/   The REST host; wwwroot/ is the built Vite bundle.
+web/            Vite + TypeScript frontend; built into src/Ccgnf.Rest/wwwroot.
 tests/
   Ccgnf.Tests/  xUnit test project.
     fixtures/   CCGNF source files used as test inputs — notably

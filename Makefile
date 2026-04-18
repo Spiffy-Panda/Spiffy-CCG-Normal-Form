@@ -15,6 +15,7 @@ RESULTS   := TestResults
 DOTNET    ?= dotnet
 
 .PHONY: all help restore build test clean format ci rest \
+        web web-dev web-build \
         ccgnf-lint ccgnf-build card-distribution
 
 all: build
@@ -29,6 +30,10 @@ help:
 	@echo "  make format     $(DOTNET) format (whitespace + analyzer fixes)"
 	@echo "  make ci         restore + build + test (invoked by GitHub Actions)"
 	@echo "  make rest       run Ccgnf.Rest on http://localhost:19397"
+	@echo ""
+	@echo "  make web        alias for web-build (npm install + vite build)"
+	@echo "  make web-dev    run the Vite dev server on http://localhost:5173"
+	@echo "  make web-build  build web/ into src/Ccgnf.Rest/wwwroot"
 	@echo ""
 	@echo "  make ccgnf-lint (future) validate all .ccgnf source files"
 	@echo "  make ccgnf-build (future) preprocess .ccgnf into intermediates"
@@ -68,6 +73,21 @@ ci: restore build test
 # Start the REST host on the default port. Override CCGNF_HTTP_PORT to change it.
 rest: build
 	$(DOTNET) run --project src/Ccgnf.Rest --no-build
+
+# ---------------------------------------------------------------------------
+# Frontend (Vite + TypeScript) under web/. The build output lands in
+# src/Ccgnf.Rest/wwwroot/ so the REST host serves it as static content. Node
+# (>= 18) and npm must be on PATH. CI stays dotnet-only; run web-build by
+# hand before committing updated wwwroot/ contents.
+# ---------------------------------------------------------------------------
+
+web: web-build
+
+web-dev:
+	cd web && npm install && npm run dev
+
+web-build:
+	cd web && npm install && npm run build
 
 # ---------------------------------------------------------------------------
 # Future targets — will be wired up once the CCGNF grammar engine lands.
