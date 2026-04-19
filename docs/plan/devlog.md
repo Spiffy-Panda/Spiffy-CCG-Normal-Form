@@ -3,6 +3,32 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — Post-7h: deck names, inspector layout, step 8 plan
+
+Two follow-ups after 7h landed:
+
+- `Interpreter.SeedDecks` now accepts `InterpreterOptions.InitialDecks`
+  (positional per-player list of card names). `Room.StartLocked` fills
+  it from each `RoomPlayer.DeckCardNames`, so Arsenal cards carry
+  their real name as `DisplayName`. The card inspector resolves
+  against the catalog and shows real rules text for hand cards (e.g.
+  "Refract — Maneuver · 1⚡ · C · TIDE — Resolves: target Unit: move
+  target to target.owner.Hand") with the encoding source path.
+- Tabletop right column is now a flex stack: inspector on top, event
+  log on bottom, no overlap. Inspector mounts via
+  `openInspector(card, rightColEl)` and is re-attached across
+  tabletop re-renders so SSE updates don't blow away its state.
+
+Also wrote [`steps/08-full-game.md`](steps/08-full-game.md) — the
+roadmap from "engine halts at Round-1 Rise" to "1 human + 1 CPU game
+reaches GameEnd via click events". Sub-commits 8a–8k cover Mulligan
+firing, turn rotation, card play with cost, target resolution, Clash
+damage, Conduit collapse SBA, one victory condition, frontend
+turn/action/clash UI, and a Playwright end-to-end. Exit criteria +
+risks called out; CPU stays first-legal throughout.
+
+---
+
 ## 2026-04-18 — 7g, 7h: CPU seat + hand-click wiring
 
 **7g — CPU seat.** `SeatKind` on `RoomPlayer`; `Room` pre-fills CPU seats

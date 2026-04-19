@@ -46,6 +46,7 @@ to be readable in a single pass.
 - [steps/05-raw-view.md](steps/05-raw-view.md)
 - [steps/06-rooms.md](steps/06-rooms.md)
 - [steps/07-playtest-mvp.md](steps/07-playtest-mvp.md)
+- [steps/08-full-game.md](steps/08-full-game.md)
 
 ## Progress
 

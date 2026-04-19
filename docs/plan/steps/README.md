@@ -17,10 +17,14 @@ updates if a threshold crossed, and an entry goes in
 | 5 | [05-raw-view.md](05-raw-view.md) | 1, 2 | Raw file-tree view with syntax highlighting. |
 | 6 | [06-rooms.md](06-rooms.md) | 1, 2 | Rooms layer, Lobby + Tabletop pages, SSE. |
 | 7 | [07-playtest-mvp.md](07-playtest-mvp.md) | 1–6 | Playtest MVP: AST humanizer, preset decks, card/board rendering, CPU seat, export. |
+| 8 | [08-full-game.md](08-full-game.md) | 1–7 | First full human + CPU game played through the Play tab — real turns, card play, Clash, Conduit collapse, GameEnd. |
 
 Steps 3 / 4 / 5 are parallelisable after 1 + 2. Step 6 is the largest;
 it can begin once 1 and 2 land. Step 7 reshapes the interpreter as a
-generator (7f) — that sub-commit is the long pole of the playtest arc.
+generator (7f) — that sub-commit was the long pole of the playtest
+arc. Step 8 extends the engine (Mulligan → turn rotation → card play
+→ target → Clash → SBA → victory) and adds the matching click-driven
+UI; its long pole is 8e (Clash) since the encoding there is dense.
 
 ## Work-style conventions
 
