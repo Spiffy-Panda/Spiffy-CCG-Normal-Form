@@ -93,6 +93,19 @@
 .tabletop-col.right {
   border-left: 1px solid var(--border);
   padding-left: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.event-log-wrap {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .tabletop-header {
@@ -472,19 +485,46 @@
   right: 16px;
   width: 320px;
   max-height: calc(100vh - 96px);
-  background: var(--panel);
+  /* Opaque background so the event log underneath doesn't bleed through.
+     Canvas / CanvasText adapt to light or dark color-scheme. */
+  background: Canvas;
+  color: CanvasText;
   border: 1px solid var(--control-border);
   border-radius: 6px;
   padding: 12px 14px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   overflow-y: auto;
   z-index: 50;
   transform: translateX(calc(100% + 32px));
-  transition: transform 160ms ease-out;
+  transition: transform 160ms ease-out, opacity 160ms ease-out;
+  pointer-events: none;
+  opacity: 0;
 }
 
 .card-inspector-open {
   transform: translateX(0);
+  pointer-events: auto;
+  opacity: 1;
+}
+
+/* Embedded mode — when the inspector mounts inside the right column
+   (tabletop), shed the fixed overlay styling and behave as a flex
+   child that splits the column with the event log. */
+.tabletop-col.right > .card-inspector {
+  position: static;
+  top: auto;
+  right: auto;
+  width: auto;
+  max-height: none;
+  flex: 0 1 50%;
+  min-height: 0;
+  overflow-y: auto;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tabletop-col.right > .card-inspector:not(.card-inspector-open) {
+  display: none;
 }
 
 .card-inspector-head {

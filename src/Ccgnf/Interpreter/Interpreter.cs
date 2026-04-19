@@ -22,6 +22,18 @@ public sealed class InterpreterOptions
     public int MaxEventDispatches { get; set; } = 10_000;
 
     /// <summary>
+    /// Per-player initial decks. Positional — <c>InitialDecks[i]</c> applies
+    /// to <c>state.Players[i]</c> (declaration order from the encoding, which
+    /// matches roster order for pre-seated CPUs followed by humans). Each
+    /// inner list is the card names to seed into that player's Arsenal;
+    /// <c>null</c> falls back to <see cref="DefaultDeckSize"/> anonymous
+    /// placeholders. Names become each <c>Card</c> entity's
+    /// <c>DisplayName</c>, so hosts can resolve them back to their catalog
+    /// entry via a name lookup.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<string>?>? InitialDecks { get; set; }
+
+    /// <summary>
     /// Fires on the interpreter thread after each <see cref="GameEvent"/> is
     /// dispatched. Hosts use this to stream SSE frames as the run advances;
     /// the handler must not block or throw.
@@ -73,6 +85,7 @@ public sealed class Interpreter
             DefaultDeckSize = options.DefaultDeckSize,
             MaxEventDispatches = options.MaxEventDispatches,
             OnEvent = options.OnEvent,
+            InitialDecks = options.InitialDecks,
             // Inputs intentionally omitted — StartRun installs its own channel.
         });
 
@@ -109,6 +122,7 @@ public sealed class Interpreter
         int seed = options.Seed;
         int deckSize = options.DefaultDeckSize;
         var onEvent = options.OnEvent;
+        var initialDecks = options.InitialDecks;
 
         var cts = new CancellationTokenSource();
         var channel = new BlockingInputChannel(cts);
@@ -117,7 +131,7 @@ public sealed class Interpreter
         var builder = new StateBuilder(_loggerFactory.CreateLogger<StateBuilder>());
         var state = builder.Build(file, scheduler);
 
-        SeedDecks(state, deckSize);
+        SeedDecks(state, deckSize, initialDecks);
 
         var evaluator = new Evaluator(state, scheduler, _loggerFactory.CreateLogger<Evaluator>());
 
@@ -139,16 +153,44 @@ public sealed class Interpreter
     // Deck seeding
     // -------------------------------------------------------------------------
 
-    private static void SeedDecks(GameState state, int deckSize)
+    private static void SeedDecks(
+        GameState state,
+        int deckSize,
+        IReadOnlyList<IReadOnlyList<string>?>? initialDecks)
     {
-        foreach (var player in state.Players)
+        for (int p = 0; p < state.Players.Count; p++)
         {
+            var player = state.Players[p];
             if (!player.Zones.TryGetValue("Arsenal", out var arsenal)) continue;
-            for (int i = 0; i < deckSize; i++)
+
+            IReadOnlyList<string>? names = null;
+            if (initialDecks is not null && p < initialDecks.Count) names = initialDecks[p];
+
+            if (names is not null && names.Count > 0)
             {
-                var card = state.AllocateEntity("Card", $"Deck_{player.DisplayName}_{i}");
-                card.OwnerId = player.Id;
-                arsenal.Contents.Add(card.Id);
+                // Named cards — one entity per listed name. Arsenal size
+                // matches the deck; DefaultDeckSize is ignored. Each entity
+                // carries the card name as its DisplayName so hosts can
+                // resolve it back to a catalog entry (for the inspector,
+                // for UI labels, etc.).
+                foreach (var name in names)
+                {
+                    var card = state.AllocateEntity("Card", name);
+                    card.OwnerId = player.Id;
+                    arsenal.Contents.Add(card.Id);
+                }
+            }
+            else
+            {
+                // No deck supplied — fill with anonymous placeholders as v1
+                // used to. Keeps tests and the stateless /api/run endpoint
+                // working without forcing every caller to provide a deck.
+                for (int i = 0; i < deckSize; i++)
+                {
+                    var card = state.AllocateEntity("Card", $"Deck_{player.DisplayName}_{i}");
+                    card.OwnerId = player.Id;
+                    arsenal.Contents.Add(card.Id);
+                }
             }
         }
     }

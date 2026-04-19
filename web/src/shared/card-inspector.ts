@@ -28,9 +28,15 @@ let panelEl: HTMLElement | null = null;
 let current: InspectorCard | null = null;
 let escListener: ((e: KeyboardEvent) => void) | null = null;
 
-export function openInspector(card: InspectorCard): void {
+/**
+ * Open the inspector. The panel is moved into <c>container</c> if supplied
+ * (embedded mode — callers get layout control, e.g. the tabletop stacks
+ * the inspector above its event log); otherwise it floats off
+ * <c>document.body</c> like a modal overlay.
+ */
+export function openInspector(card: InspectorCard, container?: HTMLElement): void {
   current = card;
-  ensurePanel();
+  ensurePanel(container);
   render();
   if (!escListener) {
     escListener = (e) => {
@@ -81,11 +87,19 @@ export function fromEntity(entity: EntityDto, catalog?: readonly CardDto[]): Ins
   };
 }
 
-function ensurePanel(): void {
-  if (panelEl) return;
-  panelEl = document.createElement("aside");
-  panelEl.className = "card-inspector";
-  document.body.appendChild(panelEl);
+function ensurePanel(container?: HTMLElement): void {
+  const target = container ?? document.body;
+  if (!panelEl) {
+    panelEl = document.createElement("aside");
+    panelEl.className = "card-inspector";
+  }
+  if (panelEl.parentElement !== target) {
+    // Insert at the top of the target container so embedded callers
+    // (the tabletop's right column) get the inspector above their other
+    // children. For body-mounted overlays this is irrelevant since the
+    // panel is fixed-positioned.
+    target.insertBefore(panelEl, target.firstChild);
+  }
 }
 
 function render(): void {

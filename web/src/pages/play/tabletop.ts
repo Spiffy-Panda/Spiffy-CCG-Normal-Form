@@ -51,6 +51,7 @@ const state: TabletopState = {
 };
 
 let container: HTMLElement | null = null;
+let rightColEl: HTMLElement | null = null;
 let sse: EventSource | null = null;
 
 export async function renderTabletop(root: HTMLElement, match: RouteMatch): Promise<void> {
@@ -434,7 +435,7 @@ function renderDeckPicker(): HTMLElement {
 }
 
 function onCardClicked(entity: EntityDto): void {
-  openInspector(fromEntity(entity, state.cardCatalog));
+  openInspector(fromEntity(entity, state.cardCatalog), rightColEl ?? undefined);
 }
 
 function renderActionBar(): HTMLElement | null {
@@ -494,6 +495,20 @@ function renderEngineBanner(round: number | null, _roomState: string | null): HT
 }
 
 function renderRight(col: HTMLElement): void {
+  // Hold onto the column element so openInspector can mount into it —
+  // the inspector stacks above the event-log wrapper and both flex to
+  // share the column's height.
+  rightColEl = col;
+
+  // Re-attach the existing singleton inspector panel (if any) so it
+  // survives tabletop re-renders. Must come before the log wrap so the
+  // flex column orders inspector above log.
+  const existingInspector = document.querySelector("aside.card-inspector");
+  if (existingInspector) col.appendChild(existingInspector);
+
+  const logWrap = document.createElement("div");
+  logWrap.className = "event-log-wrap";
+
   const head = document.createElement("h3");
   head.style.fontSize = "11px";
   head.style.textTransform = "uppercase";
@@ -501,39 +516,39 @@ function renderRight(col: HTMLElement): void {
   head.style.opacity = "0.7";
   head.style.margin = "0 0 8px 0";
   head.textContent = `Event log (${state.events.length})`;
-  col.appendChild(head);
+  logWrap.appendChild(head);
 
   if (state.events.length === 0) {
     const empty = document.createElement("div");
     empty.className = "event-log-empty";
     empty.textContent = "Events appear here as they stream in.";
-    col.appendChild(empty);
-    return;
-  }
-
-  const list = document.createElement("ul");
-  list.className = "event-log";
-  for (const frame of state.events.slice(-50).reverse()) {
-    const li = document.createElement("li");
-    li.className = "event-log-item";
-    const step = document.createElement("span");
-    step.className = "step";
-    step.textContent = `#${frame.step}`;
-    li.appendChild(step);
-    const type = document.createElement("span");
-    type.className = "type";
-    type.textContent = frame.event.type;
-    li.appendChild(type);
-    const entries = Object.entries(frame.event.fields);
-    if (entries.length > 0) {
-      const fields = document.createElement("span");
-      fields.className = "fields";
-      fields.textContent = entries.map(([k, v]) => `${k}=${v}`).join(" · ");
-      li.appendChild(fields);
+    logWrap.appendChild(empty);
+  } else {
+    const list = document.createElement("ul");
+    list.className = "event-log";
+    for (const frame of state.events.slice(-50).reverse()) {
+      const li = document.createElement("li");
+      li.className = "event-log-item";
+      const step = document.createElement("span");
+      step.className = "step";
+      step.textContent = `#${frame.step}`;
+      li.appendChild(step);
+      const type = document.createElement("span");
+      type.className = "type";
+      type.textContent = frame.event.type;
+      li.appendChild(type);
+      const entries = Object.entries(frame.event.fields);
+      if (entries.length > 0) {
+        const fields = document.createElement("span");
+        fields.className = "fields";
+        fields.textContent = entries.map(([k, v]) => `${k}=${v}`).join(" · ");
+        li.appendChild(fields);
+      }
+      list.appendChild(li);
     }
-    list.appendChild(li);
+    logWrap.appendChild(list);
   }
-  col.appendChild(list);
+  col.appendChild(logWrap);
 }
 
 function escapeHtml(s: string): string {

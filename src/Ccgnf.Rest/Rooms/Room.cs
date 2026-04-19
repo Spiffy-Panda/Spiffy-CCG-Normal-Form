@@ -258,14 +258,13 @@ public sealed class Room : IDisposable
         Lifecycle = RoomLifecycle.Active;
         LastActivityAt = DateTimeOffset.UtcNow;
 
-        foreach (var p in _players)
-        {
-            if (p.DeckCardNames is null) continue;
-            foreach (var name in p.DeckCardNames)
-            {
-                _submissions.Add(new PendingSubmission(p.PlayerId, new RtString(name)));
-            }
-        }
+        // Positional decks: roster order matches state.Players order because
+        // StateBuilder iterates `Player[i] for i ∈ {1, 2}` declaratively and
+        // roster PlayerId is allocated in the same 1..N sequence. Pre-seated
+        // CPUs fill indices 0..N-1 first; humans come after.
+        var initialDecks = _players
+            .Select(p => p.DeckCardNames)
+            .ToList();
 
         InterpreterRun run;
         try
@@ -277,6 +276,7 @@ public sealed class Room : IDisposable
             {
                 Seed = Seed,
                 DefaultDeckSize = DeckSize,
+                InitialDecks = initialDecks,
                 OnEvent = (ev, state) => EmitGameEvent(ev, state),
             });
         }
