@@ -2,6 +2,8 @@ import "./style.css";
 import { api } from "../../api/client";
 import type { RoomDetailDto, RoomEventFrame } from "../../api/dtos";
 import type { RouteMatch } from "../../router";
+import { renderBoard } from "../../shared/board";
+import { buildView } from "../../shared/play-state";
 
 interface Identity {
   roomId: string;
@@ -176,7 +178,7 @@ function renderShell(): void {
   page.appendChild(body);
 
   const left = document.createElement("div");
-  left.className = "tabletop-col";
+  left.className = "tabletop-col board-col";
   body.appendChild(left);
 
   const right = document.createElement("div");
@@ -188,29 +190,31 @@ function renderShell(): void {
 }
 
 function renderLeft(col: HTMLElement): void {
-  const identitySection = document.createElement("div");
-  identitySection.className = "play-section";
-  identitySection.innerHTML = `<h3>Seat</h3>`;
-  if (state.identity) {
-    const info = document.createElement("div");
-    info.className = "my-player";
-    info.textContent = `playerId=${state.identity.playerId}, name="${state.identity.name}"`;
-    identitySection.appendChild(info);
+  const topBar = document.createElement("div");
+  topBar.className = "play-topbar";
 
+  const seatInfo = document.createElement("div");
+  seatInfo.className = "play-topbar-seat";
+  if (state.identity) {
+    seatInfo.innerHTML =
+      `Seat: <strong>${escapeHtml(state.identity.name)}</strong> ` +
+      `<span class="muted">(playerId ${state.identity.playerId})</span>`;
+  } else {
+    seatInfo.innerHTML = `<span class="muted">Not seated — click Claim a seat.</span>`;
+  }
+  topBar.appendChild(seatInfo);
+
+  const actions = document.createElement("div");
+  actions.className = "play-topbar-actions";
+  if (state.identity) {
     if (state.room?.state === "Active" || state.room?.state === "Finished") {
-      const row = document.createElement("div");
-      row.className = "play-row";
-      row.style.marginTop = "6px";
       const passBtn = document.createElement("button");
       passBtn.className = "play-btn";
       passBtn.textContent = "Submit pass";
       passBtn.addEventListener("click", () => void submitAction("pass"));
-      row.appendChild(passBtn);
-      identitySection.appendChild(row);
+      actions.appendChild(passBtn);
     }
   } else {
-    const row = document.createElement("div");
-    row.className = "play-row";
     const joinBtn = document.createElement("button");
     joinBtn.className = "play-btn primary";
     joinBtn.textContent = state.joining ? "Joining…" : "Claim a seat";
@@ -219,25 +223,49 @@ function renderLeft(col: HTMLElement): void {
       state.room?.state === "Finished" ||
       (state.room?.occupied ?? 0) >= (state.room?.playerSlots ?? 2);
     joinBtn.addEventListener("click", () => void join());
-    row.appendChild(joinBtn);
-    identitySection.appendChild(row);
+    actions.appendChild(joinBtn);
   }
-  col.appendChild(identitySection);
+  topBar.appendChild(actions);
+  col.appendChild(topBar);
 
-  const stateSection = document.createElement("div");
-  stateSection.className = "play-section";
-  stateSection.innerHTML = `<h3>Game state</h3>`;
-  const pre = document.createElement("pre");
-  pre.className = "tabletop-state-block";
+  const boardWrap = document.createElement("div");
+  boardWrap.className = "play-board-wrap";
+
   if (state.gameState === null) {
-    pre.textContent = state.room?.state === "WaitingForPlayers"
-      ? "(waiting for second player)"
-      : "(no state yet)";
+    const pending = document.createElement("div");
+    pending.className = "play-board-empty muted";
+    pending.textContent = state.room?.state === "WaitingForPlayers"
+      ? "Waiting for a second player to join…"
+      : "No game state yet.";
+    boardWrap.appendChild(pending);
   } else {
-    pre.textContent = summarizeGameState(state.gameState);
+    const view = buildView(state.gameState);
+    if (!view) {
+      const fallback = document.createElement("div");
+      fallback.className = "play-board-empty muted";
+      fallback.textContent = "Could not parse game state.";
+      boardWrap.appendChild(fallback);
+    } else {
+      const banner = renderEngineBanner(view.round, state.room?.state ?? null);
+      if (banner) boardWrap.appendChild(banner);
+      boardWrap.appendChild(renderBoard(view, {
+        viewerPlayerId: state.identity?.playerId ?? null,
+      }));
+    }
   }
-  stateSection.appendChild(pre);
-  col.appendChild(stateSection);
+  col.appendChild(boardWrap);
+}
+
+function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {
+  // The interpreter today halts after Setup → first Round-1 Rise.
+  // Tell the reader what they're looking at so an empty board
+  // doesn't read as a bug.
+  const banner = document.createElement("div");
+  banner.className = "play-banner muted";
+  banner.innerHTML =
+    `Engine state — round ${round ?? "?"}. ` +
+    `Playtest runs through Setup + first Rise; later phases arrive with 7f (interpreter generator).`;
+  return banner;
 }
 
 function renderRight(col: HTMLElement): void {
@@ -283,28 +311,16 @@ function renderRight(col: HTMLElement): void {
   col.appendChild(list);
 }
 
-function summarizeGameState(raw: unknown): string {
-  try {
-    const obj = raw as {
-      stepCount?: number;
-      gameOver?: boolean;
-      playerIds?: number[];
-      arenaIds?: number[];
-      entities?: unknown[];
-    };
-    const lines: string[] = [];
-    if (obj.stepCount !== undefined) lines.push(`stepCount: ${obj.stepCount}`);
-    if (obj.gameOver !== undefined) lines.push(`gameOver: ${obj.gameOver}`);
-    if (obj.playerIds) lines.push(`players: ${obj.playerIds.join(", ")}`);
-    if (obj.arenaIds) lines.push(`arenas: ${obj.arenaIds.join(", ")}`);
-    if (obj.entities) lines.push(`entities: ${obj.entities.length}`);
-    lines.push("");
-    lines.push("(full JSON):");
-    lines.push(JSON.stringify(raw, null, 2));
-    return lines.join("\n");
-  } catch {
-    return JSON.stringify(raw, null, 2);
-  }
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => {
+    switch (c) {
+      case "&": return "&amp;";
+      case "<": return "&lt;";
+      case ">": return "&gt;";
+      case '"': return "&quot;";
+      default: return "&#39;";
+    }
+  });
 }
 
 function identityKey(roomId: string): string {
