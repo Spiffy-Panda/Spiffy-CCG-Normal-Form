@@ -361,6 +361,18 @@ internal static class Builtins
                 chooserPlayerId = cer.Id;
             }
         }
+        // Default chooser is the card's controller, bound by PlayCard's
+        // OnResolve evaluator. Without this a no-explicit-chooser Target
+        // (every Maneuver in the real encoding: Spark, Smolder, Refract…)
+        // surfaces on the frontend as "not your turn" and the buttons
+        // disable.
+        if (chooserPlayerId is null && env.TryLookup("controller", out var controllerVal)
+            && controllerVal is RtEntityRef ctrlRef
+            && ev.State.Entities.TryGetValue(ctrlRef.Id, out var ctrlEnt)
+            && ctrlEnt.Kind == "Player")
+        {
+            chooserPlayerId = ctrlRef.Id;
+        }
 
         var legal = candidates.Select(c => new LegalAction(
             Kind: "target_entity",

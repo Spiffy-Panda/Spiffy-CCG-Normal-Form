@@ -359,6 +359,18 @@ public sealed class Room : IDisposable
         }
         catch (OperationCanceledException) { /* shutdown */ }
 
+        // Promote room lifecycle so the tabletop header reflects the game
+        // actually being over. Without this, a GameEnd event flips
+        // state.GameOver but the room still reads "Active" in the UI.
+        lock (_lock)
+        {
+            if (Lifecycle == RoomLifecycle.Active)
+            {
+                Lifecycle = RoomLifecycle.Finished;
+                LastActivityAt = DateTimeOffset.UtcNow;
+            }
+        }
+
         var terminal = run.Status switch
         {
             RunStatus.Completed => "RoomFinished",

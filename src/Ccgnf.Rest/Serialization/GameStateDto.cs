@@ -25,6 +25,7 @@ public sealed record EntityDto(
     IReadOnlyDictionary<string, int> Counters,
     IReadOnlyDictionary<string, string> Parameters,
     IReadOnlyDictionary<string, ZoneDto> Zones,
+    IReadOnlyList<string> Tags,
     int AbilityCount);
 
 public sealed record ZoneDto(
@@ -71,6 +72,7 @@ public static class StateMapper
                 Order: kv.Value.Order.ToString(),
                 Capacity: kv.Value.Capacity,
                 Contents: new List<int>(kv.Value.Contents))),
+        Tags: e.Tags.ToList(),
         AbilityCount: e.Abilities.Count);
 
     public static EventDto ToEventDto(GameEvent ev) => new(
