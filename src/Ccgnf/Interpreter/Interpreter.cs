@@ -39,6 +39,15 @@ public sealed class InterpreterOptions
     /// the handler must not block or throw.
     /// </summary>
     public Action<GameEvent, GameState>? OnEvent { get; set; }
+
+    /// <summary>
+    /// Optional predicate evaluated after each event dispatch. When it returns
+    /// true, the event loop exits cleanly (no <see cref="GameState.GameOver"/>
+    /// transition). Tests use this to freeze the run at a specific milestone
+    /// (e.g. right after Round-1 Rise) without waiting for a natural
+    /// terminator.
+    /// </summary>
+    public Func<GameEvent, GameState, bool>? ShouldHalt { get; set; }
 }
 
 /// <summary>
@@ -85,6 +94,7 @@ public sealed class Interpreter
             DefaultDeckSize = options.DefaultDeckSize,
             MaxEventDispatches = options.MaxEventDispatches,
             OnEvent = options.OnEvent,
+            ShouldHalt = options.ShouldHalt,
             InitialDecks = options.InitialDecks,
             // Inputs intentionally omitted — StartRun installs its own channel.
         });
@@ -122,6 +132,7 @@ public sealed class Interpreter
         int seed = options.Seed;
         int deckSize = options.DefaultDeckSize;
         var onEvent = options.OnEvent;
+        var shouldHalt = options.ShouldHalt;
         var initialDecks = options.InitialDecks;
 
         var cts = new CancellationTokenSource();
@@ -144,7 +155,7 @@ public sealed class Interpreter
             cts,
             interpreterBody: _ =>
             {
-                RunEventLoop(state, evaluator, maxDispatches, onEvent);
+                RunEventLoop(state, evaluator, maxDispatches, onEvent, shouldHalt);
                 return Task.CompletedTask;
             });
     }
@@ -203,7 +214,8 @@ public sealed class Interpreter
         GameState state,
         Evaluator ev,
         int maxDispatches,
-        Action<GameEvent, GameState>? onEvent)
+        Action<GameEvent, GameState>? onEvent,
+        Func<GameEvent, GameState, bool>? shouldHalt)
     {
         while (!state.GameOver && state.PendingEvents.TryDequeue(out var current))
         {
@@ -218,7 +230,14 @@ public sealed class Interpreter
             DispatchEvent(current, state, ev);
             RunSbaPass(state, ev);
 
-            if (current.TypeName == "GameEnd") state.GameOver = true;
+            // GameEnd and Lose are both terminal — the latter covers deck-out
+            // and other direct losses from §5/§7. An encoding-level trigger
+            // that converts Lose → GameEnd with a winner field lands when the
+            // real victory rules arrive (8g).
+            if (current.TypeName == "GameEnd" || current.TypeName == "Lose")
+            {
+                state.GameOver = true;
+            }
 
             if (onEvent is not null)
             {
@@ -226,6 +245,18 @@ public sealed class Interpreter
                 catch (Exception ex)
                 {
                     _log.LogWarning(ex, "Interpreter OnEvent handler threw; continuing");
+                }
+            }
+
+            if (shouldHalt is not null)
+            {
+                try
+                {
+                    if (shouldHalt(current, state)) break;
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Interpreter ShouldHalt predicate threw; continuing");
                 }
             }
         }

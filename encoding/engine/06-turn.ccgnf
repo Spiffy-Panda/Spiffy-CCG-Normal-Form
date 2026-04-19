@@ -8,6 +8,10 @@
 
 // Rise phase.
 // Per R-4: Ramparts healing lives at end of Fall, not here.
+// Phase transitions: each phase handler ends with BeginPhase(next) so the
+// turn walks Rise → Channel → Clash → Fall → Pass without the engine
+// needing a separate advance scheduler. v1 engine stubs most of the Channel
+// / Clash bodies; 8c / 8e flesh them out.
 Game.abilities += Triggered(
   on:     Event.PhaseBegin(phase=Rise, player=p),
   effect: Sequence([
@@ -27,18 +31,28 @@ Game.abilities += Triggered(
 
     // "Start of your turn" window opens; start-of-turn triggers queue here.
     OpenTimingWindow(start_of_turn, owner=p),
-    DrainTriggersFor(window=start_of_turn)
+    DrainTriggersFor(window=start_of_turn),
+
+    BeginPhase(Channel, player: p)
   ]))
 
 // Channel phase — main phase. Play protocol lives in engine/08-play.ccgnf.
+// v1: no priority window yet; immediately advance to Clash. 8c adds the
+// priority-window card-play loop before this BeginPhase.
 Game.abilities += Triggered(
   on:     Event.PhaseBegin(phase=Channel, player=p),
-  effect: EnterMainPhase(p))
+  effect: Sequence([
+    EnterMainPhase(p),
+    BeginPhase(Clash, player: p)
+  ]))
 
 // Clash phase — see engine/09-clash.ccgnf for the declarative resolution.
 Game.abilities += Triggered(
   on:     Event.PhaseBegin(phase=Clash, player=p),
-  effect: ResolveClashPhase(active_player: p))
+  effect: Sequence([
+    ResolveClashPhase(active_player: p),
+    BeginPhase(Fall, player: p)
+  ]))
 
 // Fall phase. End-of-Fall is where Ramparts heal (per GameRules §7.3 / R-4).
 Game.abilities += Triggered(
@@ -50,7 +64,9 @@ Game.abilities += Triggered(
     ClearCounter(p, pushes_this_turn),
     // Heal Ramparts on all of p's Units to their current maximum.
     ForEach(u -> u.controller == p ∧ u.type == Unit ∧ u.zone ∈ battlefield,
-      SetCounter(u, current_ramparts, max_ramparts_of(u)))
+      SetCounter(u, current_ramparts, max_ramparts_of(u))),
+
+    BeginPhase(Pass, player: p)
   ]))
 
 // Pass — hand off to opponent; advance round when control returns to first.
@@ -60,7 +76,7 @@ Game.abilities += Triggered(
     If(other_player(p) == Game.first_player,
        IncCounter(Game, round, 1),
        NoOp),
-    BeginPhase(Rise, player=other_player(p))
+    BeginPhase(Rise, player: other_player(p))
   ]))
 
 // Note: there is NO turn-1 first-player draw-skip. GameRules §4 designates

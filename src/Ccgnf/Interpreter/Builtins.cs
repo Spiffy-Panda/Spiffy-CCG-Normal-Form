@@ -65,7 +65,7 @@ internal static class Builtins
             case "abilities_of_permanents": result = new RtList(Array.Empty<RtValue>()); return true;
             case "OpenTimingWindow":        result = new RtVoid(); return true;
             case "DrainTriggersFor":        result = new RtVoid(); return true;
-            case "BeginPhase":              result = new RtVoid(); return true;
+            case "BeginPhase":              result = BeginPhase(call, env, ev); return true;
             case "EnterMainPhase":          result = new RtVoid(); return true;
             case "ResolveClashPhase":       result = new RtVoid(); return true;
 
@@ -289,6 +289,39 @@ internal static class Builtins
     // -------------------------------------------------------------------------
     // Event ops
     // -------------------------------------------------------------------------
+
+    private static RtValue BeginPhase(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        // BeginPhase(phase, player=p) — first positional is the phase symbol,
+        // second arg (positional or `player=`) is the acting player. Expands
+        // to EmitEvent(Event.PhaseBegin(phase=..., player=...)) so the same
+        // trigger pattern matches Setup's kick-off as well as the end-of-phase
+        // advances chained from Rise → Channel → Clash → Fall → Pass.
+        AstExpr? phaseExpr = null;
+        AstExpr? playerExpr = null;
+        foreach (var a in call.Args)
+        {
+            switch (a)
+            {
+                case AstArgPositional p:
+                    if (phaseExpr is null) phaseExpr = p.Value;
+                    else if (playerExpr is null) playerExpr = p.Value;
+                    break;
+                case AstArgNamed n when n.Name == "phase": phaseExpr = n.Value; break;
+                case AstArgNamed n when n.Name == "player": playerExpr = n.Value; break;
+            }
+        }
+        if (phaseExpr is null) return new RtVoid();
+
+        var fields = new Dictionary<string, RtValue>
+        {
+            ["phase"] = ev.Eval(phaseExpr, env),
+        };
+        if (playerExpr is not null) fields["player"] = ev.Eval(playerExpr, env);
+
+        ev.State.PendingEvents.Enqueue(new GameEvent("PhaseBegin", fields));
+        return new RtVoid();
+    }
 
     private static RtValue EmitEvent(AstFunctionCall call, RtEnv env, Evaluator ev)
     {

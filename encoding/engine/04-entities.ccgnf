@@ -6,7 +6,11 @@
 
 Entity Game {
   kind: Game
-  characteristics: { round: 1, first_player: Unbound }
+  characteristics: {
+    round:          1,
+    first_player:   Unbound,
+    max_mulligans:  2    // per player; used by MulliganPhase in engine/05-setup.ccgnf.
+  }
   child_zones: { Arena[Left], Arena[Center], Arena[Right] }
   abilities: []    // populated by engine/05-setup.ccgnf, engine/06-turn.ccgnf,
                    // engine/07-sba.ccgnf, engine/08-play.ccgnf,

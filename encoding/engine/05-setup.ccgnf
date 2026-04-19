@@ -54,19 +54,12 @@ define MulliganPhase =
         mulligan: PerformMulligan(p)
       })))
 
-define PerformMulligan(p) = Sequence([
-  Target(
-    selector: cards -> cards ⊆ p.Hand ∧ Count(cards) >= 1,
-    chooser:  p,
-    bind:     returned_cards),
-  Target(
-    selector: ordering -> IsPermutationOf(ordering, returned_cards),
-    chooser:  p,
-    bind:     bottom_order,
-    effect:   ForEach(c ∈ bottom_order,
-                MoveTo(c, bottom_of(p.Arsenal)))),
-  Draw(p, amount: Max(0, Count(returned_cards) - 1))
-])
+// v1 scope (step 8a): PerformMulligan uses Target() to let the player pick
+// which cards to return. Target() is not implemented yet — it lands in 8d.
+// Until then, Mulligan consumes the "mulligan" choice and flags the seat so
+// tests can prove the Choice branch fires, but no cards actually move.
+// Ruling: the honest Target-backed implementation replaces this in 8d.
+define PerformMulligan(p) = SetCharacteristic(p, mulliganed, true)
 
 define StartFirstRound = Sequence([
   SetCounter(Game, round, 1),
