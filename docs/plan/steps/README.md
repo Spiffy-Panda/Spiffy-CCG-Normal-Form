@@ -16,9 +16,11 @@ updates if a threshold crossed, and an entry goes in
 | 4 | [04-decks-page.md](04-decks-page.md) | 1, 2, 3 | Deck construction with format selector and Draft mock pool. |
 | 5 | [05-raw-view.md](05-raw-view.md) | 1, 2 | Raw file-tree view with syntax highlighting. |
 | 6 | [06-rooms.md](06-rooms.md) | 1, 2 | Rooms layer, Lobby + Tabletop pages, SSE. |
+| 7 | [07-playtest-mvp.md](07-playtest-mvp.md) | 1–6 | Playtest MVP: AST humanizer, preset decks, card/board rendering, CPU seat, export. |
 
 Steps 3 / 4 / 5 are parallelisable after 1 + 2. Step 6 is the largest;
-it can begin once 1 and 2 land.
+it can begin once 1 and 2 land. Step 7 reshapes the interpreter as a
+generator (7f) — that sub-commit is the long pole of the playtest arc.
 
 ## Work-style conventions
 
