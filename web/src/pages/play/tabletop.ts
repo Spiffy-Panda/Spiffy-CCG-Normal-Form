@@ -550,6 +550,16 @@ function humanizeAction(a: LegalActionView): string {
       const shown = name && name !== kind ? name : `${kind} #${id}`;
       return `Target ${shown}`;
     }
+    case "target_arena": {
+      // Metadata.pos is the arena's symbol (Left / Center / Right);
+      // fall back to displayName (e.g. "ArenaLeft") or entity id.
+      const pos = m.pos || m.displayName || `Arena #${m.entityId ?? "?"}`;
+      return `Arena ${pos}`;
+    }
+    case "declare_attacker":
+      // The prompt already says which Unit is deciding ("Clash.Left(Warrior)")
+      // — the button just needs to be an imperative verb.
+      return a.label === "attack" ? "Attack" : "Hold";
     case "choice_option":
       // Mulligan "pass" / "mulligan" etc — label is already human-readable.
       return a.label.charAt(0).toUpperCase() + a.label.slice(1);

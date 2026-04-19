@@ -3,6 +3,39 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — Battlefield zone + clash-UI humanizer
+
+Closes the gap between 8e landing and a full game being playable in the
+browser against the real Resonance encoding.
+
+- Player entity in `encoding/engine/04-entities.ccgnf` now declares a
+  `Battlefield` zone alongside Arsenal/Hand/Cache/ResonanceField/Void.
+  Units played via the new 8e path land there. The real per-arena
+  partitioning (§3.2's `Arena.units[Player]`) is still expressed through
+  the Unit's `arena` parameter; child-zone nesting inside Arenas is a
+  follow-up.
+- Frontend humanizer gained cases for `target_arena` (renders "Arena
+  Left") and `declare_attacker` (renders "Attack" / "Hold"). Everything
+  else already looked right via 8i.
+
+Verified end-to-end in preview with EMBER Aggro vs EMBER Aggro CPU:
+passed mulligans, played Cinderling (1⚡ Unit) → picked "Arena Left"
+→ Clash prompt "Attack" / "Hold" fired → clicked Attack →
+`DamageDealt(source=#38, target=#67, counter=integrity, amount=2)` on
+the log, CPU's Left Conduit integrity dropped from 7 to 5, game
+advanced to CPU's Main phase. All other Conduits untouched.
+
+The loop is complete. A human can click through a full Unit-based
+combat turn against a CPU, using real decks, and see real damage
+numbers. Remaining: multi-card priority per turn (Interrupts), frontend
+per-arena Clash layout (8j is cosmetic — the action bar already
+functions), and the Playwright e2e (8k) to drive this automatically in
+CI.
+
+173/173 tests green.
+
+---
+
 ## 2026-04-19 — 8e: Unit play + Clash declaration + Force damage
 
 Units now enter play. Clash now does something. The engine can reach

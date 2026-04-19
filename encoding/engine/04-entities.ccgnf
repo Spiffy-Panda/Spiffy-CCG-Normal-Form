@@ -68,6 +68,11 @@ Entity Player[i] for i ∈ {1, 2} {
     Hand:           Zone(capacity: 10, order: unordered,
                          visibility: private_to_owner,
                          on_overflow: discard_down_at_end_of_turn),
+    // Battlefield — Units and Standards the player controls. Each Unit
+    // carries its Arena via a `arena` parameter; the real per-arena
+    // partitioning in Arena.units[Player] (§3.2) is interpreted via that
+    // parameter rather than as a nested zone structure.
+    Battlefield:    Zone(order: unordered, visibility: public),
     Cache:          Zone(order: FIFO, visibility: public),
     ResonanceField: Zone(capacity: 5, order: FIFO,
                          on_overflow: EvictLeftmost,
