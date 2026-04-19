@@ -36,7 +36,11 @@ import {
 } from "./play-state";
 
 export interface BoardRenderOptions {
-  viewerPlayerId: number | null;  // which seat is "you"; null = spectator
+  // Roster PlayerId of the viewing seat (1 = first joiner, 2 = second),
+  // null when the viewer isn't seated. This is NOT an entity id — the
+  // interpreter's Player entities have their own ids (usually 2/3 after
+  // Game=1), and we map roster id → state.Players order positionally.
+  viewerPlayerId: number | null;
   onCardClick?: (entity: EntityDto) => void;
 }
 
@@ -45,11 +49,12 @@ export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLEleme
   root.className = "board";
 
   const players = view.players;
-  // Determine which player is "top" and "bottom". If viewer is not in
-  // the match, pick players[1] as top, players[0] as bottom so the UI
-  // is deterministic.
-  const youId = opts.viewerPlayerId;
-  const bottom = players.find((p) => p.id === youId) ?? players[0] ?? null;
+  // Roster PlayerId N ↔ state.Players[N-1]. view.players is sorted by
+  // entity id ascending, which matches the Setup allocation order of
+  // `Entity Player[i] for i ∈ {1,2}`. Spectators (viewerPlayerId == null)
+  // default to players[0] as the bottom seat.
+  const viewerIdx = opts.viewerPlayerId !== null ? opts.viewerPlayerId - 1 : -1;
+  const bottom = (viewerIdx >= 0 ? players[viewerIdx] : null) ?? players[0] ?? null;
   const top = players.find((p) => p.id !== bottom?.id) ?? players[1] ?? null;
 
   root.appendChild(renderSeatStrip(top, view, { side: "top", faceDown: true, isViewer: false, onCardClick: opts.onCardClick }));

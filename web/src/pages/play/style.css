@@ -625,3 +625,26 @@
   align-self: center;
   margin-left: auto;
 }
+
+/* ── Turn chip (header) ─────────────────────────────────────────────────── */
+
+.tabletop-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tabletop-chip {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--control-border);
+  background: var(--panel);
+  white-space: nowrap;
+}
+
+.tabletop-chip-yours {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.18);
+  font-weight: 600;
+}

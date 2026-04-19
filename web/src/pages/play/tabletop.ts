@@ -22,6 +22,11 @@ interface PendingInputView {
   options: string[];
 }
 
+interface PhaseMarker {
+  phase: string;         // "Rise" | "Channel" | "Clash" | "Fall" | "Pass"
+  playerEntityId: number | null;
+}
+
 interface TabletopState {
   roomId: string | null;
   room: RoomDetailDto | null;
@@ -34,6 +39,7 @@ interface TabletopState {
   selectedDeckKey: string;  // "preset:<id>" | "saved:<name>" | ""
   cardCatalog: CardDto[];
   pendingInput: PendingInputView | null;
+  currentPhase: PhaseMarker | null;
 }
 
 const state: TabletopState = {
@@ -48,6 +54,7 @@ const state: TabletopState = {
   selectedDeckKey: "",
   cardCatalog: [],
   pendingInput: null,
+  currentPhase: null,
 };
 
 let container: HTMLElement | null = null;
@@ -71,6 +78,7 @@ export async function renderTabletop(root: HTMLElement, match: RouteMatch): Prom
     state.identity = loadIdentity(id);
     state.error = null;
     state.pendingInput = null;
+    state.currentPhase = null;
   }
   await refresh();
   openStream(id);
@@ -136,6 +144,13 @@ function closeStream(): void {
 
 function updatePendingFromFrame(frame: RoomEventFrame): void {
   const type = frame.event.type;
+  if (type === "GameEvent" && frame.event.fields["eventType"] === "PhaseBegin") {
+    const phase = frame.event.fields["field.phase"] ?? "";
+    const playerField = frame.event.fields["field.player"] ?? "";
+    const m = /#(\d+)/.exec(playerField);
+    const playerEntityId = m ? parseInt(m[1], 10) : null;
+    if (phase) state.currentPhase = { phase, playerEntityId };
+  }
   if (type === "InputPending") {
     const f = frame.event.fields;
     const pid = f.playerId ? parseInt(f.playerId, 10) : NaN;
@@ -273,7 +288,10 @@ function renderShell(): void {
         ${state.room ? `${state.room.state} · ${state.room.occupied}/${state.room.playerSlots} players` : "loading…"}
       </div>
     </div>
-    <a href="#/play/lobby" class="play-btn">← Lobby</a>
+    <div class="tabletop-header-right">
+      ${renderTurnChip()}
+      <a href="#/play/lobby" class="play-btn">← Lobby</a>
+    </div>
   `;
   page.appendChild(header);
 
@@ -434,6 +452,21 @@ function renderDeckPicker(): HTMLElement {
   return select;
 }
 
+function renderTurnChip(): string {
+  const phase = state.currentPhase;
+  if (!phase) return "";
+  const view = state.gameState ? buildView(state.gameState) : null;
+  const idx = view && phase.playerEntityId !== null
+    ? view.players.findIndex((p) => p.id === phase.playerEntityId)
+    : -1;
+  const seat = idx >= 0 ? state.room?.players[idx] : undefined;
+  const viewerId = state.identity?.playerId ?? null;
+  const yours = seat !== undefined && viewerId !== null && seat.playerId === viewerId;
+  const who = seat ? (yours ? "Your turn" : `${escapeHtml(seat.name)}'s turn`) : "Turn";
+  const tone = yours ? "tabletop-chip tabletop-chip-yours" : "tabletop-chip";
+  return `<span class="${tone}">${who} · ${escapeHtml(phase.phase)}</span>`;
+}
+
 function onCardClicked(entity: EntityDto): void {
   openInspector(fromEntity(entity, state.cardCatalog), rightColEl ?? undefined);
 }
@@ -483,14 +516,14 @@ function renderActionBar(): HTMLElement | null {
 }
 
 function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {
-  // The interpreter today halts after Setup → first Round-1 Rise.
-  // Tell the reader what they're looking at so an empty board
-  // doesn't read as a bug.
+  // Since 8a+8c+8d the engine walks all five phases, plays cards out of
+  // hand, and resolves single-target effects. The banner just shows round
+  // + a pointer to what's still being built (Clash, SBAs, victory).
   const banner = document.createElement("div");
   banner.className = "play-banner muted";
   banner.innerHTML =
     `Engine state — round ${round ?? "?"}. ` +
-    `Playtest runs through Setup + first Rise; later phases arrive with 7f (interpreter generator).`;
+    `Main-phase card play and single-target effects are live; Clash damage and Conduit-collapse victory land in 8e–8g.`;
   return banner;
 }
 
