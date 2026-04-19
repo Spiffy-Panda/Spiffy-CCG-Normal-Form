@@ -18,6 +18,8 @@ export interface InspectorCard {
   cost: number | null;
   rarity: string;
   abilitiesText: string[];
+  keywords?: string[];
+  text?: string;
   sourcePath?: string | null;
   sourceLine?: number | null;
   // The original raw payload, for the Source tab fallback.
@@ -65,6 +67,8 @@ export function fromCardDto(dto: CardDto): InspectorCard {
     cost: dto.cost,
     rarity: dto.rarity,
     abilitiesText: dto.abilitiesText ?? [],
+    keywords: dto.keywords ?? [],
+    text: dto.text ?? undefined,
     sourcePath: dto.sourcePath,
     sourceLine: dto.sourceLine,
     raw: dto,
@@ -131,7 +135,17 @@ function render(): void {
   meta.textContent = parts.join(" · ");
   panelEl.appendChild(meta);
 
-  if (current.abilitiesText.length > 0) {
+  // Rules body: humanized ability text (from AstHumanizer) first, then a
+  // keyword line ("Keywords: Blitz, DeploymentSickness"), then flavor/card
+  // text ("// text: Blitz.") if the card's abilities: is empty. A card
+  // like Cinderhound has no OnResolve, but its keywords + text field carry
+  // the entire rule — dropping them meant "No humanized rules" on cards
+  // that actually do have rules, just at a different layer.
+  const hasRules = current.abilitiesText.length > 0;
+  const hasKeywords = (current.keywords?.length ?? 0) > 0;
+  const hasText = !!current.text;
+
+  if (hasRules) {
     const rules = document.createElement("div");
     rules.className = "card-inspector-rules";
     for (const line of current.abilitiesText) {
@@ -140,12 +154,28 @@ function render(): void {
       rules.appendChild(p);
     }
     panelEl.appendChild(rules);
-  } else {
+  }
+
+  if (hasKeywords) {
+    const kws = document.createElement("div");
+    kws.className = "card-inspector-keywords";
+    kws.textContent = `Keywords: ${current.keywords!.join(", ")}`;
+    panelEl.appendChild(kws);
+  }
+
+  if (hasText) {
+    const flavor = document.createElement("div");
+    flavor.className = "card-inspector-text";
+    flavor.textContent = current.text!;
+    panelEl.appendChild(flavor);
+  }
+
+  if (!hasRules && !hasKeywords && !hasText) {
     const empty = document.createElement("div");
     empty.className = "muted";
     empty.style.fontSize = "12px";
     empty.style.marginTop = "6px";
-    empty.textContent = "No humanized rules. Runtime entity — see Source below.";
+    empty.textContent = "No rules text. Runtime entity — see Source below.";
     panelEl.appendChild(empty);
   }
 
