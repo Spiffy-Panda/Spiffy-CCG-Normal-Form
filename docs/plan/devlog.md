@@ -3,6 +3,43 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — 8f + 8g: Conduit collapse SBA + first victory condition
+
+The interpreter's event loop has had a `RunSbaPass` hook since v1; it was
+a no-op. Now it does the two SBAs that actually matter today:
+
+- **Conduit collapse.** After each event dispatch, walks all Conduit
+  entities; any with `integrity ≤ 0` and no `collapsed` tag gets marked
+  collapsed (tag + `collapsed: true` characteristic) and an
+  `Event.ConduitCollapsed(conduit, owner)` is enqueued.
+- **Two-conduits-lost victory (GameRules §7.5).** Same pass — for each
+  Player, counts their collapsed Conduits. At 2+ the player is tagged
+  `lost` and `Event.GameEnd(loser, winner, reason: TwoConduitsLost)`
+  enters the queue. Main loop flips `GameOver` on `GameEnd` as before.
+
+Both rules are declared as Static abilities with `check_at: continuously`
+in `encoding/engine/07-sba.ccgnf`. The full Static-ability evaluator
+isn't wired yet, so this is engine-hardcoded to match the encoding's
+intent — when the Static path lands, `RunSbaPass` becomes a driver that
+walks those abilities instead.
+
+Minor supporting change: `StateBuilder.PopulateBody` now hoists an
+`owner:` body field to `Entity.OwnerId` when it evaluates to an entity
+ref. Lets conduit fixtures using a `for owner ∈ {…}` clause carry
+ownership without InstantiateEntity. Existing InstantiateEntity path
+still sets OwnerId from the `owner` parameter.
+
+New fixture (`conduit-collapse.ccgnf`) has four Conduits (two per
+player, via InstantiateEntity) and a DoubleAnnihilate Maneuver that
+picks two targets and deals 7 each. Four tests: owner hoist works,
+ConduitCollapsed fires, GameEnd fires with loser/winner/reason, and
+single collapses across both players do NOT end the game.
+
+167/167 tests (+4). The engine can now end a game via combat (well —
+via Maneuver damage; Unit/Clash damage lands in 8e).
+
+---
+
 ## 2026-04-18 — 8a, 8c, 8d: turns roll; cards resolve; targets pick
 
 Three slices of step 8 in one session.

@@ -1,0 +1,47 @@
+// =============================================================================
+// Fixture: Conduit collapse SBA + two-conduits-lost victory (8f + 8g).
+// =============================================================================
+// Four conduits, two per player, set up via InstantiateEntity so OwnerId
+// gets hoisted from the `owner:` parameter. DoubleAnnihilate plays two
+// targets per resolution so the test can collapse both of P2's conduits
+// in one card.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  counters: { aether: 10, debt: 0 }
+  zones: {
+    Arsenal: Zone(order: sequential),
+    Hand:    Zone(order: unordered),
+    Cache:   Zone(order: FIFO)
+  }
+  abilities: []
+}
+
+Card DoubleAnnihilate {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(Sequence([
+      Target(t -> t.kind == Conduit, DealDamage(target, 7)),
+      Target(t -> t.kind == Conduit, DealDamage(target, 7))
+    ]))
+  ]
+  // text: Pick two Conduits; deal 7 damage to each. Enough to collapse them.
+}
+
+Game.abilities += Triggered(
+  on:     Event.GameStart,
+  effect: Sequence([
+    InstantiateEntity(kind: Conduit, owner: Player1, initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player1, initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, initial_counters: { integrity: 7 }),
+    Draw(Player1, amount: 1),
+    EnterMainPhase(Player1)
+  ]))

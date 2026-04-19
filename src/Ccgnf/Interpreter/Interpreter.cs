@@ -295,11 +295,70 @@ public sealed class Interpreter
 
     private static void RunSbaPass(GameState state, Evaluator ev)
     {
-        // v1: wired but inert. Real SBA dispatch walks Game.abilities of kind
-        // Static with check_at: continuously; none fire during Setup, so
-        // leaving this as a no-op keeps the test corpus honest about what's
-        // actually implemented.
-        _ = state; _ = ev;
+        // v1 SBA scope (8f/8g): conduit collapse + two-conduits-lost victory.
+        // These rules are declared in encoding/engine/07-sba.ccgnf as Static
+        // abilities with check_at: continuously; the full Static-ability
+        // evaluator isn't wired yet, so we enforce them engine-side in the
+        // same order the encoding expects. When the Static path lands, this
+        // function becomes a driver that walks those abilities instead.
+        //
+        // Loops until the pass finds no new changes — damage dealt during
+        // collapse processing can chain into more collapses (unlikely in v1,
+        // but cheap insurance).
+        bool changed = true;
+        int guard = 0;
+        while (changed && guard++ < 64)
+        {
+            changed = false;
+
+            foreach (var entity in state.Entities.Values)
+            {
+                if (entity.Kind != "Conduit") continue;
+                if (entity.Tags.Contains("collapsed")) continue;
+                int integrity = entity.Counters.GetValueOrDefault("integrity", int.MaxValue);
+                if (integrity > 0) continue;
+
+                entity.Tags.Add("collapsed");
+                entity.Characteristics["collapsed"] = new RtBool(true);
+
+                var fields = new Dictionary<string, RtValue>
+                {
+                    ["conduit"] = new RtEntityRef(entity.Id),
+                };
+                if (entity.OwnerId is int oid) fields["owner"] = new RtEntityRef(oid);
+                state.PendingEvents.Enqueue(new GameEvent("ConduitCollapsed", fields));
+                changed = true;
+            }
+
+            // Two-conduits-lost victory (GameRules §7.5). If a player has
+            // two or more collapsed conduits and hasn't already lost, emit
+            // GameEnd with loser/winner/reason. The interpreter's main
+            // event loop flips GameOver on GameEnd.
+            foreach (var player in state.Players)
+            {
+                if (player.Tags.Contains("lost")) continue;
+                int collapsed = 0;
+                foreach (var entity in state.Entities.Values)
+                {
+                    if (entity.Kind != "Conduit") continue;
+                    if (entity.OwnerId != player.Id) continue;
+                    if (entity.Tags.Contains("collapsed")) collapsed++;
+                }
+                if (collapsed < 2) continue;
+
+                player.Tags.Add("lost");
+                var opponent = state.Players.FirstOrDefault(p => p.Id != player.Id);
+                var fields = new Dictionary<string, RtValue>
+                {
+                    ["loser"] = new RtEntityRef(player.Id),
+                    ["reason"] = new RtSymbol("TwoConduitsLost"),
+                };
+                if (opponent is not null) fields["winner"] = new RtEntityRef(opponent.Id);
+                state.PendingEvents.Enqueue(new GameEvent("GameEnd", fields));
+                changed = true;
+            }
+        }
+        _ = ev;
     }
 
     // -------------------------------------------------------------------------

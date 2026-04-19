@@ -168,6 +168,19 @@ public sealed class StateBuilder
                     // augmentations.
                     break;
 
+                case "owner":
+                {
+                    // First-class owner plumbing: a body like `owner: owner`
+                    // inside a for-clause template evaluates to the bound
+                    // player ref. SBAs key off Entity.OwnerId, not a
+                    // characteristic, so we hoist it here. Non-entity owners
+                    // still fall through to Characteristics.
+                    var v = EvaluateField(field.Value, ev, env);
+                    if (v is RtEntityRef er) entity.OwnerId = er.Id;
+                    else entity.Characteristics["owner"] = v;
+                    break;
+                }
+
                 default:
                     // Unknown field — store as a characteristic for later
                     // inspection. Cheap, keeps the state builder lenient.
