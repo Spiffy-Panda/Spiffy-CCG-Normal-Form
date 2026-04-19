@@ -44,6 +44,7 @@ async function loadProject(force: boolean): Promise<void> {
     state.error = String(err);
   } finally {
     state.loading = false;
+    renderShell();
   }
 }
 

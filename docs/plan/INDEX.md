@@ -34,6 +34,7 @@ to be readable in a single pass.
 - [web/overview.md](web/overview.md) — stack choice (Vite), routing, project layout.
 - [web/pages.md](web/pages.md) — cards, decks, interpreter, play, raw — detail per page.
 - [web/rooms-protocol.md](web/rooms-protocol.md) — room lifecycle, action/event shapes, TTL, auth tokens.
+- [web/verification.md](web/verification.md) — agent-facing preview runbook; covers every step's features plus regression signatures.
 
 ## Step-by-step plans
 
