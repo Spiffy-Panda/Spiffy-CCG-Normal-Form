@@ -14,6 +14,7 @@ public sealed record CardDto(
     string Rarity,
     IReadOnlyList<string> Keywords,
     string Text,
+    IReadOnlyList<string> AbilitiesText,
     string SourcePath,
     int SourceLine);
 

@@ -1,0 +1,15 @@
+# Golden snapshot for dual.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== AshrootWhelp ===
+(none)
+
+=== TidecallersHollow ===
+Resolves: target Unit: move target to target.owner.Hand; RandomExileFromHand(target.owner, count: 1).
+
+=== Bramblewarden ===
+When this enters play: if not this Arena has collapsed for you, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== ThornwallBastion ===
+Static (KeywordSet(unit)): for each friendly Unit in this Arena, grant Fortify(1) to u.
+

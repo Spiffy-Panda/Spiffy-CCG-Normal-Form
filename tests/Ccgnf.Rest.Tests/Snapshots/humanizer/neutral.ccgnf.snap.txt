@@ -1,0 +1,42 @@
+# Golden snapshot for neutral.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Baseline ===
+(none)
+
+=== ConduitTender ===
+(none)
+
+=== ScavengedBlade ===
+Resolves: target Unit: if your Banner exists, deal 3 damage to target; otherwise deal 2 damage to target.
+
+=== Wayfarer ===
+When this enters play: if your Banner exists, you draws 1.
+
+=== Lodgekeeper ===
+(none)
+
+=== Bannerkeeper ===
+Static ({force, ramparts} on this): if your Banner exists, this gets +1 force; this gets +1 ramparts.
+
+=== Vagabond ===
+(none)
+
+=== CampCook ===
+(none)
+
+=== PatchJob ===
+Resolves: target Conduit: heal 1 on target.
+
+=== CaravanMaster ===
+When this enters play: you draws 1.
+
+=== StoneglassWatcher ===
+Static (ramparts on this): if your Banner exists, this gets +2 ramparts.
+
+=== TreasureHoard ===
+Resolves: if your Banner exists, you draws 3; otherwise you draws 2.
+
+=== BannersEdge ===
+Resolves: target Unit or Conduit: if your Banner exists, deal 6 damage to target; otherwise deal 4 damage to target.
+

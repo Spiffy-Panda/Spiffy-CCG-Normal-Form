@@ -1,0 +1,60 @@
+# Golden snapshot for hollow.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Veilslip ===
+(none)
+
+=== PrivateThought ===
+Resolves: Reveal(self.controller, opponent_of(self.controller).Hand, count: 2); target target where c in revealed_set: you.
+
+=== Greyface ===
+(none)
+
+=== Unmake ===
+Resolves: let force_threshold = if HOLLOW 3, 4; otherwise, 3: target Unit where u.force <= force_threshold: Destroy(target).
+
+=== TheLastWhisper ===
+Resolves: target Maneuver where b.countered is false and in_post_tier_interrupt_window(b): you.
+
+=== BlankfaceCultist ===
+Triggered (Event.PhantomReturn(target=self)): pilfer 1.
+
+=== TheUnreadPage ===
+When this enters play: if Peak HOLLOW, SetModifier(opponent_of(self.controller), hand_cap, value: 5, while_source: self); SetModifier(opponent_of(self.controller), aether_refresh_delta, value: -1, while_source: self); otherwise choose one — opponent_of(self.controller).
+Static (ActiveModifiers(self)): if Peak HOLLOW, EnsureModifiers({hand_cap_5, aether_minus_1}).
+
+=== Oreth_TheUnseenAuthor ===
+When this enters play: when HOLLOW 4, pilfer 2.
+Triggered (Event.PhantomReturn(target=self)): when Peak HOLLOW, RandomExileFromHand(opponent_of(self.controller), count: 1).
+
+=== QuietTheft ===
+Resolves: if HOLLOW 3, pilfer 2; otherwise, pilfer 1.
+
+=== Whisperthief ===
+Resolves: if HOLLOW 3, pilfer 2; otherwise, pilfer 1.
+
+=== VeiledStrike ===
+Resolves: target Unit: deal 2 damage to target; when HOLLOW 3, ModifyCharacteristic(target, force, -1, duration: end_of_turn, layer: 2).
+
+=== PaleStalker ===
+(none)
+
+=== Veilwraith ===
+When this enters play: pilfer 1.
+
+=== VanishingWord ===
+Resolves: target Unit: grant Phantom to target until end of turn; when HOLLOW 3, pilfer 1.
+
+=== TheHollowSovereign ===
+When this enters play: pilfer 2.
+At start of your turn: when Peak HOLLOW, pilfer 1.
+
+=== PhantomStrike ===
+Resolves: target Unit: if Peak HOLLOW, move target to bottom_of(target.owner.Arsenal); otherwise, grant Phantom to target until end of turn.
+
+=== Devour ===
+Resolves: if HOLLOW 4, pilfer 3; otherwise, pilfer 2.
+
+=== TheFacelessVerdict ===
+Resolves: for each opposing Unit, grant Phantom to u until end of turn; when Peak HOLLOW, RandomExileFromHand(opponent_of(self.controller), count: 1).
+

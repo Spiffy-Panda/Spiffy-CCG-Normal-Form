@@ -29,6 +29,18 @@ export async function renderCardDetail(
   for (const k of card.keywords) chips.appendChild(chip({ label: k, variant: "keyword" }));
   wrap.appendChild(chips);
 
+  if (card.abilitiesText && card.abilitiesText.length > 0) {
+    const abilities = document.createElement("div");
+    abilities.className = "card-detail-abilities";
+    for (const line of card.abilitiesText) {
+      const p = document.createElement("p");
+      p.className = "card-detail-ability";
+      p.textContent = line;
+      abilities.appendChild(p);
+    }
+    wrap.appendChild(abilities);
+  }
+
   if (card.text) {
     const text = document.createElement("p");
     text.className = "card-detail-text";

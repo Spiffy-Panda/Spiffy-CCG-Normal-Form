@@ -1,0 +1,64 @@
+# Golden snapshot for thorn.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Thornling ===
+(none)
+
+=== TakeRoot ===
+Resolves: target Arena (not collapsed): for each element, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller).
+
+=== GroveKinDruid ===
+When this enters play: for each friendly Unit in this Arena, ModifyCharacteristic(u, ramparts, +1, duration: end_of_turn, layer: 2).
+
+=== KindlingBrazier ===
+(none)
+
+=== Thicketwarden ===
+Static (force on this): if count of Filter(AllUnits, u -> u.arena == self.arena ∧ u.controller == self.controller ∧ u.type == Unit) >= 3, this gets +2 force.
+
+=== Bloom ===
+Resolves: target Arena (not collapsed): for each element, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller).
+
+=== TheEndlessThicket ===
+At start of your turn: if Peak THORN, for each Arena (not collapsed), CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller, with_modifier: Characteristic(force, +1, layer: 2)); otherwise, for each Arena (not collapsed) where count of {u: u.arena is a and u.controller is you and u.type is Unit} >= 2, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller).
+
+=== Myrrhan_KeeperOfGrowth ===
+Static ({force, ramparts} on sapling_tokens): when THORN 3, for each friendly where s.template is ThornSapling, SetBase(s, force: 2, ramparts: 2).
+At start of your turn: when Peak THORN, for each Arena (not collapsed) where ArenaHasFriendlyUnit(a, self.controller), for each element, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller).
+
+=== HardenedGrowth ===
+Resolves: target friendly Unit: if THORN 3, ModifyCharacteristic(target, force, +1, duration: end_of_turn, layer: 2); ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2); otherwise, ModifyCharacteristic(target, ramparts, +2, duration: end_of_turn, layer: 2).
+
+=== ThornseedPlanter ===
+When this enters play: if not this Arena has collapsed for you, for each element, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== Bramblepup ===
+(none)
+
+=== SaplingScout ===
+(none)
+
+=== Thornpup ===
+When this enters play: if not this Arena has collapsed for you, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== BriarWatcher ===
+When this enters play: if not this Arena has collapsed for you, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== Vinegrowth ===
+Resolves: target Arena (not collapsed): if THORN 3, for each element, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller); otherwise, CreateToken(template: ThornSapling, zone: a, owner: self.controller, controller: self.controller).
+
+=== TanglevineDruid ===
+When this enters play: if not this Arena has collapsed for you, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== ThornbroodPatriarch ===
+When this enters play: if not this Arena has collapsed for you, if THORN 3, for each element, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller); otherwise, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== CradleMother ===
+When this enters play: if not this Arena has collapsed for you, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== Vinemother ===
+When this enters play: if not this Arena has collapsed for you, if Peak THORN, for each element, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller); otherwise, for each element, CreateToken(template: ThornSapling, zone: self.arena, owner: self.controller, controller: self.controller).
+
+=== Thornlord ===
+Static (force on target_unit): when THORN 3, for each friendly Unit in this Arena, u gets +1 force.
+

@@ -1,0 +1,50 @@
+# Golden snapshot for bulwark.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Palisade ===
+(none)
+
+=== WardenInitiate ===
+(none)
+
+=== SealTheBreach ===
+Resolves: target Conduit: if BULWARK 3, heal 5 on target; otherwise, heal 3 on target.
+
+=== HoldTheLine ===
+Resolves: target Arena: PreventIncoming(arena: target, side: self.controller, amount_cap: 4, duration: until_end_of_turn).
+
+=== CohortCaptain ===
+When this enters an Arena: BULWARK friendly Unit.
+
+=== Reconstitute ===
+Resolves: target Conduit where c.owner is you: if not target.arena has collapsed for you, heal starting_integrity_of(target) on target; otherwise SetCounter(target, integrity, 3); SetFlag(Arena[target.arena].collapsed_for[self.controller], false).
+
+=== TheQuietWall ===
+Static (KeywordSet(unit)): for each friendly Unit, grant Sentinel to u.
+Static (ClashContribution(unit)): when Peak BULWARK, for each friendly Unit, OverrideContribution(u, projected_force: 1).
+
+=== Vaen_ArchitectOfTheLastHour ===
+Static (ramparts on target_unit): when BULWARK 4, for each friendly Unit in this Arena, add(+2).
+Static (DamageReduction(Conduit, by_opposing)): when Peak BULWARK, for each Conduit where c.owner is you, Floor(c.integrity, min: 1, source_filter: e -> e.controller != self.controller).
+
+=== Stonewatcher ===
+(none)
+
+=== WardenOfTheMendedWall ===
+When this enters an Arena: BULWARK friendly Unit.
+
+=== Stonewright ===
+(none)
+
+=== ReinforceWalls ===
+Resolves: target Arena: for each friendly Unit where u.arena is target, grant Fortify(1) to u until end of turn.
+
+=== TheMendedVault ===
+At start of your turn: if Conduit[self.controller, self.arena] exists and not this Arena has collapsed for you, if Peak BULWARK, heal 2 on self.controller.Conduit(self.arena); otherwise, heal 1 on self.controller.Conduit(self.arena).
+
+=== WallOfConviction ===
+Resolves: for each friendly Unit, grant Fortify(2) to u until end of turn.
+
+=== BishopOfMending ===
+When a card matching BULWARK friendly is played: when BULWARK 3, if Conduit[self.controller, self.arena] exists and not this Arena has collapsed for you, heal 1 on self.controller.Conduit(self.arena).
+

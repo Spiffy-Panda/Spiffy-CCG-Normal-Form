@@ -1,0 +1,67 @@
+# Golden snapshot for tide.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Ripplekin ===
+(none)
+
+=== Refract ===
+Resolves: target Unit: move target to target.owner.Hand.
+
+=== Brinescribe ===
+When this enters play: you draws 1.
+
+=== ReshapeTheCurrent ===
+Resolves: Reshape(2).
+
+=== Harborkeeper ===
+⟪Replacement(on: Event.EnterPlay(target=u), guard: u.controller == self.controller ∧ u.type == Unit ∧ collapsed_for(self.controller, u.intended_arena) ∧ AnyMatch(a ∈ adjacent(u.intended_arena), not collapsed_for(self.controller, a)), replace_with: Target(a -> a ∈ adjacent(u.intended_arena) ∧ not collapsed_for(self.controller, a), chooser: self.controller, effect: Event.EnterPlay(target=u, arena=a)))⟫
+
+=== Undertow ===
+Resolves: target Arena: if TIDE 4, for each target where u.arena is target, target Arena (not collapsed): you; otherwise, for each target where u.arena is target, target target where dir in {left, right}: you.
+
+=== TheStandingWave ===
+When a card matching friendly is played: Reshape(1).
+When a card matching friendly is played: when Peak TIDE, choose one — you.
+
+=== Thessa_WhoReturns ===
+When a card matching TIDE friendly is played: when TIDE 3, choose one — you.
+
+=== Tidewatcher ===
+When this enters play: Reshape(1).
+
+=== Currentkin ===
+(none)
+
+=== CurrentsPull ===
+Resolves: target friendly Unit: target target (not collapsed) where a in adjacent(u.arena): you.
+
+=== TidalPull ===
+Resolves: target Arena: for each friendly Unit where u.arena is target, target target (not collapsed) where dest in adjacent(u.arena): you.
+
+=== ReturningWave ===
+Resolves: target TIDE where c in self.controller.Cache and not Unique in c.keywords: move target to self.controller.Hand.
+
+=== Tidalshaper ===
+When this enters play: Reshape(1).
+
+=== Spelunker ===
+When this enters play: you draws 1.
+
+=== Marshlord ===
+(none)
+
+=== EchoingWave ===
+Resolves: target Unit: move target to target.owner.Hand.
+
+=== DriftingMist ===
+Resolves: for each friendly Unit where Drift in u.keywords, choose one — you.
+
+=== WaveSage ===
+When this enters play: Reshape(2).
+
+=== TidemootElder ===
+At start of your turn: Reshape(1).
+
+=== Currentmaster ===
+When a card matching TIDE friendly is played: Reshape(1).
+

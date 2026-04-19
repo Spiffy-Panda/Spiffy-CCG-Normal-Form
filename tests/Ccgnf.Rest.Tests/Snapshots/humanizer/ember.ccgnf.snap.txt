@@ -1,0 +1,78 @@
+# Golden snapshot for ember.ccgnf
+# Regenerate with UPDATE_HUMANIZER_SNAPSHOTS=1.
+
+=== Cinderling ===
+(none)
+
+=== Spark ===
+Resolves: target Unit or Conduit: if EMBER 3, deal 3 damage to target; otherwise, deal 2 damage to target.
+
+=== EmberhandRaider ===
+(none)
+
+=== Smolder ===
+Resolves: target Unit or Conduit: if EMBER 4, deal 4 damage to target; otherwise, deal 2 damage to target.
+
+=== Pyrebrand ===
+Static (Ignite on this): set Ignite on this to if EMBER 3, 2; otherwise 1.
+
+=== Stokefire ===
+Resolves: if Peak EMBER, deal 5 damage, split as you choose; otherwise, deal 3 damage, split as you choose.
+
+=== ChoirOfTheBlaze ===
+At start of your turn: for each opposing Unit in this Arena, deal 1 damage to u; when EMBER 4, if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 1 damage to Conduit[other_player(self.controller), self.arena].
+
+=== Eremis_TheUnfaded ===
+When a card matching EMBER Maneuver is played: when Peak EMBER, play a copy of the triggering card.
+
+=== Ashcharger ===
+(none)
+
+=== Coalkin ===
+(none)
+
+=== Cinderhound ===
+(none)
+
+=== Sparkbearer ===
+(none)
+
+=== MatchStrike ===
+Resolves: target Unit or Conduit: if EMBER 2, deal 2 damage to target; otherwise, deal 1 damage to target.
+
+=== Pyrearrow ===
+Resolves: target Arena: if EMBER 3, for each opposing where t.arena is target and t.type is Unit or t.kind is Conduit, deal 2 damage to t; otherwise, for each opposing where t.arena is target and t.type is Unit or t.kind is Conduit, deal 1 damage to t.
+
+=== SearingWave ===
+Resolves: target Arena: for each opposing Unit where u.arena is target, deal 2 damage to u; when EMBER 4, if Conduit[other_player(self.controller), target] exists and not target has collapsed for the other player of you, deal 2 damage to Conduit[other_player(self.controller), target].
+
+=== Quickstrike ===
+Resolves: target Unit: if EMBER 3, deal 4 damage to target; otherwise, deal 3 damage to target.
+
+=== SearingVolley ===
+Resolves: if EMBER 3, deal 4 damage, split as you choose; otherwise, deal 3 damage, split as you choose.
+
+=== IgnitingWord ===
+Resolves: target Unit or Conduit: deal 2 damage to target; when EMBER 3, you draws 1.
+
+=== Coalrunner ===
+(none)
+
+=== Stormcharger ===
+(none)
+
+=== WarCry ===
+Resolves: for each friendly Unit, grant Blitz to u until end of turn.
+
+=== Blazefury ===
+When this enters play: for each opposing Unit in this Arena, deal 1 damage to u.
+
+=== Pyrechampion ===
+(none)
+
+=== SunfireMarshal ===
+When this enters play: if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 2 damage to Conduit[other_player(self.controller), self.arena].
+
+=== RoaringChampion ===
+Static (force on target_unit): for each EMBER friendly Unit in this Arena, u gets +1 force.
+

@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.RegularExpressions;
 using Ccgnf.Ast;
+using Ccgnf.Rest.Rendering;
 
 namespace Ccgnf.Rest.Serialization;
 
@@ -28,6 +29,7 @@ public static class CardMapper
         string rarity = "";
         var factions = new List<string>();
         var keywords = new List<string>();
+        IReadOnlyList<string> abilitiesText = Array.Empty<string>();
 
         foreach (var field in card.Body.Fields)
         {
@@ -55,6 +57,9 @@ public static class CardMapper
                         }
                     }
                     break;
+                case "abilities":
+                    abilitiesText = AstHumanizer.HumanizeAbilitiesField(field.Value);
+                    break;
             }
         }
 
@@ -66,6 +71,7 @@ public static class CardMapper
             Rarity: rarity,
             Keywords: keywords,
             Text: ExtractText(rawContent, sourceLine),
+            AbilitiesText: abilitiesText,
             SourcePath: sourcePath,
             SourceLine: sourceLine);
     }

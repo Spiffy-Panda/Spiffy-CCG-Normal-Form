@@ -86,6 +86,7 @@ export interface CardDto {
   rarity: string;
   keywords: string[];
   text: string;
+  abilitiesText: string[];
   sourcePath: string;
   sourceLine: number;
 }
