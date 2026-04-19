@@ -73,4 +73,42 @@ public class DecksEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(pool, body.GetProperty("cards").GetArrayLength());
     }
+
+    [Fact]
+    public async Task Presets_ReturnsAllPresetDecks()
+    {
+        var client = _factory.CreateClient();
+        var resp = await client.GetAsync("/api/decks/presets");
+        resp.EnsureSuccessStatusCode();
+        var decks = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+        // At least the four starters shipped in encoding/decks/.
+        Assert.True(decks.GetArrayLength() >= 4,
+            $"Expected ≥4 preset decks, got {decks.GetArrayLength()}.");
+
+        var ids = decks.EnumerateArray().Select(d => d.GetProperty("id").GetString()).ToArray();
+        Assert.Contains("ember-aggro", ids);
+        Assert.Contains("bulwark-control", ids);
+        Assert.Contains("tide-thorn-combo", ids);
+        Assert.Contains("hollow-disruption", ids);
+    }
+
+    [Fact]
+    public async Task Presets_EveryDeck_Has30CardsAndNoUnknownNames()
+    {
+        var client = _factory.CreateClient();
+        var resp = await client.GetAsync("/api/decks/presets");
+        resp.EnsureSuccessStatusCode();
+        var decks = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+        foreach (var deck in decks.EnumerateArray())
+        {
+            string id = deck.GetProperty("id").GetString()!;
+            Assert.Equal(30, deck.GetProperty("cardCount").GetInt32());
+            int unknown = deck.GetProperty("unknownCards").GetArrayLength();
+            Assert.True(unknown == 0,
+                $"Deck '{id}' references unknown cards: " +
+                string.Join(", ", deck.GetProperty("unknownCards").EnumerateArray().Select(x => x.GetString())));
+        }
+    }
 }

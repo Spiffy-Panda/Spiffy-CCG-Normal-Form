@@ -132,6 +132,22 @@ export interface MockPoolResponse {
   cards: string[];
 }
 
+export interface DeckCardEntry {
+  name: string;
+  count: number;
+}
+
+export interface PresetDeckDto {
+  id: string;
+  name: string;
+  format: string;
+  factions: string[];
+  description: string;
+  cards: DeckCardEntry[];
+  cardCount: number;
+  unknownCards: string[];
+}
+
 export interface RoomCreateRequest {
   files: SourceFileDto[];
   seed: number;

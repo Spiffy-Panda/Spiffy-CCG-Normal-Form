@@ -1,0 +1,19 @@
+{
+  "id": "tide-thorn-combo",
+  "name": "TIDE + THORN Combo",
+  "format": "constructed",
+  "factions": ["TIDE", "THORN"],
+  "description": "Reshape the board with TIDE shifts while THORN grows tempo through sticky low-cost units.",
+  "cards": [
+    { "name": "Ripplekin", "count": 3 },
+    { "name": "Refract", "count": 3 },
+    { "name": "Brinescribe", "count": 3 },
+    { "name": "Tidewatcher", "count": 3 },
+    { "name": "Currentkin", "count": 3 },
+    { "name": "Thornling", "count": 3 },
+    { "name": "TakeRoot", "count": 3 },
+    { "name": "Bramblepup", "count": 3 },
+    { "name": "SaplingScout", "count": 3 },
+    { "name": "Thornpup", "count": 3 }
+  ]
+}

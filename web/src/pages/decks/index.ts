@@ -1,6 +1,6 @@
 import "./style.css";
 import { api } from "../../api/client";
-import type { CardDto } from "../../api/dtos";
+import type { CardDto, PresetDeckDto } from "../../api/dtos";
 import type { RouteMatch } from "../../router";
 import { chip } from "../../shared/chip";
 import { cardCostBucket } from "../cards/filter";
@@ -18,6 +18,7 @@ interface PageState {
   loading: boolean;
   error: string | null;
   draftSeed: number;
+  presets: PresetDeckDto[];
 }
 
 const state: PageState = {
@@ -30,6 +31,7 @@ const state: PageState = {
   loading: false,
   error: null,
   draftSeed: 1234,
+  presets: [],
 };
 
 let container: HTMLElement | null = null;
@@ -40,11 +42,15 @@ export async function renderDecks(root: HTMLElement, _match: RouteMatch): Promis
     state.loading = true;
     renderShell();
     try {
-      const { ok, body } = await api.cards();
-      if (!ok) throw new Error("GET /api/cards failed");
-      state.allCards = body;
-      state.cardsByName = new Map(body.map((c) => [c.name, c]));
-      state.pool = body;
+      const [cardsResult, presetsResult] = await Promise.all([
+        api.cards(),
+        api.deckPresets(),
+      ]);
+      if (!cardsResult.ok) throw new Error("GET /api/cards failed");
+      state.allCards = cardsResult.body;
+      state.cardsByName = new Map(cardsResult.body.map((c) => [c.name, c]));
+      state.pool = cardsResult.body;
+      state.presets = presetsResult.ok ? presetsResult.body : [];
       state.error = null;
     } catch (err) {
       state.error = String(err);
@@ -167,20 +173,42 @@ function renderLeft(col: HTMLElement): void {
   saveSection.appendChild(actionRow);
 
   const saved = listSavedDecks(state.format.id);
-  if (saved.length > 0) {
+  const presetsForFormat = state.presets.filter((p) => p.format === state.format.id);
+  if (saved.length > 0 || presetsForFormat.length > 0) {
     const loadRow = document.createElement("div");
     loadRow.className = "decks-row";
     loadRow.style.marginTop = "6px";
     const loadSelect = document.createElement("select");
     loadSelect.className = "decks-format-select";
-    loadSelect.innerHTML = `<option value="">Load…</option>` +
-      saved.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+    let optionsHtml = `<option value="">Load…</option>`;
+    if (presetsForFormat.length > 0) {
+      optionsHtml += `<optgroup label="Presets">` +
+        presetsForFormat
+          .map((p) => `<option value="preset:${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`)
+          .join("") +
+        `</optgroup>`;
+    }
+    if (saved.length > 0) {
+      optionsHtml += `<optgroup label="My saved decks">` +
+        saved.map((n) => `<option value="saved:${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("") +
+        `</optgroup>`;
+    }
+    loadSelect.innerHTML = optionsHtml;
     loadSelect.addEventListener("change", () => {
-      if (!loadSelect.value) return;
-      const d = loadDeck(state.format.id, loadSelect.value);
-      if (d) {
-        state.deck = new Map(d.cards.map((c) => [c.name, c.count]));
-        renderShell();
+      const v = loadSelect.value;
+      if (!v) return;
+      if (v.startsWith("preset:")) {
+        const preset = state.presets.find((p) => p.id === v.slice(7));
+        if (preset) {
+          state.deck = new Map(preset.cards.map((c) => [c.name, c.count]));
+          renderShell();
+        }
+      } else if (v.startsWith("saved:")) {
+        const d = loadDeck(state.format.id, v.slice(6));
+        if (d) {
+          state.deck = new Map(d.cards.map((c) => [c.name, c.count]));
+          renderShell();
+        }
       }
     });
     loadRow.appendChild(loadSelect);
@@ -188,10 +216,11 @@ function renderLeft(col: HTMLElement): void {
     const delBtn = document.createElement("button");
     delBtn.className = "decks-btn";
     delBtn.textContent = "Delete";
-    delBtn.title = "Delete selected saved deck";
+    delBtn.title = "Delete selected saved deck (presets cannot be deleted)";
     delBtn.addEventListener("click", () => {
-      if (!loadSelect.value) return;
-      deleteDeck(state.format.id, loadSelect.value);
+      const v = loadSelect.value;
+      if (!v || !v.startsWith("saved:")) return;
+      deleteDeck(state.format.id, v.slice(6));
       renderShell();
     });
     loadRow.appendChild(delBtn);

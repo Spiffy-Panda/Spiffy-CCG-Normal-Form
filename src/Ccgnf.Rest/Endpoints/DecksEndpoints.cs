@@ -13,7 +13,11 @@ internal static class DecksEndpoints
     public static void Map(WebApplication app)
     {
         app.MapPost("/api/decks/mock-pool", MockPool);
+        app.MapGet("/api/decks/presets", Presets);
     }
+
+    private static IResult Presets(DeckCatalog catalog) =>
+        Results.Ok(catalog.Get());
 
     private static readonly IReadOnlyDictionary<string, int> RarityWeights =
         new Dictionary<string, int>(StringComparer.Ordinal)

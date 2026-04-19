@@ -1,0 +1,19 @@
+{
+  "id": "hollow-disruption",
+  "name": "HOLLOW Disruption",
+  "format": "constructed",
+  "factions": ["HOLLOW"],
+  "description": "Pilfer and strike from hiding. Deny the opponent's best plays while building pressure.",
+  "cards": [
+    { "name": "Veilslip", "count": 3 },
+    { "name": "PrivateThought", "count": 3 },
+    { "name": "Greyface", "count": 3 },
+    { "name": "Unmake", "count": 3 },
+    { "name": "BlankfaceCultist", "count": 3 },
+    { "name": "QuietTheft", "count": 3 },
+    { "name": "Whisperthief", "count": 3 },
+    { "name": "VeiledStrike", "count": 3 },
+    { "name": "Devour", "count": 3 },
+    { "name": "Veilwraith", "count": 3 }
+  ]
+}

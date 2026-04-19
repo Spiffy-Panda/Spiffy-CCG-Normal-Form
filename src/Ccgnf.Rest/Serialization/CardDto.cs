@@ -29,3 +29,15 @@ public sealed record DistributionDto(
 public sealed record MockPoolRequest(string? Format, int Seed = 1234, int Size = 40);
 
 public sealed record MockPoolResponse(string Format, int Seed, IReadOnlyList<string> Cards);
+
+public sealed record DeckCardEntry(string Name, int Count);
+
+public sealed record PresetDeckDto(
+    string Id,
+    string Name,
+    string Format,
+    IReadOnlyList<string> Factions,
+    string Description,
+    IReadOnlyList<DeckCardEntry> Cards,
+    int CardCount,
+    IReadOnlyList<string> UnknownCards);

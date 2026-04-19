@@ -1,0 +1,19 @@
+{
+  "id": "ember-aggro",
+  "name": "EMBER Aggro",
+  "format": "constructed",
+  "factions": ["EMBER"],
+  "description": "Low-curve burn and fast Blitz/Surge bodies. Threatens the opposing Conduit before defenders stabilize.",
+  "cards": [
+    { "name": "Cinderling", "count": 3 },
+    { "name": "Spark", "count": 3 },
+    { "name": "MatchStrike", "count": 3 },
+    { "name": "Coalkin", "count": 3 },
+    { "name": "EmberhandRaider", "count": 3 },
+    { "name": "Sparkbearer", "count": 3 },
+    { "name": "Cinderhound", "count": 3 },
+    { "name": "Pyrearrow", "count": 3 },
+    { "name": "Quickstrike", "count": 3 },
+    { "name": "Smolder", "count": 3 }
+  ]
+}

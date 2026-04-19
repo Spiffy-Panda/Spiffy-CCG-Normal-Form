@@ -26,6 +26,7 @@ builder.WebHost.UseUrls($"http://localhost:{httpPort}");
 
 builder.Services.AddSingleton<SessionStore>();
 builder.Services.AddSingleton<ProjectCatalog>();
+builder.Services.AddSingleton<DeckCatalog>();
 builder.Services.AddSingleton<RoomStore>();
 builder.Services.AddHostedService<RoomTtlSweeper>();
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>

@@ -6,6 +6,7 @@ import type {
   MockPoolRequest,
   MockPoolResponse,
   ParseResponse,
+  PresetDeckDto,
   PreprocessResponse,
   ProjectDto,
   ProjectRequest,
@@ -60,6 +61,7 @@ export const api = {
   cardsDistribution: (cards: string[] | null) =>
     postJson<DistributionDto>("/api/cards/distribution", { cards }),
   mockPool: (req: MockPoolRequest) => postJson<MockPoolResponse>("/api/decks/mock-pool", req),
+  deckPresets: () => request<PresetDeckDto[]>("/api/decks/presets"),
 
   createRoom: (req: RoomCreateRequest) => postJson<RoomSummaryDto>("/api/rooms", req),
   listRooms: () => request<RoomSummaryDto[]>("/api/rooms"),

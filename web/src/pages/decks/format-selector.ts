@@ -7,7 +7,7 @@ export interface Format {
 }
 
 export const FORMATS: Format[] = [
-  { id: "constructed", label: "Constructed", maxCopies: 4, deckSize: 40, needsMockPool: false },
+  { id: "constructed", label: "Constructed", maxCopies: 3, deckSize: 30, needsMockPool: false },
   { id: "draft", label: "Draft (mock)", maxCopies: 4, deckSize: 40, needsMockPool: true },
 ];
 
