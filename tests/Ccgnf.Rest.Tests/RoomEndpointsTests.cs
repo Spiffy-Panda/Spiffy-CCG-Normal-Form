@@ -132,6 +132,34 @@ public class RoomEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Export_ReturnsSeedDecksAndState()
+    {
+        var client = _factory.CreateClient();
+        var roomId = await CreateRoom(client);
+
+        var j1 = await client.PostAsJsonAsync($"/api/rooms/{roomId}/join",
+            new { name = "alice", deck = new { preset = "ember-aggro" } });
+        j1.EnsureSuccessStatusCode();
+        var j2 = await client.PostAsJsonAsync($"/api/rooms/{roomId}/join",
+            new { name = "bob", deck = new { preset = "hollow-disruption" } });
+        j2.EnsureSuccessStatusCode();
+
+        var resp = await client.GetAsync($"/api/rooms/{roomId}/export");
+        resp.EnsureSuccessStatusCode();
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.Equal(roomId, body.GetProperty("roomId").GetString());
+        Assert.Equal(42, body.GetProperty("seed").GetInt32());
+        Assert.Equal(30, body.GetProperty("deckSize").GetInt32());
+        Assert.True(body.GetProperty("stepCount").GetInt32() > 0);
+        var players = body.GetProperty("players").EnumerateArray().ToArray();
+        Assert.Equal(2, players.Length);
+        Assert.Equal("EMBER Aggro", players[0].GetProperty("deckName").GetString());
+        Assert.Equal(30, players[0].GetProperty("deckCardNames").GetArrayLength());
+        Assert.True(body.GetProperty("state").ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Join_TwoPlayers_ThirdReturns409()
     {
         var client = _factory.CreateClient();

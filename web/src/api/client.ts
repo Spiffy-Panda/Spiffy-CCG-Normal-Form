@@ -7,6 +7,7 @@ import type {
   MockPoolResponse,
   ParseResponse,
   PresetDeckDto,
+  RoomExportDto,
   PreprocessResponse,
   ProjectDto,
   ProjectRequest,
@@ -81,4 +82,6 @@ export const api = {
     request<unknown>(`/api/rooms/${encodeURIComponent(id)}/state`),
   deleteRoom: (id: string) =>
     fetch(`/api/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  exportRoom: (id: string) =>
+    request<RoomExportDto>(`/api/rooms/${encodeURIComponent(id)}/export`),
 };

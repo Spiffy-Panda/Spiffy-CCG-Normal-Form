@@ -197,3 +197,23 @@ export interface RoomEventFrame {
   step: number;
   event: { type: string; fields: Record<string, string> };
 }
+
+export interface RoomExportPlayerDto {
+  playerId: number;
+  name: string;
+  deckName?: string | null;
+  deckCardNames?: string[] | null;
+}
+
+export interface RoomExportDto {
+  roomId: string;
+  seed: number;
+  deckSize: number;
+  createdAt: string;
+  exportedAt: string;
+  lifecycle: string;
+  stepCount: number;
+  gameOver: boolean;
+  players: RoomExportPlayerDto[];
+  state: unknown;
+}

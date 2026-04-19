@@ -26,7 +26,27 @@ internal static class RoomEndpoints
         app.MapPost("/api/rooms/{id}/actions", Action);
         app.MapGet("/api/rooms/{id}/state", GetState);
         app.MapGet("/api/rooms/{id}/events", Events);
+        app.MapGet("/api/rooms/{id}/export", Export);
         app.MapDelete("/api/rooms/{id}", Delete);
+    }
+
+    private static IResult Export(string id, RoomStore store)
+    {
+        if (!store.TryGet(id, out var room)) return Results.NotFound();
+        return Results.Ok(new RoomExportDto(
+            RoomId: room.Id,
+            Seed: room.Seed,
+            DeckSize: room.DeckSize,
+            CreatedAt: room.CreatedAt.ToString("o"),
+            ExportedAt: DateTimeOffset.UtcNow.ToString("o"),
+            Lifecycle: room.Lifecycle.ToString(),
+            StepCount: (int)(room.State?.StepCount ?? 0),
+            GameOver: room.State?.GameOver ?? false,
+            Players: room.Players
+                .Select(p => new RoomExportPlayerDto(
+                    p.PlayerId, p.Name, p.DeckName, p.DeckCardNames))
+                .ToList(),
+            State: room.State is null ? null : StateMapper.ToDto(room.State)));
     }
 
     // -------------------------------------------------------------------------

@@ -40,3 +40,21 @@ public sealed record RoomJoinResponse(
 public sealed record RoomActionRequest(int PlayerId, string Token, string Action);
 
 public sealed record RoomActionResponse(bool Accepted);
+
+public sealed record RoomExportPlayerDto(
+    int PlayerId,
+    string Name,
+    string? DeckName,
+    IReadOnlyList<string>? DeckCardNames);
+
+public sealed record RoomExportDto(
+    string RoomId,
+    int Seed,
+    int DeckSize,
+    string CreatedAt,
+    string ExportedAt,
+    string Lifecycle,
+    int StepCount,
+    bool GameOver,
+    IReadOnlyList<RoomExportPlayerDto> Players,
+    GameStateDto? State);

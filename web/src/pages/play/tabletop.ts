@@ -163,6 +163,31 @@ function deckNameForKey(key: string): string | null {
   return null;
 }
 
+async function exportState(): Promise<void> {
+  if (!state.roomId) return;
+  try {
+    const { ok, body } = await api.exportRoom(state.roomId);
+    if (!ok) {
+      state.error = "Export failed.";
+      renderShell();
+      return;
+    }
+    const json = JSON.stringify(body, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `room-${state.roomId}-step-${body.stepCount}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    state.error = String(err);
+    renderShell();
+  }
+}
+
 async function submitAction(action: string): Promise<void> {
   if (!state.roomId || !state.identity) return;
   try {
@@ -252,6 +277,13 @@ function renderLeft(col: HTMLElement): void {
       passBtn.textContent = "Submit pass";
       passBtn.addEventListener("click", () => void submitAction("pass"));
       actions.appendChild(passBtn);
+
+      const exportBtn = document.createElement("button");
+      exportBtn.className = "play-btn";
+      exportBtn.textContent = "Export";
+      exportBtn.title = "Download the current game state as JSON";
+      exportBtn.addEventListener("click", () => void exportState());
+      actions.appendChild(exportBtn);
     }
   } else {
     actions.appendChild(renderDeckPicker());
