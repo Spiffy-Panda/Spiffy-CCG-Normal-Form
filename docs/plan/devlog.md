@@ -3,6 +3,64 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — 8a, 8c, 8d: turns roll; cards resolve; targets pick
+
+Three slices of step 8 in one session.
+
+**8a — Turn rotation + Mulligan.** Each phase handler chains
+`BeginPhase(next, player: p)` at the end of its Sequence; the turn
+walks Rise → Channel → Clash → Fall → Pass → (other player) → … Round
+counter increments when control returns to first player. Engine
+treats `Event.Lose` as terminal alongside `GameEnd`. Mulligan's
+`Game.max_mulligans` reference was silently unbound — added to Game's
+characteristics (per-Player copy stays, informational). `PerformMulligan`
+stubbed to a single `SetCharacteristic(p, mulliganed, true)` call —
+the real Target-backed implementation lands when the full mulligan
+protocol follows up. `BeginPhase` became a real builtin emitting
+`Event.PhaseBegin`. `InterpreterOptions.ShouldHalt` added (pre-dispatch
+predicate) so tests can freeze state at a phase boundary.
+
+**8c — Channel opens a priority window.** `EnterMainPhase(p)` now
+enumerates affordable cards in hand and publishes an `InputRequest`
+whose `LegalActions` include `[pass] ∪ {play:<entityId>, …}`.
+Submitting `play:<id>` pays aether, moves card Hand → Cache, evaluates
+`OnResolve` with `self` = card / `controller` = player, and emits a
+`CardPlayed` event. Single-shot per turn (multi-card priority loop
+lands with Interrupts). `GameState.CardDecls` indexes `AstCardDecl`s
+by name for O(1) lookup at play time. Fixture + 5 tests covering
+legal-action filtering, cost payment, effect resolution, zone move,
+event emission.
+
+**8d — Target(selector, chooser, bind).** Full implementation, not a
+stub. Evaluates a 1-arg lambda selector against all entities,
+publishes an `InputRequest` with `Kind="target_entity"` and one
+`LegalAction` per matching entity (Label `"target:<id>"`, Metadata
+carries kind + displayName). Consumer's submission binds the picked
+entity to `target` (or caller's `bind:` override) in the effect's
+environment. `DealDamage(target, amount)` drains
+`current_ramparts → current_hp → integrity` in order and emits
+`DamageDealt`. `Evaluator.LookupMember` grew intrinsic entity
+accessors: `kind`, `id`, `displayName`, `owner`, `controller`.
+Fixture has two Conduit entities via a `for`-clause (must share Kind
+via decl.Name — entity Kind comes from declaration name, not the
+body `kind:` field) and a `TargetedBlast` Maneuver that deals 2 to a
+chosen Conduit. 3 tests cover publish, apply, and unknown-choice
+no-op.
+
+163/163 tests green (from 160 after the CSS commit; +3 for 8d). No
+frontend changes in this batch — 8h/8i wire the new LegalAction
+kinds into the tabletop UI.
+
+Follow-ups I left:
+
+- Existing full-game tests now provide 200-pass pads because Channel
+  blocks per turn. When Interrupts / priority-window loops land,
+  revisit the pad counts.
+- `Lose → GameEnd` conversion still missing; Lose is terminal directly.
+  8g wires a proper winner/loser GameEnd when victory conditions land.
+
+---
+
 ## 2026-04-18 — Post-7h: deck names, inspector layout, step 8 plan
 
 Two follow-ups after 7h landed:

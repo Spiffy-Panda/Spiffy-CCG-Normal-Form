@@ -1,0 +1,51 @@
+// =============================================================================
+// Fixture: targeted card play (8d).
+// =============================================================================
+// Minimum encoding to exercise Target(...) inside OnResolve. Same shape as
+// card-play-noop but adds two Conduit singletons (one per player) so the
+// targeted Maneuver has something to pick.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  counters: { aether: 3, debt: 0 }
+  zones: {
+    Arsenal: Zone(order: sequential),
+    Hand:    Zone(order: unordered),
+    Cache:   Zone(order: FIFO)
+  }
+  abilities: []
+}
+
+// Two Conduit entities. Uses a `for`-clause so both instances share the
+// "Conduit" Kind — the TargetedBlast selector matches on
+// `t.kind == Conduit`, which only works when the runtime Kind (which the
+// state builder takes from the declaration name, not the body `kind:`
+// field) matches the symbol it's compared against. Symbol-indexed for
+// clean NamedEntities keys (ConduitLeft, ConduitRight).
+Entity Conduit[side] for side ∈ {Left, Right} {
+  kind: Conduit
+  counters: { integrity: 7 }
+}
+
+Card TargetedBlast {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(Target(t -> t.kind == Conduit, DealDamage(target, 2)))
+  ]
+  // text: Deal 2 damage to a target Conduit.
+}
+
+// Setup: draw one card for Player1, then open its Main phase.
+Game.abilities += Triggered(
+  on:     Event.GameStart,
+  effect: Sequence([
+    Draw(Player1, amount: 1),
+    EnterMainPhase(Player1)
+  ]))

@@ -149,6 +149,21 @@ public sealed class Evaluator
     {
         if (target is RtEntityRef er && State.Entities.TryGetValue(er.Id, out var entity))
         {
+            // Intrinsic entity accessors come first so characteristic names
+            // can't mask them. `kind` exposes the entity's declared kind
+            // symbol (Unit / Conduit / Player / …); `id` the integer handle;
+            // `owner` / `controller` the RtEntityRef of the owner.
+            switch (member)
+            {
+                case "kind": return new RtSymbol(entity.Kind);
+                case "id":   return new RtInt(entity.Id);
+                case "displayName": return new RtString(entity.DisplayName);
+                case "owner":
+                case "controller":
+                    if (entity.OwnerId is int oid) return new RtEntityRef(oid);
+                    break;
+            }
+
             // Characteristics first, then counters, then zones, then parameters,
             // then bare-fall-through symbol.
             if (entity.Characteristics.TryGetValue(member, out var ch)) return ch;

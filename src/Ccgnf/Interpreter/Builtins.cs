@@ -69,8 +69,11 @@ internal static class Builtins
             case "EnterMainPhase":          result = EnterMainPhase(call, env, ev); return true;
             case "ResolveClashPhase":       result = new RtVoid(); return true;
 
-            // ----- Target / Mulligan helpers — v1 relies on "pass" inputs, never invoked -----
-            case "Target":                  result = new RtVoid(); return true;
+            // ----- Target / Damage -----
+            case "Target":                  result = Target(call, env, ev); return true;
+            case "DealDamage":              result = DealDamage(call, env, ev); return true;
+
+            // ----- Mulligan / MoveTo — still stubbed (lands alongside full Target) -----
             case "PerformMulligan":         result = new RtVoid(); return true;
             case "MoveTo":                  result = new RtVoid(); return true;
 
@@ -289,6 +292,150 @@ internal static class Builtins
     // -------------------------------------------------------------------------
     // Event ops
     // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Target — pick a single entity matching a lambda predicate.
+    // -------------------------------------------------------------------------
+
+    private static RtValue Target(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        // Two argument shapes, both exercised in the real encoding:
+        //   Target(lambda, effect)                         // positional
+        //   Target(selector: lambda, chooser: p,
+        //          bind: target, effect: expr)            // named
+        // The bound variable defaults to `target`. If no effect is supplied
+        // we still return the chosen entity so callers using `Target(...)`
+        // inline (e.g. `let t = Target(...)`) get a usable value.
+        AstExpr? selectorExpr = null;
+        AstExpr? effectExpr = null;
+        AstExpr? chooserExpr = null;
+        string bindName = "target";
+        int positional = 0;
+        foreach (var a in call.Args)
+        {
+            switch (a)
+            {
+                case AstArgPositional pa:
+                    if (positional == 0) selectorExpr = pa.Value;
+                    else if (positional == 1) effectExpr = pa.Value;
+                    positional++;
+                    break;
+                case AstArgNamed { Name: "selector" } n: selectorExpr = n.Value; break;
+                case AstArgNamed { Name: "effect" } n: effectExpr = n.Value; break;
+                case AstArgNamed { Name: "chooser" } n: chooserExpr = n.Value; break;
+                case AstArgNamed { Name: "bind" } n: bindName = IdentName(n.Value); break;
+            }
+        }
+        if (selectorExpr is null) return new RtVoid();
+
+        var lambdaVal = ev.Eval(selectorExpr, env);
+        if (lambdaVal is not RtLambda lambda || lambda.Parameters.Count != 1)
+        {
+            ev.Log.LogDebug("Target: selector is not a 1-arg lambda");
+            return new RtVoid();
+        }
+        string paramName = lambda.Parameters[0];
+
+        // Snapshot entity ids before iterating so selector side-effects
+        // (there shouldn't be any, but...) can't grow the set mid-scan.
+        var snapshot = ev.State.Entities.Values.ToList();
+        var candidates = new List<Entity>();
+        foreach (var entity in snapshot)
+        {
+            var testEnv = env.Extend(paramName, new RtEntityRef(entity.Id));
+            if (Evaluator.AsBool(ev.Eval(lambda.Body, testEnv)))
+            {
+                candidates.Add(entity);
+            }
+        }
+        if (candidates.Count == 0) return new RtVoid();
+
+        int? chooserPlayerId = null;
+        if (chooserExpr is not null)
+        {
+            var chosen = ev.Eval(chooserExpr, env);
+            if (chosen is RtEntityRef cer &&
+                ev.State.Entities.TryGetValue(cer.Id, out var ce) &&
+                ce.Kind == "Player")
+            {
+                chooserPlayerId = cer.Id;
+            }
+        }
+
+        var legal = candidates.Select(c => new LegalAction(
+            Kind: "target_entity",
+            Label: $"target:{c.Id}",
+            Metadata: new Dictionary<string, string>
+            {
+                ["entityId"] = c.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["kind"] = c.Kind,
+                ["displayName"] = c.DisplayName,
+            })).ToList();
+
+        var request = new InputRequest(
+            Prompt: $"Target({bindName})",
+            PlayerId: chooserPlayerId,
+            LegalActions: legal);
+
+        var choice = ev.Scheduler.Inputs.Next(request);
+        string label = choice switch
+        {
+            RtSymbol s => s.Name,
+            RtString s => s.V,
+            _ => choice.ToString() ?? "",
+        };
+
+        int targetId;
+        if (label.StartsWith("target:") &&
+            int.TryParse(label.AsSpan("target:".Length), out targetId) &&
+            candidates.Any(c => c.Id == targetId))
+        {
+            // Bind and (optionally) evaluate effect.
+            if (effectExpr is not null)
+            {
+                var effEnv = env.Extend(bindName, new RtEntityRef(targetId));
+                ev.Eval(effectExpr, effEnv);
+            }
+            return new RtEntityRef(targetId);
+        }
+
+        ev.Log.LogDebug("Target: ignored unrecognised choice {Label}", label);
+        return new RtVoid();
+    }
+
+    // -------------------------------------------------------------------------
+    // DealDamage — apply HP loss to a target entity.
+    // -------------------------------------------------------------------------
+
+    private static RtValue DealDamage(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var targetRef = ev.Eval(ExprOf(call.Args[0]), env);
+        int amount = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[1]), env));
+        if (targetRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var entity))
+        {
+            return new RtVoid();
+        }
+
+        // v1 damage order (8d slice): current_ramparts → current_hp → integrity.
+        // Real §7.3 order with Ramparts / Force absorption lands in 8e.
+        foreach (var counter in new[] { "current_ramparts", "current_hp", "integrity" })
+        {
+            if (!entity.Counters.ContainsKey(counter)) continue;
+            entity.Counters[counter] = Math.Max(0, entity.Counters[counter] - amount);
+            ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+                new Dictionary<string, RtValue>
+                {
+                    ["target"] = new RtEntityRef(entity.Id),
+                    ["counter"] = new RtSymbol(counter),
+                    ["amount"] = new RtInt(amount),
+                }));
+            return new RtVoid();
+        }
+        ev.Log.LogDebug("DealDamage: target {Id} has no damage-absorbing counter", entity.Id);
+        return new RtVoid();
+    }
 
     // -------------------------------------------------------------------------
     // Main / Channel phase — v1 priority decision.
