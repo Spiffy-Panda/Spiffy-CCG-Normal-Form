@@ -58,7 +58,7 @@ export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLEleme
   const top = players.find((p) => p.id !== bottom?.id) ?? players[1] ?? null;
 
   root.appendChild(renderSeatStrip(top, view, { side: "top", faceDown: true, isViewer: false, onCardClick: opts.onCardClick }));
-  root.appendChild(renderArenaRow(view, top, bottom));
+  root.appendChild(renderArenaRow(view, top, bottom, opts.onCardClick));
   root.appendChild(renderSeatStrip(bottom, view, { side: "bottom", faceDown: false, isViewer: true, onCardClick: opts.onCardClick }));
 
   return root;
@@ -127,7 +127,12 @@ function renderSeatStrip(
   return strip;
 }
 
-function renderArenaRow(view: PlayView, top: EntityDto | null, bottom: EntityDto | null): HTMLElement {
+function renderArenaRow(
+  view: PlayView,
+  top: EntityDto | null,
+  bottom: EntityDto | null,
+  onCardClick?: (entity: EntityDto) => void,
+): HTMLElement {
   const row = document.createElement("div");
   row.className = "arena-row";
 
@@ -142,8 +147,8 @@ function renderArenaRow(view: PlayView, top: EntityDto | null, bottom: EntityDto
     col.appendChild(label);
 
     col.appendChild(renderConduit(view, top, arena, "top"));
-    col.appendChild(renderUnitLane(view, top, arena, "top"));
-    col.appendChild(renderUnitLane(view, bottom, arena, "bottom"));
+    col.appendChild(renderUnitLane(view, top, arena, "top", onCardClick));
+    col.appendChild(renderUnitLane(view, bottom, arena, "bottom", onCardClick));
     col.appendChild(renderConduit(view, bottom, arena, "bottom"));
 
     row.appendChild(col);
@@ -178,21 +183,42 @@ function renderConduit(
 }
 
 function renderUnitLane(
-  _view: PlayView,
+  view: PlayView,
   player: EntityDto | null,
-  _arena: EntityDto,
+  arena: EntityDto,
   side: "top" | "bottom",
+  onCardClick?: (entity: EntityDto) => void,
 ): HTMLElement {
-  // v1: no unit-in-arena data yet (interpreter stops before units
-  // enter play). Render an empty lane so the board still looks like
-  // a board.
   const lane = document.createElement("div");
   lane.className = `unit-lane unit-lane-${side}`;
   if (!player) return lane;
-  const empty = document.createElement("span");
-  empty.className = "muted unit-lane-empty";
-  empty.textContent = "— empty —";
-  lane.appendChild(empty);
+
+  // Units in play for this (player, arena) pair. 8e's PlayUnit tags each
+  // card entity with parameters.arena = "Left" / "Center" / "Right" and
+  // characteristics.in_play = "true" (serialized as strings).
+  const arenaPosName = arenaPos(arena);
+  const units: EntityDto[] = [];
+  for (const entity of view.cardsById.values()) {
+    if (entity.ownerId !== player.id) continue;
+    if (entity.characteristics?.["in_play"] !== "true") continue;
+    if (entity.parameters?.["arena"] !== arenaPosName) continue;
+    units.push(entity);
+  }
+
+  if (units.length === 0) {
+    const empty = document.createElement("span");
+    empty.className = "muted unit-lane-empty";
+    empty.textContent = "— empty —";
+    lane.appendChild(empty);
+    return lane;
+  }
+
+  for (const unit of units) {
+    lane.appendChild(renderCardFromEntity(unit, {
+      size: "sm",
+      onClick: onCardClick ? () => onCardClick(unit) : undefined,
+    }));
+  }
   return lane;
 }
 

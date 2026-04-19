@@ -571,14 +571,56 @@ function humanizeAction(a: LegalActionView): string {
 }
 
 function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {
-  // Since 8a+8c+8d the engine walks all five phases, plays cards out of
-  // hand, and resolves single-target effects. The banner just shows round
-  // + a pointer to what's still being built (Clash, SBAs, victory).
+  // Live phase tracker: Round N · Rise Channel Clash Fall Pass with the
+  // current phase highlighted, plus the active seat's name and the SSE
+  // step count. Replaces the stale "engine state" text.
+  const view = state.gameState ? buildView(state.gameState) : null;
+  const phaseState = state.currentPhase;
+  const activeEntityId = phaseState?.playerEntityId ?? null;
+  const activeIdx = view && activeEntityId !== null
+    ? view.players.findIndex((p) => p.id === activeEntityId)
+    : -1;
+  const activeSeat = activeIdx >= 0 ? state.room?.players[activeIdx] : undefined;
+  const viewerId = state.identity?.playerId ?? null;
+  const viewerIsActive = activeSeat !== undefined && viewerId !== null && activeSeat.playerId === viewerId;
+  const seatLabel = activeSeat
+    ? (viewerIsActive ? "Your" : `${activeSeat.name}'s`)
+    : "—";
+
+  const phases = ["Rise", "Channel", "Clash", "Fall", "Pass"];
+  const currentPhase = phaseState?.phase ?? null;
+  const stepCount = (state.events[state.events.length - 1]?.step) ?? 0;
+
   const banner = document.createElement("div");
-  banner.className = "play-banner muted";
-  banner.innerHTML =
-    `Engine state — round ${round ?? "?"}. ` +
-    `Main-phase card play and single-target effects are live; Clash damage and Conduit-collapse victory land in 8e–8g.`;
+  banner.className = "play-phase-tracker";
+
+  const roundEl = document.createElement("span");
+  roundEl.className = "play-phase-round";
+  roundEl.textContent = `Round ${round ?? "?"}`;
+  banner.appendChild(roundEl);
+
+  const phasesWrap = document.createElement("span");
+  phasesWrap.className = "play-phase-steps";
+  for (const p of phases) {
+    const pill = document.createElement("span");
+    pill.className = "play-phase-pill";
+    if (p === currentPhase) pill.classList.add("play-phase-pill-active");
+    pill.textContent = p;
+    phasesWrap.appendChild(pill);
+  }
+  banner.appendChild(phasesWrap);
+
+  const seat = document.createElement("span");
+  seat.className = "play-phase-seat";
+  if (viewerIsActive) seat.classList.add("play-phase-seat-yours");
+  seat.textContent = currentPhase ? `${seatLabel} turn` : "waiting…";
+  banner.appendChild(seat);
+
+  const step = document.createElement("span");
+  step.className = "play-phase-step muted";
+  step.textContent = `step ${stepCount}`;
+  banner.appendChild(step);
+
   return banner;
 }
 

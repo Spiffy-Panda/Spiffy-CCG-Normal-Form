@@ -648,3 +648,63 @@
   background: rgba(59, 130, 246, 0.18);
   font-weight: 600;
 }
+
+/* ── Phase tracker ──────────────────────────────────────────────────────── */
+
+.play-phase-tracker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  border-radius: 4px;
+  background: var(--panel);
+  border-left: 3px solid var(--accent);
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.play-phase-round {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.play-phase-steps {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.play-phase-pill {
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  opacity: 0.55;
+  font-size: 11px;
+}
+
+.play-phase-pill-active {
+  opacity: 1;
+  background: rgba(59, 130, 246, 0.25);
+  border-color: var(--accent);
+  font-weight: 600;
+}
+
+.play-phase-seat {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--control-border);
+}
+
+.play-phase-seat-yours {
+  border-color: var(--accent);
+  background: rgba(59, 130, 246, 0.15);
+  font-weight: 600;
+}
+
+.play-phase-step {
+  margin-left: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}

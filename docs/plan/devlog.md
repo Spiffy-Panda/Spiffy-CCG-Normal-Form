@@ -3,6 +3,30 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — Units render on arenas + phase tracker
+
+Two frontend-only follow-ups to make 8e visible.
+
+- `board.ts` renderUnitLane now actually renders Units. Iterates
+  `view.cardsById`, filters by `ownerId === player.id`,
+  `characteristics.in_play === "true"`, and
+  `parameters.arena === <arenaPos>`. Each match renders via
+  `renderCardFromEntity` with click → inspector. Previously the
+  comment said "no unit-in-arena data yet (interpreter stops before
+  units enter play)" — stale since 8e.
+- Stale "Engine state — round N … 8e–8g" banner replaced with a
+  live phase tracker: round number, five phase pills (active one
+  highlighted), active-seat chip ("Your turn" / "Opponent's turn"),
+  and the SSE step count. Reads directly from `state.currentPhase`
+  (set by `PhaseBegin` SSE frames) and `buildView(state.gameState)`.
+
+Verified in preview: played Cinderling into Arena Left, it rendered
+in the top-of-arena unit lane at the correct side; tracker updated
+to "Round 1 · Rise Channel Clash Fall Pass · Your turn · step 7"
+with Clash highlighted.
+
+---
+
 ## 2026-04-19 — Battlefield zone + clash-UI humanizer
 
 Closes the gap between 8e landing and a full game being playable in the
