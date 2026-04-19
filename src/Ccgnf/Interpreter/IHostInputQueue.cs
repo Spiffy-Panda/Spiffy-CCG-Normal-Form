@@ -1,25 +1,30 @@
 namespace Ccgnf.Interpreter;
 
 /// <summary>
-/// The channel through which player choices enter the interpreter. v1 is
-/// strictly pre-sequenced: all inputs are enqueued before a run; the engine
-/// pulls them in order and fails fast if more are needed than were provided.
-/// Interactive I/O is out of scope until the REST and Godot hosts land.
+/// The channel through which player choices enter the interpreter. Two
+/// realities coexist: a pre-sequenced <see cref="QueuedInputs"/> used by tests
+/// and the sync <see cref="Interpreter.Run"/> wrapper, and a blocking channel
+/// used by <see cref="InterpreterRun"/> so long-lived hosts can drive the
+/// interpreter action-by-action. Implementations receive an
+/// <see cref="InputRequest"/> so async hosts can surface chooser / legal-action
+/// context to the UI; pre-sequenced queues ignore it.
 /// </summary>
 public interface IHostInputQueue
 {
     /// <summary>
-    /// Pull the next input for <paramref name="prompt"/>. Implementations may
-    /// ignore the prompt; it exists for logging and future interactive modes.
+    /// Pull the next input for <paramref name="request"/>. Implementations may
+    /// ignore the request body; it exists for logging and for async hosts that
+    /// need to publish context to a player before blocking.
     /// </summary>
-    RtValue Next(string prompt);
+    RtValue Next(InputRequest request);
 
-    /// <summary>True if no more inputs remain.</summary>
+    /// <summary>True if no more inputs remain (pre-sequenced queues only).</summary>
     bool IsEmpty { get; }
 }
 
 /// <summary>
-/// Default queue backed by an in-memory list. Consumed in FIFO order.
+/// Default queue backed by an in-memory list. Consumed in FIFO order;
+/// ignores <see cref="InputRequest"/> context.
 /// </summary>
 public sealed class QueuedInputs : IHostInputQueue
 {
@@ -32,12 +37,12 @@ public sealed class QueuedInputs : IHostInputQueue
 
     public bool IsEmpty => _queue.Count == 0;
 
-    public RtValue Next(string prompt)
+    public RtValue Next(InputRequest request)
     {
         if (_queue.Count == 0)
         {
             throw new InvalidOperationException(
-                $"Host input queue exhausted while requesting '{prompt}'.");
+                $"Host input queue exhausted while requesting '{request.Prompt}'.");
         }
         return _queue.Dequeue();
     }

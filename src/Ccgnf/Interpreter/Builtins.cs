@@ -158,18 +158,54 @@ internal static class Builtins
     {
         // Choice(chooser: p, options: { key1: effect1, key2: effect2, ... })
         AstExpr? optionsExpr = null;
+        AstExpr? chooserExpr = null;
         string? chooserLabel = null;
         foreach (var a in call.Args)
         {
             switch (a)
             {
                 case AstArgNamed { Name: "options" } n: optionsExpr = n.Value; break;
-                case AstArgNamed { Name: "chooser" } n2: chooserLabel = Describe(n2.Value); break;
+                case AstArgNamed { Name: "chooser" } n2:
+                    chooserExpr = n2.Value;
+                    chooserLabel = Describe(n2.Value);
+                    break;
             }
         }
         if (optionsExpr is not AstBraceExpr be) return new RtVoid();
 
-        var choice = ev.Scheduler.Inputs.Next($"Choice({chooserLabel ?? "?"})");
+        // Chooser → PlayerId. Best-effort; if the chooser isn't an entity we
+        // know about (e.g. `self.controller` during Setup, where no self is in
+        // scope), PlayerId stays null and the host surfaces a prompt with no
+        // seat attribution.
+        int? chooserPlayerId = null;
+        if (chooserExpr is not null)
+        {
+            var chosen = ev.Eval(chooserExpr, env);
+            if (chosen is RtEntityRef er &&
+                ev.State.Entities.TryGetValue(er.Id, out var entity) &&
+                entity.Kind == "Player")
+            {
+                chooserPlayerId = er.Id;
+            }
+        }
+
+        // Snapshot the option keys before asking for input — this is what
+        // GetLegalActions returns while the interpreter is suspended here.
+        var legal = new List<LegalAction>();
+        foreach (var entry in be.Entries)
+        {
+            if (entry is AstBraceField bf)
+            {
+                legal.Add(new LegalAction("choice_option", bf.Field.Key.Name));
+            }
+        }
+
+        var request = new InputRequest(
+            Prompt: $"Choice({chooserLabel ?? "?"})",
+            PlayerId: chooserPlayerId,
+            LegalActions: legal);
+
+        var choice = ev.Scheduler.Inputs.Next(request);
         var choiceKey = choice switch
         {
             RtSymbol s => s.Name,

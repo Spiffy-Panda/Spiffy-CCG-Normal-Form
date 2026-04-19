@@ -1,0 +1,34 @@
+// =============================================================================
+// Fixture: single Choice on GameStart.
+// =============================================================================
+// A minimal encoding that triggers a Choice when the event loop starts, so
+// tests can drive InterpreterRun through its pending/submit handshake and
+// verify GetLegalActions against a known option set.
+//
+// Not a playable game — just enough entities for StateBuilder to resolve
+// Player1 / Player2 references during Choice's chooser lookup.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1 }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  zones: {
+    Arsenal: Zone(order: sequential),
+    Hand:    Zone(order: unordered)
+  }
+  abilities: []
+}
+
+Game.abilities += Triggered(
+  on:       Event.GameStart,
+  check_at: event_emission,
+  apply_at: after_event,
+  effect:   Choice(chooser: Player1, options: {
+    pass:     NoOp,
+    mulligan: NoOp
+  }))

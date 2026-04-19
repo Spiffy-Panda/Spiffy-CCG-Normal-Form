@@ -12,7 +12,7 @@ public sealed class InterpreterOptions
     /// <summary>Seed for the scheduler's <see cref="Random"/>.</summary>
     public int Seed { get; set; }
 
-    /// <summary>Pre-sequenced host inputs; defaults to empty.</summary>
+    /// <summary>Pre-sequenced host inputs; defaults to empty. Ignored by <see cref="Interpreter.StartRun"/>, which installs its own blocking channel.</summary>
     public IHostInputQueue? Inputs { get; set; }
 
     /// <summary>Cards to seed into each player's Arsenal before Setup.</summary>
@@ -20,6 +20,13 @@ public sealed class InterpreterOptions
 
     /// <summary>Safety cap on events processed in one run (v1 guard).</summary>
     public int MaxEventDispatches { get; set; } = 10_000;
+
+    /// <summary>
+    /// Fires on the interpreter thread after each <see cref="GameEvent"/> is
+    /// dispatched. Hosts use this to stream SSE frames as the run advances;
+    /// the handler must not block or throw.
+    /// </summary>
+    public Action<GameEvent, GameState>? OnEvent { get; set; }
 }
 
 /// <summary>
@@ -27,6 +34,17 @@ public sealed class InterpreterOptions
 /// <see cref="AstFile"/>, emits the initial <c>Event.GameStart</c>, and drives
 /// the event loop until it drains. v1 scope is Setup through the first
 /// player's Round-1 Rise phase (GrammarSpec §8).
+///
+/// Two entry shapes:
+/// <list type="bullet">
+///   <item><see cref="Run"/> — synchronous wrapper, drives a pre-sequenced
+///     <see cref="IHostInputQueue"/> to completion. Suited to tests and the
+///     stateless <c>/api/run</c> endpoint.</item>
+///   <item><see cref="StartRun"/> — returns an <see cref="InterpreterRun"/>
+///     handle; the event loop runs on a background task and suspends at each
+///     <c>Choice</c> for a consumer to <c>Submit</c>. Suited to rooms where
+///     actions arrive over time.</item>
+/// </list>
 /// </summary>
 public sealed class Interpreter
 {
@@ -39,29 +57,82 @@ public sealed class Interpreter
         _loggerFactory = loggerFactory ?? NullLoggerFactory.Instance;
     }
 
+    /// <summary>
+    /// Synchronous run. Drives the event loop to completion against the
+    /// pre-sequenced <see cref="InterpreterOptions.Inputs"/>. Throws if the
+    /// interpreter requests more inputs than were supplied.
+    /// </summary>
     public GameState Run(AstFile file, InterpreterOptions? options = null)
     {
         options ??= new InterpreterOptions();
         var inputs = options.Inputs ?? new QueuedInputs(Array.Empty<RtValue>());
-        var scheduler = new Scheduler(options.Seed, inputs, _loggerFactory.CreateLogger<Scheduler>());
 
+        using var handle = StartRun(file, new InterpreterOptions
+        {
+            Seed = options.Seed,
+            DefaultDeckSize = options.DefaultDeckSize,
+            MaxEventDispatches = options.MaxEventDispatches,
+            OnEvent = options.OnEvent,
+            // Inputs intentionally omitted — StartRun installs its own channel.
+        });
+
+        while (true)
+        {
+            var pending = handle.WaitPending();
+            if (pending is null) break;
+            handle.Submit(inputs.Next(pending));
+        }
+
+        // Propagate faults so callers of Run see them, not a silent bad state.
+        if (handle.Status == RunStatus.Faulted && handle.Fault is not null)
+        {
+            throw handle.Fault;
+        }
+
+        _log.LogInformation(
+            "Interpreter: run halted; {Steps} events dispatched, {Entities} entities",
+            handle.State.StepCount, handle.State.Entities.Count);
+
+        return handle.State;
+    }
+
+    /// <summary>
+    /// Start an asynchronous run. Returns a handle that publishes pending
+    /// inputs via <see cref="InterpreterRun.WaitPending"/> and resumes on
+    /// <see cref="InterpreterRun.Submit"/>. Pre-sequenced inputs on
+    /// <paramref name="options"/> are ignored — drive with <c>Submit</c>.
+    /// </summary>
+    public InterpreterRun StartRun(AstFile file, InterpreterOptions? options = null)
+    {
+        options ??= new InterpreterOptions();
+        int maxDispatches = options.MaxEventDispatches;
+        int seed = options.Seed;
+        int deckSize = options.DefaultDeckSize;
+        var onEvent = options.OnEvent;
+
+        var cts = new CancellationTokenSource();
+        var channel = new BlockingInputChannel(cts);
+
+        var scheduler = new Scheduler(seed, channel, _loggerFactory.CreateLogger<Scheduler>());
         var builder = new StateBuilder(_loggerFactory.CreateLogger<StateBuilder>());
         var state = builder.Build(file, scheduler);
 
-        SeedDecks(state, options.DefaultDeckSize);
+        SeedDecks(state, deckSize);
 
         var evaluator = new Evaluator(state, scheduler, _loggerFactory.CreateLogger<Evaluator>());
 
         state.PendingEvents.Enqueue(new GameEvent("GameStart",
             new Dictionary<string, RtValue>()));
 
-        RunEventLoop(state, evaluator, options.MaxEventDispatches);
-
-        _log.LogInformation(
-            "Interpreter: run halted; {Steps} events dispatched, {Entities} entities",
-            state.StepCount, state.Entities.Count);
-
-        return state;
+        return new InterpreterRun(
+            state,
+            channel,
+            cts,
+            interpreterBody: _ =>
+            {
+                RunEventLoop(state, evaluator, maxDispatches, onEvent);
+                return Task.CompletedTask;
+            });
     }
 
     // -------------------------------------------------------------------------
@@ -86,7 +157,11 @@ public sealed class Interpreter
     // Event loop — §8.2 sketch, minus Interrupts / Replacements (not v1).
     // -------------------------------------------------------------------------
 
-    private void RunEventLoop(GameState state, Evaluator ev, int maxDispatches)
+    private void RunEventLoop(
+        GameState state,
+        Evaluator ev,
+        int maxDispatches,
+        Action<GameEvent, GameState>? onEvent)
     {
         while (!state.GameOver && state.PendingEvents.TryDequeue(out var current))
         {
@@ -102,6 +177,15 @@ public sealed class Interpreter
             RunSbaPass(state, ev);
 
             if (current.TypeName == "GameEnd") state.GameOver = true;
+
+            if (onEvent is not null)
+            {
+                try { onEvent(current, state); }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Interpreter OnEvent handler threw; continuing");
+                }
+            }
         }
     }
 

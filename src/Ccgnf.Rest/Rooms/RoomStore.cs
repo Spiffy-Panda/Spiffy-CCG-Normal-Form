@@ -47,6 +47,7 @@ public sealed class RoomStore
         if (!_rooms.TryRemove(id, out var room)) return false;
         room.Finish();
         await room.Broadcaster.DisposeAsync();
+        room.Dispose();
         _log.LogInformation("Room {Id} removed.", id);
         return true;
     }
@@ -63,6 +64,7 @@ public sealed class RoomStore
                 {
                     room.Finish();
                     await room.Broadcaster.DisposeAsync();
+                    room.Dispose();
                     evicted++;
                 }
             }

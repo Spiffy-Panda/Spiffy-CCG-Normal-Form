@@ -6,28 +6,76 @@ Location: `src/Ccgnf/Interpreter/`.
 
 ### `Interpreter`
 
-`Interpreter.cs`. Orchestrates a run.
+`Interpreter.cs`. Orchestrates a run. Exposes two entry points — a synchronous
+wrapper for tests / the stateless `/api/run` endpoint, and a generator-shaped
+handle for long-lived hosts (rooms, CPU loop).
 
 ```csharp
 public sealed class Interpreter {
     Interpreter(ILogger<Interpreter>? log = null, ILoggerFactory? loggerFactory = null);
     GameState Run(AstFile file, InterpreterOptions? options = null);
+    InterpreterRun StartRun(AstFile file, InterpreterOptions? options = null);
 }
 
 public sealed class InterpreterOptions {
     int Seed { get; set; }
-    IHostInputQueue? Inputs { get; set; }
+    IHostInputQueue? Inputs { get; set; }                 // used by Run; ignored by StartRun
     int DefaultDeckSize { get; set; } = 30;
     int MaxEventDispatches { get; set; } = 10_000;
+    Action<GameEvent, GameState>? OnEvent { get; set; }   // fires per dispatched event on the interpreter thread
 }
 ```
 
 `Run` flow:
-1. Build `Scheduler(seed, inputs)`.
-2. Build `GameState` via `StateBuilder`.
-3. Seed decks (N anonymous `Card` entities per Player's Arsenal).
-4. Enqueue `Event.GameStart`.
-5. Drain the event loop.
+1. `StartRun` (below) builds scheduler / state / event queue and launches the task.
+2. Loop `WaitPending` / `Submit(options.Inputs.Next(request))` until the run finishes.
+3. Propagate any `Fault` so callers see exceptions, not silent bad state.
+
+`StartRun` flow:
+1. Create a `BlockingInputChannel` wired to a fresh `CancellationTokenSource`.
+2. Build `Scheduler(seed, channel)`.
+3. Build `GameState` via `StateBuilder`.
+4. Seed decks (N anonymous `Card` entities per Player's Arsenal).
+5. Enqueue `Event.GameStart`.
+6. Return an `InterpreterRun` whose background task drains the event loop,
+   suspending in `channel.Next` whenever a `Choice` needs input.
+
+### `InterpreterRun`
+
+`InterpreterRun.cs`. Cooperative-generator handle for one run.
+
+```csharp
+public enum RunStatus { Running, WaitingForInput, Completed, Faulted, Cancelled }
+
+public sealed class InterpreterRun : IDisposable {
+    GameState State { get; }
+    RunStatus Status { get; }
+    Exception? Fault { get; }
+    InputRequest? Pending { get; }
+
+    InputRequest? WaitPending(CancellationToken ct = default);  // blocks; null => run ended
+    void Submit(RtValue value);                                 // resumes the interpreter
+    IReadOnlyList<LegalAction> GetLegalActions(int playerId);   // from current pending
+    void Stop();                                                // cooperative cancel
+    void WaitForExit(TimeSpan timeout);
+}
+
+public sealed record InputRequest(
+    string Prompt, int? PlayerId, IReadOnlyList<LegalAction> LegalActions);
+
+public sealed record LegalAction(
+    string Kind, string Label, IReadOnlyDictionary<string,string>? Metadata = null);
+```
+
+Threading — the interpreter runs on one `Task`; the consumer calls the handle
+from a single thread (the room lock serializes REST requests). `State` is
+safe to observe when `Status` is `WaitingForInput`, `Completed`, `Faulted`,
+or `Cancelled`; during `Running` it may be mid-mutation.
+
+`BlockingInputChannel` (internal) implements `IHostInputQueue` by publishing
+`InputRequest` via one `ManualResetEventSlim` and blocking for a
+`Submit`-delivered value via another. `Submit` clears the pending atomically
+with the response so `WaitPending` can't observe a stale request.
 
 ### `ProjectLoader`
 
@@ -221,7 +269,7 @@ public sealed class Scheduler {
 
 ```csharp
 public interface IHostInputQueue {
-    RtValue Next(string prompt);
+    RtValue Next(InputRequest request);
     bool IsEmpty { get; }
 }
 
@@ -230,6 +278,11 @@ public sealed class QueuedInputs : IHostInputQueue {
     // throws InvalidOperationException when queue exhausted
 }
 ```
+
+`InputRequest` carries the prompt, the chooser's player id (when the builtin
+can resolve one), and a list of `LegalAction`s the host may surface. Pre-
+sequenced queues (`QueuedInputs`) ignore the request body; `BlockingInputChannel`
+uses it to publish context to the consumer thread.
 
 ## Event loop
 
@@ -257,5 +310,10 @@ while !GameOver and queue.TryDequeue(e):
 ## Test coverage
 
 - `tests/Ccgnf.Tests/InterpreterTests.cs` — setup invariants, Round-1
-  Rise aether + draw, structural determinism.
+  Rise aether + draw, structural determinism (sync path).
+- `tests/Ccgnf.Tests/InterpreterRunTests.cs` — generator path: sync `Run`
+  matches pre-7f serialization, async `StartRun` with one-at-a-time `Submit`
+  converges on the same state, `OnEvent` fires once per dispatched event,
+  `GetLegalActions` returns `[pass, mulligan]` at the fixture's Choice, `Stop`
+  transitions to `Cancelled`.
 - Full REST pipeline: `tests/Ccgnf.Rest.Tests/EndpointsTests.cs::Run_Encoding_ProducesState`.

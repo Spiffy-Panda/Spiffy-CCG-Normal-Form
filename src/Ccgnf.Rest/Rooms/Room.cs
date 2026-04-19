@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using Ccgnf.Ast;
 using Ccgnf.Interpreter;
@@ -29,15 +30,22 @@ public sealed class RoomPlayer
 /// out to connected subscribers. A per-room lock serialises join / action
 /// / lifecycle transitions.
 ///
-/// v1 note: the interpreter runs synchronously on transition to Active, so
-/// the live input queue is drained into a pre-sequenced snapshot before
-/// Run and post-run appends buffer but do not drive further steps. The
-/// async refactor is tracked as step 6c in the plan.
+/// Since 7f the interpreter runs as a generator — <see cref="InterpreterRun"/>
+/// exposes pending inputs via <c>WaitPending</c> and resumes on <c>Submit</c>.
+/// A per-room driver task pumps that loop: it consumes buffered submissions
+/// (deck names queued at start, then action values arriving via
+/// <see cref="AppendAction"/>) and blocks on an internal submission queue
+/// when the interpreter needs a value that hasn't been supplied yet.
 /// </summary>
-public sealed class Room
+public sealed class Room : IDisposable
 {
     private readonly object _lock = new();
     private readonly ILoggerFactory _loggerFactory;
+    private readonly BlockingCollection<PendingSubmission> _submissions = new();
+    private InterpreterRun? _run;
+    private Task? _driverTask;
+    private CancellationTokenSource? _driverCts;
+    private bool _disposed;
 
     public string Id { get; }
     public AstFile AstFile { get; }
@@ -47,8 +55,7 @@ public sealed class Room
     public DateTimeOffset CreatedAt { get; }
     public DateTimeOffset LastActivityAt { get; private set; }
     public RoomLifecycle Lifecycle { get; private set; } = RoomLifecycle.WaitingForPlayers;
-    public GameState? State { get; private set; }
-    public LiveInputQueue Inputs { get; } = new();
+    public GameState? State => _run?.State;
     public SseBroadcaster Broadcaster { get; } = new();
     public IReadOnlyList<RoomPlayer> Players => _players;
 
@@ -122,7 +129,11 @@ public sealed class Room
         lock (_lock)
         {
             LastActivityAt = DateTimeOffset.UtcNow;
-            Inputs.Append(new RtString(action));
+            if (_disposed || _submissions.IsAddingCompleted)
+            {
+                return;
+            }
+            _submissions.Add(new PendingSubmission(playerId, new RtSymbol(action)));
             Broadcaster.Emit(new RoomEventFrame(
                 Step: State?.StepCount is { } step ? (int)step : 0,
                 EventType: "ActionAccepted",
@@ -130,7 +141,6 @@ public sealed class Room
                 {
                     ["playerId"] = playerId.ToString(System.Globalization.CultureInfo.InvariantCulture),
                     ["action"] = action,
-                    ["queued"] = Inputs.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 }));
             _ = args;
         }
@@ -138,16 +148,33 @@ public sealed class Room
 
     public void Finish()
     {
+        InterpreterRun? run;
+        Task? driver;
+        CancellationTokenSource? cts;
         lock (_lock)
         {
             if (Lifecycle == RoomLifecycle.Finished) return;
             Lifecycle = RoomLifecycle.Finished;
             LastActivityAt = DateTimeOffset.UtcNow;
+            run = _run;
+            driver = _driverTask;
+            cts = _driverCts;
+
+            if (!_submissions.IsAddingCompleted)
+            {
+                _submissions.CompleteAdding();
+            }
+
             Broadcaster.Emit(new RoomEventFrame(
                 Step: State?.StepCount is { } step ? (int)step : 0,
                 EventType: "RoomClosed",
                 Fields: new Dictionary<string, string>()));
         }
+
+        try { cts?.Cancel(); } catch { }
+        run?.Stop();
+        try { driver?.Wait(TimeSpan.FromSeconds(2)); } catch { }
+        run?.Dispose();
     }
 
     public bool IsExpired(TimeSpan ttl, DateTimeOffset now)
@@ -161,23 +188,43 @@ public sealed class Room
         }
     }
 
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+        }
+        Finish();
+        _submissions.Dispose();
+    }
+
     private void StartLocked()
     {
         // `_lock` is held by the caller (TryJoin).
         Lifecycle = RoomLifecycle.Active;
         LastActivityAt = DateTimeOffset.UtcNow;
 
+        foreach (var p in _players)
+        {
+            if (p.DeckCardNames is null) continue;
+            foreach (var name in p.DeckCardNames)
+            {
+                _submissions.Add(new PendingSubmission(p.PlayerId, new RtString(name)));
+            }
+        }
+
+        InterpreterRun run;
         try
         {
             var interpreter = new InterpreterRt(
                 _loggerFactory.CreateLogger<InterpreterRt>(),
                 _loggerFactory);
-            var snapshot = Inputs.Drain();
-            State = interpreter.Run(AstFile, new InterpreterOptions
+            run = interpreter.StartRun(AstFile, new InterpreterOptions
             {
                 Seed = Seed,
-                Inputs = snapshot,
                 DefaultDeckSize = DeckSize,
+                OnEvent = (ev, state) => EmitGameEvent(ev, state),
             });
         }
         catch (Exception ex)
@@ -190,14 +237,82 @@ public sealed class Room
             return;
         }
 
+        _run = run;
+        _driverCts = new CancellationTokenSource();
+        _driverTask = Task.Run(() => DriveRun(run, _driverCts.Token));
+
         Broadcaster.Emit(new RoomEventFrame(
-            Step: (int)(State?.StepCount ?? 0),
+            Step: 0,
             EventType: "RoomStarted",
             Fields: new Dictionary<string, string>
             {
-                ["stepCount"] = (State?.StepCount ?? 0).ToString(System.Globalization.CultureInfo.InvariantCulture),
-                ["gameOver"] = (State?.GameOver ?? false) ? "true" : "false",
+                ["players"] = _players.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
             }));
+    }
+
+    private void DriveRun(InterpreterRun run, CancellationToken ct)
+    {
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var pending = run.WaitPending(ct);
+                if (pending is null) break;
+
+                Broadcaster.Emit(new RoomEventFrame(
+                    Step: (int)run.State.StepCount,
+                    EventType: "InputPending",
+                    Fields: new Dictionary<string, string>
+                    {
+                        ["prompt"] = pending.Prompt,
+                        ["playerId"] = pending.PlayerId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                        ["options"] = string.Join(",", pending.LegalActions.Select(a => a.Label)),
+                    }));
+
+                PendingSubmission submission;
+                try
+                {
+                    submission = _submissions.Take(ct);
+                }
+                catch (OperationCanceledException) { break; }
+                catch (InvalidOperationException) { break; } // CompleteAdding was called
+
+                run.Submit(submission.Value);
+            }
+        }
+        catch (OperationCanceledException) { /* shutdown */ }
+
+        var terminal = run.Status switch
+        {
+            RunStatus.Completed => "RoomFinished",
+            RunStatus.Faulted => "InterpreterError",
+            RunStatus.Cancelled => "RoomCancelled",
+            _ => "RoomHalted",
+        };
+        var fields = new Dictionary<string, string>
+        {
+            ["stepCount"] = run.State.StepCount.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["gameOver"] = run.State.GameOver ? "true" : "false",
+            ["status"] = run.Status.ToString(),
+        };
+        if (run.Fault is { } fault) fields["message"] = fault.Message;
+        Broadcaster.Emit(new RoomEventFrame((int)run.State.StepCount, terminal, fields));
+    }
+
+    private void EmitGameEvent(GameEvent ev, GameState state)
+    {
+        var fields = new Dictionary<string, string>
+        {
+            ["eventType"] = ev.TypeName,
+        };
+        foreach (var (key, value) in ev.Fields)
+        {
+            fields["field." + key] = value.ToString() ?? "";
+        }
+        Broadcaster.Emit(new RoomEventFrame(
+            Step: (int)state.StepCount,
+            EventType: "GameEvent",
+            Fields: fields));
     }
 
     private static string GenerateToken()
@@ -206,4 +321,6 @@ public sealed class Room
         RandomNumberGenerator.Fill(bytes);
         return "tok_" + Convert.ToHexString(bytes).ToLowerInvariant();
     }
+
+    private readonly record struct PendingSubmission(int? PlayerId, RtValue Value);
 }

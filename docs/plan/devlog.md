@@ -3,6 +3,43 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — 7f: Interpreter generator + legal-actions
+
+Reshaped `Interpreter.Run` into a cooperative generator. The sync entry is
+now a thin wrapper that drives `StartRun` → `InterpreterRun` with a
+pre-sequenced input list; pre-7f behavior is preserved bit-for-bit (the
+existing determinism test still passes against the serialized state).
+
+Implementation is "thread per run" — `BlockingInputChannel : IHostInputQueue`
+bridges the synchronous `Choice → Next(request)` call on the interpreter
+thread to the consumer's `WaitPending` / `Submit` on another thread. Chose
+this over CPS-converting every `Evaluator` / `Builtins` method: blast
+radius was hundreds of call sites and didn't fit a single sub-commit. Room
+limit is <10 concurrent, so a few extra thread-pool threads is fine.
+
+New public surface: `InputRequest`, `LegalAction`, `RunStatus`,
+`InterpreterRun`, `InterpreterOptions.OnEvent`. `Builtins.Choice` now
+evaluates its chooser to a PlayerId and publishes option keys as
+`LegalAction`s before blocking. `Room.StartLocked` drives the handle on a
+background task; `AppendAction` pushes into a `BlockingCollection` that
+the driver drains.
+
+Caught one race during test-driving: the consumer's `WaitPending` could
+observe the previous `_current` if the interpreter hadn't cleared it yet
+after reading the response. Fixed by clearing `_current` + resetting the
+request signal atomically inside `Submit`.
+
+148 tests pass (143 → 148, +5 in `InterpreterRunTests.cs`). Docs updated:
+[reference/interpreter.md](reference/interpreter.md).
+
+Deferred: the Resonance encoding's `Game.max_mulligans` is unbound on
+Game (it's declared on Player), so MulliganPhase collapses to `Repeat(0, …)`
+and no live Choice fires. Added a fixture
+[`tests/Ccgnf.Tests/fixtures/choice-on-start.ccgnf`](../../tests/Ccgnf.Tests/fixtures/choice-on-start.ccgnf)
+to exercise Choice directly — encoding fix is its own change.
+
+---
+
 ## 2026-04-18 — Steps 4, 5, 6 landed
 
 Shipped the remaining web-app steps in one batch:
