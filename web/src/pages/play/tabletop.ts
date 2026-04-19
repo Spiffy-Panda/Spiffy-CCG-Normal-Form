@@ -119,7 +119,16 @@ async function join(): Promise<void> {
   state.joining = true;
   renderShell();
   try {
-    const name = window.prompt("Display name (optional):") ?? "";
+    // window.prompt is blocked in some embedded browsers (Claude Preview,
+    // sandboxed iframes) — fall back to the empty string so the server
+    // assigns a default name. Users can later rename themselves once an
+    // inline name field lands.
+    let name = "";
+    try {
+      name = window.prompt("Display name (optional):") ?? "";
+    } catch {
+      name = "";
+    }
     const deck = resolveSelectedDeck();
     const { ok, body } = await api.joinRoom(state.roomId, name || null, deck);
     if (!ok) throw new Error("POST /api/rooms/{id}/join failed");

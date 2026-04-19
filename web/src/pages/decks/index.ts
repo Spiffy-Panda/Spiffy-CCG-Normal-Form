@@ -460,7 +460,15 @@ function barGroup(title: string, counts: Record<string, number>, total: number):
 }
 
 function onSave(): void {
-  const name = window.prompt("Save deck as:");
+  // window.prompt is blocked in some embedded browsers (Claude Preview,
+  // sandboxed iframes) — fall back to a timestamped default so the save
+  // path still works there.
+  let name: string | null;
+  try {
+    name = window.prompt("Save deck as:");
+  } catch {
+    name = `Deck ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
+  }
   if (!name) return;
   const cards: DeckEntry[] = [...state.deck.entries()]
     .map(([name, count]) => ({ name, count }))
