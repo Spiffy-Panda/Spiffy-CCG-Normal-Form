@@ -1,0 +1,55 @@
+// =============================================================================
+// Fixture: Unit play + Clash declaration + damage (8e).
+// =============================================================================
+// Two arenas (Left / Right), two conduits per player (one per arena). A
+// simple Warrior Unit (cost 1, force 2, ramparts 1) the active player can
+// play into an arena and then push through in Clash.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  counters: { aether: 10, debt: 0 }
+  zones: {
+    Arsenal:     Zone(order: sequential),
+    Hand:        Zone(order: unordered),
+    Battlefield: Zone(order: unordered),
+    Cache:       Zone(order: FIFO)
+  }
+  abilities: []
+}
+
+Entity Arena[pos] for pos ∈ {Left, Right} {
+  kind: Arena
+  characteristics: { position: pos }
+}
+
+Card Warrior {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 2, ramparts: 1, rarity: C
+  abilities: []
+  // text: Test Unit. Force 2 hits an opponent Conduit in its arena on Clash.
+}
+
+Card BigWarrior {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 7, ramparts: 1, rarity: C
+  abilities: []
+  // text: One attack collapses a Conduit outright.
+}
+
+// Setup: conduits per (owner, arena), draw, open Main for Player1.
+Game.abilities += Triggered(
+  on:     Event.GameStart,
+  effect: Sequence([
+    InstantiateEntity(kind: Conduit, owner: Player1, arena: Left,  initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player1, arena: Right, initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, arena: Left,  initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, arena: Right, initial_counters: { integrity: 7 }),
+    Draw(Player1, amount: 1),
+    EnterMainPhase(Player1),
+    ResolveClashPhase(active_player: Player1)
+  ]))

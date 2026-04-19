@@ -3,6 +3,70 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — 8e: Unit play + Clash declaration + Force damage
+
+Units now enter play. Clash now does something. The engine can reach
+a TwoConduitsLost victory through pure combat — not just Maneuver
+damage.
+
+**Unit play.** `Builtins.PlayCard` dispatches on `type:` from the
+CardDecl. Maneuvers keep the 8c path (Hand → Cache → OnResolve).
+Units hit a new `PlayUnit`:
+
+1. Publish an `InputRequest` with `Kind="target_arena"`, one
+   `LegalAction` per `state.Arenas` entry (Metadata carries the
+   arena's `pos` symbol).
+2. On submission, move card Hand → `Player.Battlefield` (new zone in
+   fixtures; real encoding needs a migration in its own commit).
+3. Copy `force` + `ramparts` from the CardDecl onto the entity's
+   counters. Set `type="Unit"`, `in_play=true`, `OwnerId=player`,
+   `arena=<pos symbol>`, `arena_entity=<arena ref>`.
+4. Fire `OnResolve` (most real Units don't have one; enter-the-
+   battlefield triggers are separate) and enqueue `UnitEntered` +
+   `CardPlayed` events.
+
+**Clash.** `ResolveClashPhase(active_player: p)` replaces its void
+stub. For each Arena in `state.Arenas`:
+
+- Find the active player's Units whose `arena` parameter matches the
+  Arena's `pos`.
+- If any: emit `ClashBegin`, then for each Unit publish an
+  `InputRequest` with `Kind="declare_attacker"` offering
+  `attack` / `hold`. `attack` accumulates into a per-arena attacker
+  list; `hold` is a no-op.
+- After declarations, find the opponent's non-collapsed Conduit with
+  matching `arena` pos; each attacker's `force` drains its integrity.
+  Emits `DamageDealt` per hit and `ClashEnd` per arena.
+- Multiple attackers in one arena stack on the same Conduit; 8f's
+  SBA pass fires `ConduitCollapsed` when integrity hits 0.
+
+Simplifications called out in the 08 plan: no blockers, no Interrupts,
+no per-player defender step. One-directional Force → Conduit only.
+
+Fixture `clash.ccgnf`: two Arenas (Left/Right), four Conduits via
+`InstantiateEntity`, `Warrior` (force 2) and `BigWarrior` (force 7).
+Six tests cover: Unit → Battlefield with stats and arena set, event
+emission, attack damages opponent's same-arena Conduit, untouched
+other-arena Conduit, hold deals no damage, no-unit Clash passes
+through without prompting, and 7 force collapses a Conduit via 8f's
+SBA pipeline.
+
+173/173 tests green (+6 for 8e).
+
+Open items still gating step 8's "Done when":
+
+- No multi-card priority loop — Main phase is still single-shot, so
+  a player can't play multiple cards in one turn. Interrupts land
+  with the full priority window.
+- Real encoding's Player has no Battlefield zone; Units-in-play need
+  a zone migration (real encoding uses `Arena.units[Player]` child
+  zones). Fixtures work; the real game still halts at deck-out
+  unless the decks contain Maneuvers only.
+- No frontend yet for declare_attacker / target_arena. 8j wires the
+  Clash UI.
+
+---
+
 ## 2026-04-19 — 8i: Readable action-bar labels
 
 Small UX polish on top of 8c/8d/8h. The action bar was rendering raw

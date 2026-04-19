@@ -67,7 +67,7 @@ internal static class Builtins
             case "DrainTriggersFor":        result = new RtVoid(); return true;
             case "BeginPhase":              result = BeginPhase(call, env, ev); return true;
             case "EnterMainPhase":          result = EnterMainPhase(call, env, ev); return true;
-            case "ResolveClashPhase":       result = new RtVoid(); return true;
+            case "ResolveClashPhase":       result = ResolveClashPhase(call, env, ev); return true;
 
             // ----- Target / Damage -----
             case "Target":                  result = Target(call, env, ev); return true;
@@ -518,6 +518,24 @@ internal static class Builtins
     {
         player.Counters["aether"] = Math.Max(0, player.Counters.GetValueOrDefault("aether", 0) - cost);
 
+        var type = GetCardType(decl);
+        if (type == "Unit")
+        {
+            PlayUnit(ev, player, cardEntity, decl, cost);
+        }
+        else
+        {
+            PlayManeuver(ev, player, cardEntity, decl, cost);
+        }
+    }
+
+    private static void PlayManeuver(
+        Evaluator ev,
+        Entity player,
+        Entity cardEntity,
+        Ast.AstCardDecl decl,
+        int cost)
+    {
         // Move Hand → Cache before resolving so the effect sees the card in
         // Cache (same as the real §6.2 resolution order once Interrupts land).
         if (player.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Remove(cardEntity.Id);
@@ -533,7 +551,7 @@ internal static class Builtins
             ev.Eval(onResolve, resolveEnv);
         }
 
-        ev.Log.LogInformation("Played card {Name} (#{Id}) for {Cost} aether",
+        ev.Log.LogInformation("Played Maneuver {Name} (#{Id}) for {Cost} aether",
             cardEntity.DisplayName, cardEntity.Id, cost);
 
         ev.State.PendingEvents.Enqueue(new GameEvent("CardPlayed",
@@ -542,17 +560,142 @@ internal static class Builtins
                 ["player"] = new RtEntityRef(player.Id),
                 ["card"] = new RtEntityRef(cardEntity.Id),
                 ["cost"] = new RtInt(cost),
+                ["type"] = new RtSymbol("Maneuver"),
             }));
     }
 
-    private static int GetCardCost(Ast.AstCardDecl decl)
+    private static void PlayUnit(
+        Evaluator ev,
+        Entity player,
+        Entity cardEntity,
+        Ast.AstCardDecl decl,
+        int cost)
+    {
+        // Unit play opens a target-arena pending. The Unit lives on the
+        // controller's Battlefield zone and carries the chosen arena as a
+        // symbol parameter so Clash can filter per-arena units later.
+        var arenas = ev.State.Arenas;
+        if (arenas.Count == 0)
+        {
+            // No Arenas defined — put the unit on the battlefield with an
+            // unspecified arena. Clash with no arenas is a no-op later.
+            PlaceUnit(ev, player, cardEntity, decl, cost, arenaEntityId: null, arenaPos: null);
+            return;
+        }
+
+        var legal = arenas.Select(a => new LegalAction(
+            Kind: "target_arena",
+            Label: $"arena:{a.Id}",
+            Metadata: new Dictionary<string, string>
+            {
+                ["entityId"] = a.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["kind"] = a.Kind,
+                ["displayName"] = a.DisplayName,
+                ["pos"] = (a.Parameters.TryGetValue("pos", out var p) && p is RtSymbol sp) ? sp.Name : "",
+            })).ToList();
+
+        var request = new InputRequest(
+            Prompt: $"PickArena({cardEntity.DisplayName})",
+            PlayerId: player.Id,
+            LegalActions: legal);
+
+        var choice = ev.Scheduler.Inputs.Next(request);
+        string label = choice switch
+        {
+            RtSymbol s => s.Name,
+            RtString s => s.V,
+            _ => choice.ToString() ?? "",
+        };
+
+        Entity? arena = null;
+        if (label.StartsWith("arena:") && int.TryParse(label.AsSpan("arena:".Length), out var aid))
+        {
+            arena = arenas.FirstOrDefault(a => a.Id == aid);
+        }
+        if (arena is null)
+        {
+            ev.Log.LogDebug("PlayUnit: no arena picked for {Name}; fallback to first", cardEntity.DisplayName);
+            arena = arenas[0];
+        }
+
+        RtSymbol? posSym = null;
+        if (arena.Parameters.TryGetValue("pos", out var posVal) && posVal is RtSymbol ps) posSym = ps;
+        PlaceUnit(ev, player, cardEntity, decl, cost, arenaEntityId: arena.Id, arenaPos: posSym);
+    }
+
+    private static void PlaceUnit(
+        Evaluator ev,
+        Entity player,
+        Entity cardEntity,
+        Ast.AstCardDecl decl,
+        int cost,
+        int? arenaEntityId,
+        RtSymbol? arenaPos)
+    {
+        // Move Hand → Battlefield (falls back to Cache if fixture didn't
+        // declare a Battlefield zone).
+        if (player.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Remove(cardEntity.Id);
+        Zone? dest = player.Zones.TryGetValue("Battlefield", out var bf) ? bf
+                   : player.Zones.TryGetValue("Cache", out var cache) ? cache : null;
+        dest?.Contents.Add(cardEntity.Id);
+
+        // Copy Unit stats from the declaration onto the runtime entity.
+        cardEntity.Counters["force"] = GetCardIntField(decl, "force");
+        cardEntity.Counters["max_ramparts"] = GetCardIntField(decl, "ramparts");
+        cardEntity.Counters["current_ramparts"] = cardEntity.Counters["max_ramparts"];
+        cardEntity.OwnerId = player.Id;
+        cardEntity.Characteristics["type"] = new RtSymbol("Unit");
+        cardEntity.Characteristics["in_play"] = new RtBool(true);
+        if (arenaEntityId is int aid) cardEntity.Parameters["arena_entity"] = new RtEntityRef(aid);
+        if (arenaPos is not null) cardEntity.Parameters["arena"] = arenaPos;
+
+        // OnResolve, if any, fires after the Unit enters play. Most real
+        // Units have no OnResolve (enter-the-battlefield triggers are a
+        // different phase of §6.2), but the hook is free.
+        var onResolve = GetCardOnResolve(decl);
+        if (onResolve is not null)
+        {
+            var resolveEnv = RtEnv.Empty
+                .Extend("self", new RtEntityRef(cardEntity.Id))
+                .Extend("controller", new RtEntityRef(player.Id));
+            ev.Eval(onResolve, resolveEnv);
+        }
+
+        ev.Log.LogInformation("Played Unit {Name} (#{Id}) into arena {Arena} for {Cost} aether",
+            cardEntity.DisplayName, cardEntity.Id, arenaPos?.Name ?? "<none>", cost);
+
+        var fields = new Dictionary<string, RtValue>
+        {
+            ["player"] = new RtEntityRef(player.Id),
+            ["card"] = new RtEntityRef(cardEntity.Id),
+            ["cost"] = new RtInt(cost),
+            ["type"] = new RtSymbol("Unit"),
+        };
+        if (arenaEntityId is int aid2) fields["arena"] = new RtEntityRef(aid2);
+        ev.State.PendingEvents.Enqueue(new GameEvent("UnitEntered", fields));
+        ev.State.PendingEvents.Enqueue(new GameEvent("CardPlayed", fields));
+    }
+
+    private static int GetCardCost(Ast.AstCardDecl decl) => GetCardIntField(decl, "cost");
+
+    private static int GetCardIntField(Ast.AstCardDecl decl, string name)
     {
         foreach (var f in decl.Body.Fields)
         {
-            if (f.Key.Name != "cost") continue;
+            if (f.Key.Name != name) continue;
             if (f.Value is Ast.AstFieldExpr fe && fe.Value is Ast.AstIntLit i) return i.Value;
         }
         return 0;
+    }
+
+    private static string? GetCardType(Ast.AstCardDecl decl)
+    {
+        foreach (var f in decl.Body.Fields)
+        {
+            if (f.Key.Name != "type") continue;
+            if (f.Value is Ast.AstFieldExpr fe && fe.Value is Ast.AstIdent id) return id.Name;
+        }
+        return null;
     }
 
     private static Ast.AstExpr? GetCardOnResolve(Ast.AstCardDecl decl)
@@ -572,6 +715,152 @@ internal static class Builtins
                     return ExprOf(fc.Args[0]);
                 }
             }
+        }
+        return null;
+    }
+
+    // -------------------------------------------------------------------------
+    // ResolveClashPhase — walk arenas, ask each active-player Unit attack/
+    // hold, then push Force → opponent's same-arena Conduit for attackers.
+    // -------------------------------------------------------------------------
+
+    private static RtValue ResolveClashPhase(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        // Named arg: active_player: p. Legacy positional also accepted.
+        AstExpr? playerExpr = null;
+        foreach (var a in call.Args)
+        {
+            switch (a)
+            {
+                case AstArgNamed { Name: "active_player" } n: playerExpr = n.Value; break;
+                case AstArgPositional pa: playerExpr ??= pa.Value; break;
+            }
+        }
+        if (playerExpr is null) return new RtVoid();
+
+        var playerVal = ev.Eval(playerExpr, env);
+        if (playerVal is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var attacker))
+        {
+            return new RtVoid();
+        }
+        var opponent = ev.State.Players.FirstOrDefault(p => p.Id != attacker.Id);
+
+        // Per-arena: attack/hold prompt for each active-player Unit whose
+        // `arena` parameter matches the arena's `pos`. Holds are a no-op;
+        // attackers accumulate into a list, then damage resolves after all
+        // prompts so declarations are atomic per arena (plan's simplified §7.1).
+        foreach (var arena in ev.State.Arenas)
+        {
+            if (!arena.Parameters.TryGetValue("pos", out var posVal) ||
+                posVal is not RtSymbol pos)
+            {
+                continue;
+            }
+
+            var units = UnitsOnArena(ev, attacker.Id, pos.Name);
+            if (units.Count == 0) continue;
+
+            ev.State.PendingEvents.Enqueue(new GameEvent("ClashBegin",
+                new Dictionary<string, RtValue>
+                {
+                    ["arena"] = new RtEntityRef(arena.Id),
+                    ["active_player"] = new RtEntityRef(attacker.Id),
+                }));
+
+            var attackers = new List<Entity>();
+            foreach (var unit in units)
+            {
+                var legal = new List<LegalAction>
+                {
+                    new("declare_attacker", "attack", new Dictionary<string, string>
+                    {
+                        ["unitId"] = unit.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["cardName"] = unit.DisplayName,
+                        ["arena"] = pos.Name,
+                        ["force"] = unit.Counters.GetValueOrDefault("force", 0).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    }),
+                    new("declare_attacker", "hold", new Dictionary<string, string>
+                    {
+                        ["unitId"] = unit.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["cardName"] = unit.DisplayName,
+                        ["arena"] = pos.Name,
+                    }),
+                };
+                var request = new InputRequest(
+                    Prompt: $"Clash.{pos.Name}({unit.DisplayName})",
+                    PlayerId: attacker.Id,
+                    LegalActions: legal);
+                var choice = ev.Scheduler.Inputs.Next(request);
+                string label = choice switch
+                {
+                    RtSymbol s => s.Name,
+                    RtString s => s.V,
+                    _ => choice.ToString() ?? "",
+                };
+                if (label == "attack") attackers.Add(unit);
+            }
+
+            // Damage: each attacker's Force hits the opponent's Conduit
+            // sitting in the same arena (if any). Multiple attackers in one
+            // arena stack straight onto the same conduit.
+            if (opponent is not null && attackers.Count > 0)
+            {
+                Entity? conduit = FindConduit(ev, opponent.Id, pos.Name);
+                foreach (var a in attackers)
+                {
+                    int force = a.Counters.GetValueOrDefault("force", 0);
+                    if (conduit is null || force <= 0) continue;
+                    int before = conduit.Counters.GetValueOrDefault("integrity", 0);
+                    conduit.Counters["integrity"] = Math.Max(0, before - force);
+                    ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+                        new Dictionary<string, RtValue>
+                        {
+                            ["source"] = new RtEntityRef(a.Id),
+                            ["target"] = new RtEntityRef(conduit.Id),
+                            ["counter"] = new RtSymbol("integrity"),
+                            ["amount"] = new RtInt(force),
+                        }));
+                }
+            }
+
+            ev.State.PendingEvents.Enqueue(new GameEvent("ClashEnd",
+                new Dictionary<string, RtValue>
+                {
+                    ["arena"] = new RtEntityRef(arena.Id),
+                    ["attackers"] = new RtInt(attackers.Count),
+                }));
+        }
+        return new RtVoid();
+    }
+
+    private static List<Entity> UnitsOnArena(Evaluator ev, int playerId, string arenaPos)
+    {
+        var units = new List<Entity>();
+        foreach (var e in ev.State.Entities.Values)
+        {
+            if (e.OwnerId != playerId) continue;
+            if (!e.Characteristics.TryGetValue("in_play", out var ip) ||
+                ip is not RtBool rb || !rb.V) continue;
+            if (!e.Characteristics.TryGetValue("type", out var t) ||
+                t is not RtSymbol ts || ts.Name != "Unit") continue;
+            if (!e.Parameters.TryGetValue("arena", out var av) ||
+                av is not RtSymbol ap || ap.Name != arenaPos) continue;
+            units.Add(e);
+        }
+        return units;
+    }
+
+    private static Entity? FindConduit(Evaluator ev, int ownerId, string arenaPos)
+    {
+        foreach (var e in ev.State.Entities.Values)
+        {
+            if (e.Kind != "Conduit") continue;
+            if (e.OwnerId != ownerId) continue;
+            if (e.Tags.Contains("collapsed")) continue;
+            if (!e.Parameters.TryGetValue("arena", out var av) ||
+                av is not RtSymbol ap || ap.Name != arenaPos) continue;
+            return e;
         }
         return null;
     }
