@@ -15,11 +15,17 @@ interface Identity {
   deckName: string | null;
 }
 
+interface LegalActionView {
+  kind: string;
+  label: string;
+  metadata?: Record<string, string>;
+}
+
 interface PendingInputView {
   step: number;
   prompt: string;
   playerId: number | null;
-  options: string[];
+  legalActions: LegalActionView[];
 }
 
 interface PhaseMarker {
@@ -154,12 +160,26 @@ function updatePendingFromFrame(frame: RoomEventFrame): void {
   if (type === "InputPending") {
     const f = frame.event.fields;
     const pid = f.playerId ? parseInt(f.playerId, 10) : NaN;
-    const opts = (f.options ?? "").split(",").filter((s) => s.length > 0);
+    let legal: LegalActionView[] = [];
+    if (f.legalActions) {
+      try {
+        const parsed = JSON.parse(f.legalActions);
+        if (Array.isArray(parsed)) legal = parsed as LegalActionView[];
+      } catch (e) {
+        console.warn("InputPending.legalActions parse failed", e);
+      }
+    }
+    if (legal.length === 0) {
+      // Back-compat: derive from the flat options string when legalActions
+      // isn't present (older server, or a frame queued before 8i).
+      legal = (f.options ?? "").split(",").filter((s) => s.length > 0)
+        .map((label) => ({ kind: label === "pass" ? "pass_priority" : "", label }));
+    }
     state.pendingInput = {
       step: frame.step,
       prompt: f.prompt ?? "",
       playerId: Number.isFinite(pid) ? pid : null,
-      options: opts,
+      legalActions: legal,
     };
   } else if (
     type === "CpuAction" ||
@@ -473,13 +493,10 @@ function onCardClicked(entity: EntityDto): void {
 
 function renderActionBar(): HTMLElement | null {
   const pending = state.pendingInput;
-  if (!pending || pending.options.length === 0) return null;
+  if (!pending || pending.legalActions.length === 0) return null;
 
   const viewerId = state.identity?.playerId ?? null;
   const viewerSeat = viewerId && state.room?.players.find((p) => p.playerId === viewerId);
-  // Map the interpreter's entity id (pending.playerId) back to the roster
-  // seat via positional order. State already has view.players in order,
-  // but we approximate using the roster and trust chooser seating.
   const isForViewer =
     viewerSeat !== undefined && viewerSeat !== null
       ? (() => {
@@ -498,12 +515,13 @@ function renderActionBar(): HTMLElement | null {
   label.textContent = isForViewer ? "Your choice:" : "Waiting on opponent:";
   bar.appendChild(label);
 
-  for (const opt of pending.options) {
+  for (const action of pending.legalActions) {
     const btn = document.createElement("button");
     btn.className = "play-action-btn";
-    btn.textContent = opt;
+    btn.textContent = humanizeAction(action);
+    btn.title = `${action.kind} · ${action.label}`;
     btn.disabled = !isForViewer;
-    btn.addEventListener("click", () => void submitAction(opt));
+    btn.addEventListener("click", () => void submitAction(action.label));
     bar.appendChild(btn);
   }
 
@@ -513,6 +531,33 @@ function renderActionBar(): HTMLElement | null {
   bar.appendChild(note);
 
   return bar;
+}
+
+function humanizeAction(a: LegalActionView): string {
+  const m = a.metadata ?? {};
+  switch (a.kind) {
+    case "play_card": {
+      const name = m.cardName ?? a.label;
+      const cost = m.cost;
+      return cost ? `Play ${name} (${cost}⚡)` : `Play ${name}`;
+    }
+    case "target_entity": {
+      const name = m.displayName ?? "";
+      const kind = m.kind ?? "entity";
+      const id = m.entityId ?? "?";
+      // Anonymous instances (InstantiateEntity) have DisplayName == Kind;
+      // collapse to "Kind #id" so the label isn't "Conduit Conduit".
+      const shown = name && name !== kind ? name : `${kind} #${id}`;
+      return `Target ${shown}`;
+    }
+    case "choice_option":
+      // Mulligan "pass" / "mulligan" etc — label is already human-readable.
+      return a.label.charAt(0).toUpperCase() + a.label.slice(1);
+    case "pass_priority":
+      return "Pass";
+    default:
+      return a.label;
+  }
 }
 
 function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text.Json;
 using Ccgnf.Ast;
 using Ccgnf.Interpreter;
 using InterpreterRt = Ccgnf.Interpreter.Interpreter;
@@ -319,7 +320,11 @@ public sealed class Room : IDisposable
                     {
                         ["prompt"] = pending.Prompt,
                         ["playerId"] = pending.PlayerId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "",
+                        // Flat comma-joined label list kept for back-compat with
+                        // the v1 action-bar renderer — the richer `legalActions`
+                        // field supersedes it.
                         ["options"] = string.Join(",", pending.LegalActions.Select(a => a.Label)),
+                        ["legalActions"] = SerializeLegalActions(pending.LegalActions),
                     }));
 
                 // CPU seats act autonomously: pick the first legal action
@@ -369,6 +374,26 @@ public sealed class Room : IDisposable
         };
         if (run.Fault is { } fault) fields["message"] = fault.Message;
         Broadcaster.Emit(new RoomEventFrame((int)run.State.StepCount, terminal, fields));
+    }
+
+    private static readonly JsonSerializerOptions _legalActionJsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static string SerializeLegalActions(IReadOnlyList<LegalAction> actions)
+    {
+        // LegalAction ships kind + label + optional metadata so UIs can render
+        // meaningful button labels ("Play Cinderhound (1⚡)" vs "play:57").
+        // Serialized as a compact JSON array on the SSE frame.
+        var projected = actions.Select(a => new
+        {
+            a.Kind,
+            a.Label,
+            Metadata = a.Metadata,
+        });
+        return JsonSerializer.Serialize(projected, _legalActionJsonOpts);
     }
 
     private bool TryResolveCpuSubmission(

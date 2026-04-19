@@ -3,6 +3,31 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — 8i: Readable action-bar labels
+
+Small UX polish on top of 8c/8d/8h. The action bar was rendering raw
+`play:57` / `target:4` labels because `InputPending` SSE frames only
+carried a comma-joined string of `LegalAction.Label`s — the richer
+`Metadata` (cardName, cost, displayName, kind) was dropped server-side.
+
+- `Room.DriveRun` now serializes the full `LegalAction` list as JSON
+  into a new `legalActions` field alongside the existing `options`
+  string (kept for back-compat).
+- `tabletop.ts` parses the JSON, stores an array of `{kind, label,
+  metadata}`, and a new `humanizeAction` helper renders the shown
+  text: `"Play Cinderhound (2⚡)"`, `"Target Conduit #67"`, `"Pass"`,
+  etc. Falls through to the raw label for unknown kinds.
+- Anonymous instances (`InstantiateEntity(kind: Conduit, …)` has
+  `DisplayName == Kind`) collapse to `"Kind #id"` instead of "Conduit
+  Conduit".
+
+Verified in preview: full lobby → CPU + human join → mulligan-pass
+flow, Main-phase buttons read `"Play Spark (1⚡)"`; clicking Spark
+opens a target prompt whose buttons read `"Target Conduit #67"` ×
+six (the six conduits in the real encoding).
+
+---
+
 ## 2026-04-19 — 8f + 8g: Conduit collapse SBA + first victory condition
 
 The interpreter's event loop has had a `RunSbaPass` hook since v1; it was
