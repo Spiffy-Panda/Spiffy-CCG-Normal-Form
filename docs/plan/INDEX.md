@@ -47,6 +47,9 @@ to be readable in a single pass.
 - [steps/06-rooms.md](steps/06-rooms.md)
 - [steps/07-playtest-mvp.md](steps/07-playtest-mvp.md)
 - [steps/08-full-game.md](steps/08-full-game.md)
+- [steps/09-godot-client.md](steps/09-godot-client.md)
+- [steps/10-long-term-ai.md](steps/10-long-term-ai.md)
+- [steps/11-humanizer-templates.md](steps/11-humanizer-templates.md)
 
 ## Progress
 
