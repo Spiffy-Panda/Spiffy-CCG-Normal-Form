@@ -3,6 +3,44 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-18 — 7g, 7h: CPU seat + hand-click wiring
+
+**7g — CPU seat.** `SeatKind` on `RoomPlayer`; `Room` pre-fills CPU seats
+passed via the constructor. Driver detects a pending whose `PlayerId`
+maps (by Players-list position) to a Cpu seat and auto-submits
+`LegalActions[0]`, falling back to `pass`. CPU moves stream as
+`CpuAction` SSE frames. Endpoint: `POST /api/rooms` accepts
+`cpuSeats: [{ name?, deck }]`; deck resolution factored out so Create
+and Join share the same preset lookup. Lobby grew a "+ Add CPU player"
+UI (name + deck picker); tabletop roster marks Cpu seats with 🤖.
+Seeded-RNG bot is deferred — "first legal" is deterministic without it.
++2 tests (auto-fill + unknown preset 400).
+
+**7h — Hand-click → inspector + action bar.** New shared
+`card-inspector.ts` (right-edge panel, Escape to close) usable from any
+page; the tabletop wires it onto hand cards via `board.onCardClick`. A
+new `play-action-bar` renders the labels from the last `InputPending`
+SSE frame as clickable buttons when the viewer is the chooser, greyed
+out otherwise. Inspector falls back to a raw entity dump when the
+entity's `displayName` doesn't resolve to a `CardDto` (current v1 deck
+seeding produces placeholder names like `Deck_Player1_4`).
+
+Verified end-to-end in the preview: human + CPU, joined with
+presets, state reaches `RoomFinished`, clicking a hand card opens the
+inspector, Escape closes.
+
+Follow-ups I noticed but didn't fix:
+- The engine-banner text still reads "later phases arrive with 7f" even
+  though 7f has landed — cosmetic.
+- `viewerPlayerId` in `board.ts` is a roster PlayerId but
+  `PlayView.players[].id` is an entity id, so the "bottom seat = me"
+  check never matches. Pre-existing bug; both seats render the same
+  hand today. Worth a tiny follow-up.
+
+Test count: 150/150 (from 148 after 7f, +2 for CPU).
+
+---
+
 ## 2026-04-18 — 7f: Interpreter generator + legal-actions
 
 Reshaped `Interpreter.Run` into a cooperative generator. The sync entry is

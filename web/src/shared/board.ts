@@ -37,6 +37,7 @@ import {
 
 export interface BoardRenderOptions {
   viewerPlayerId: number | null;  // which seat is "you"; null = spectator
+  onCardClick?: (entity: EntityDto) => void;
 }
 
 export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLElement {
@@ -51,9 +52,9 @@ export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLEleme
   const bottom = players.find((p) => p.id === youId) ?? players[0] ?? null;
   const top = players.find((p) => p.id !== bottom?.id) ?? players[1] ?? null;
 
-  root.appendChild(renderSeatStrip(top, view, { side: "top", faceDown: true, isViewer: false }));
+  root.appendChild(renderSeatStrip(top, view, { side: "top", faceDown: true, isViewer: false, onCardClick: opts.onCardClick }));
   root.appendChild(renderArenaRow(view, top, bottom));
-  root.appendChild(renderSeatStrip(bottom, view, { side: "bottom", faceDown: false, isViewer: true }));
+  root.appendChild(renderSeatStrip(bottom, view, { side: "bottom", faceDown: false, isViewer: true, onCardClick: opts.onCardClick }));
 
   return root;
 }
@@ -62,6 +63,7 @@ interface SeatOptions {
   side: "top" | "bottom";
   faceDown: boolean;
   isViewer: boolean;
+  onCardClick?: (entity: EntityDto) => void;
 }
 
 function renderSeatStrip(
@@ -108,6 +110,9 @@ function renderSeatStrip(
         hand.appendChild(renderCardFromEntity(entity, {
           faceDown: opts.faceDown,
           size: "sm",
+          onClick: opts.faceDown || !opts.onCardClick
+            ? undefined
+            : () => opts.onCardClick!(entity),
         }));
       }
     }

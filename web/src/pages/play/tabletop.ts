@@ -1,9 +1,10 @@
 import "./style.css";
 import { api } from "../../api/client";
-import type { PresetDeckDto, RoomDetailDto, RoomEventFrame } from "../../api/dtos";
+import type { CardDto, PresetDeckDto, RoomDetailDto, RoomEventFrame } from "../../api/dtos";
 import type { RouteMatch } from "../../router";
 import { renderBoard } from "../../shared/board";
-import { buildView } from "../../shared/play-state";
+import { closeInspector, fromEntity, openInspector } from "../../shared/card-inspector";
+import { buildView, type EntityDto } from "../../shared/play-state";
 import { listSavedDecks, loadDeck } from "../decks/persistence";
 
 interface Identity {
@@ -12,6 +13,13 @@ interface Identity {
   token: string;
   name: string;
   deckName: string | null;
+}
+
+interface PendingInputView {
+  step: number;
+  prompt: string;
+  playerId: number | null;
+  options: string[];
 }
 
 interface TabletopState {
@@ -24,6 +32,8 @@ interface TabletopState {
   error: string | null;
   presets: PresetDeckDto[];
   selectedDeckKey: string;  // "preset:<id>" | "saved:<name>" | ""
+  cardCatalog: CardDto[];
+  pendingInput: PendingInputView | null;
 }
 
 const state: TabletopState = {
@@ -36,6 +46,8 @@ const state: TabletopState = {
   error: null,
   presets: [],
   selectedDeckKey: "",
+  cardCatalog: [],
+  pendingInput: null,
 };
 
 let container: HTMLElement | null = null;
@@ -50,12 +62,14 @@ export async function renderTabletop(root: HTMLElement, match: RouteMatch): Prom
   }
   if (state.roomId !== id) {
     closeStream();
+    closeInspector();
     state.roomId = id;
     state.room = null;
     state.gameState = null;
     state.events = [];
     state.identity = loadIdentity(id);
     state.error = null;
+    state.pendingInput = null;
   }
   await refresh();
   openStream(id);
@@ -68,6 +82,10 @@ async function refresh(): Promise<void> {
     if (state.presets.length === 0) {
       const presetsResult = await api.deckPresets();
       if (presetsResult.ok) state.presets = presetsResult.body;
+    }
+    if (state.cardCatalog.length === 0) {
+      const cardsResult = await api.cards();
+      if (cardsResult.ok) state.cardCatalog = cardsResult.body;
     }
     const { ok, body } = await api.getRoom(state.roomId);
     if (!ok) throw new Error("GET /api/rooms/{id} failed");
@@ -91,6 +109,7 @@ function openStream(id: string): void {
       try {
         const frame = JSON.parse((ev as MessageEvent).data) as RoomEventFrame;
         state.events.push(frame);
+        updatePendingFromFrame(frame);
         // Re-fetch state on any event so the snapshot stays current.
         void refresh();
       } catch (err) {
@@ -111,6 +130,30 @@ function closeStream(): void {
   if (sse) {
     sse.close();
     sse = null;
+  }
+}
+
+function updatePendingFromFrame(frame: RoomEventFrame): void {
+  const type = frame.event.type;
+  if (type === "InputPending") {
+    const f = frame.event.fields;
+    const pid = f.playerId ? parseInt(f.playerId, 10) : NaN;
+    const opts = (f.options ?? "").split(",").filter((s) => s.length > 0);
+    state.pendingInput = {
+      step: frame.step,
+      prompt: f.prompt ?? "",
+      playerId: Number.isFinite(pid) ? pid : null,
+      options: opts,
+    };
+  } else if (
+    type === "CpuAction" ||
+    type === "ActionAccepted" ||
+    type === "RoomFinished" ||
+    type === "RoomCancelled" ||
+    type === "InterpreterError"
+  ) {
+    // Any of these resolves the previous pending either way.
+    state.pendingInput = null;
   }
 }
 
@@ -342,8 +385,11 @@ function renderLeft(col: HTMLElement): void {
     } else {
       const banner = renderEngineBanner(view.round, state.room?.state ?? null);
       if (banner) boardWrap.appendChild(banner);
+      const actionBar = renderActionBar();
+      if (actionBar) boardWrap.appendChild(actionBar);
       boardWrap.appendChild(renderBoard(view, {
         viewerPlayerId: state.identity?.playerId ?? null,
+        onCardClick: onCardClicked,
       }));
     }
   }
@@ -385,6 +431,54 @@ function renderDeckPicker(): HTMLElement {
     renderShell();
   });
   return select;
+}
+
+function onCardClicked(entity: EntityDto): void {
+  openInspector(fromEntity(entity, state.cardCatalog));
+}
+
+function renderActionBar(): HTMLElement | null {
+  const pending = state.pendingInput;
+  if (!pending || pending.options.length === 0) return null;
+
+  const viewerId = state.identity?.playerId ?? null;
+  const viewerSeat = viewerId && state.room?.players.find((p) => p.playerId === viewerId);
+  // Map the interpreter's entity id (pending.playerId) back to the roster
+  // seat via positional order. State already has view.players in order,
+  // but we approximate using the roster and trust chooser seating.
+  const isForViewer =
+    viewerSeat !== undefined && viewerSeat !== null
+      ? (() => {
+          const view = state.gameState ? buildView(state.gameState) : null;
+          if (!view) return false;
+          const idx = view.players.findIndex((p) => p.id === pending.playerId);
+          return idx >= 0 && state.room?.players[idx]?.playerId === viewerId;
+        })()
+      : false;
+
+  const bar = document.createElement("div");
+  bar.className = "play-action-bar";
+
+  const label = document.createElement("span");
+  label.className = "play-action-bar-label";
+  label.textContent = isForViewer ? "Your choice:" : "Waiting on opponent:";
+  bar.appendChild(label);
+
+  for (const opt of pending.options) {
+    const btn = document.createElement("button");
+    btn.className = "play-action-btn";
+    btn.textContent = opt;
+    btn.disabled = !isForViewer;
+    btn.addEventListener("click", () => void submitAction(opt));
+    bar.appendChild(btn);
+  }
+
+  const note = document.createElement("span");
+  note.className = "play-action-note";
+  note.textContent = pending.prompt;
+  bar.appendChild(note);
+
+  return bar;
 }
 
 function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {
