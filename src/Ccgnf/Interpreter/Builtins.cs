@@ -489,6 +489,7 @@ internal static class Builtins
                         ["entityId"] = cardId.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         ["cardName"] = card.DisplayName,
                         ["cost"] = cost.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["type"] = GetCardType(decl) ?? "",
                     }));
             }
         }
