@@ -3,6 +3,7 @@ using System.Text;
 using Ccgnf.Interpreter;
 using Ccgnf.Rest.Rooms;
 using Ccgnf.Rest.Serialization;
+using Ccgnf.Rest.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Ccgnf.Rest.Endpoints;
@@ -61,16 +62,50 @@ internal static class RoomEndpoints
         return Results.Ok(ToDetail(room));
     }
 
-    private static IResult Join(string id, RoomJoinRequest req, RoomStore store)
+    private static IResult Join(string id, RoomJoinRequest req, RoomStore store, DeckCatalog decks)
     {
         if (!store.TryGet(id, out var room)) return Results.NotFound();
-        var player = room.TryJoin(req.Name);
+
+        string? deckName = null;
+        IReadOnlyList<string>? deckCardNames = null;
+        if (req.Deck is { } spec)
+        {
+            if (!string.IsNullOrWhiteSpace(spec.Preset))
+            {
+                var preset = decks.Get().FirstOrDefault(p => p.Id == spec.Preset);
+                if (preset is null)
+                {
+                    return Results.BadRequest(new { error = $"Unknown preset deck '{spec.Preset}'." });
+                }
+                deckName = preset.Name;
+                deckCardNames = ExpandDeckCards(preset.Cards);
+            }
+            else if (spec.Cards is { Count: > 0 } cards)
+            {
+                int total = 0;
+                foreach (var c in cards) total += c.Count;
+                deckName = $"Custom deck ({total} cards)";
+                deckCardNames = ExpandDeckCards(cards);
+            }
+        }
+
+        var player = room.TryJoin(req.Name, deckName, deckCardNames);
         if (player is null) return Results.Conflict(new { error = "Room full or finished." });
 
         return Results.Ok(new RoomJoinResponse(
             PlayerId: player.PlayerId,
             Token: player.Token,
             State: room.State is null ? null : StateMapper.ToDto(room.State)));
+    }
+
+    private static IReadOnlyList<string> ExpandDeckCards(IReadOnlyList<DeckCardEntry> entries)
+    {
+        var list = new List<string>();
+        foreach (var e in entries)
+        {
+            for (int i = 0; i < e.Count; i++) list.Add(e.Name);
+        }
+        return list;
     }
 
     private static IResult Action(string id, RoomActionRequest req, RoomStore store)
@@ -143,6 +178,6 @@ internal static class RoomEndpoints
         CreatedAt: room.CreatedAt.ToString("o"),
         LastActivityAt: room.LastActivityAt.ToString("o"),
         Players: room.Players
-            .Select(p => new RoomPlayerDto(p.PlayerId, p.Name, Connected: true))
+            .Select(p => new RoomPlayerDto(p.PlayerId, p.Name, Connected: true, DeckName: p.DeckName))
             .ToList());
 }

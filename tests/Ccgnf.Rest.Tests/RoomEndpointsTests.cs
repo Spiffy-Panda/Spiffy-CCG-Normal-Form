@@ -74,6 +74,64 @@ public class RoomEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Join_WithPresetDeck_StoresDeckNameOnPlayer()
+    {
+        var client = _factory.CreateClient();
+        var roomId = await CreateRoom(client);
+
+        var join = await client.PostAsJsonAsync(
+            $"/api/rooms/{roomId}/join",
+            new { name = "alice", deck = new { preset = "ember-aggro" } });
+        join.EnsureSuccessStatusCode();
+
+        var detail = await (await client.GetAsync($"/api/rooms/{roomId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var p1 = detail.GetProperty("players").EnumerateArray().First();
+        Assert.Equal("alice", p1.GetProperty("name").GetString());
+        Assert.Equal("EMBER Aggro", p1.GetProperty("deckName").GetString());
+    }
+
+    [Fact]
+    public async Task Join_WithUnknownPreset_Returns400()
+    {
+        var client = _factory.CreateClient();
+        var roomId = await CreateRoom(client);
+
+        var join = await client.PostAsJsonAsync(
+            $"/api/rooms/{roomId}/join",
+            new { name = "alice", deck = new { preset = "does-not-exist" } });
+        Assert.Equal(HttpStatusCode.BadRequest, join.StatusCode);
+    }
+
+    [Fact]
+    public async Task Join_WithExplicitCards_StoresCustomDeckLabel()
+    {
+        var client = _factory.CreateClient();
+        var roomId = await CreateRoom(client);
+
+        var join = await client.PostAsJsonAsync(
+            $"/api/rooms/{roomId}/join",
+            new
+            {
+                name = "bob",
+                deck = new
+                {
+                    cards = new[]
+                    {
+                        new { name = "Cinderling", count = 3 },
+                        new { name = "Spark", count = 3 },
+                    },
+                },
+            });
+        join.EnsureSuccessStatusCode();
+
+        var detail = await (await client.GetAsync($"/api/rooms/{roomId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var p = detail.GetProperty("players").EnumerateArray().First();
+        Assert.Contains("Custom deck", p.GetProperty("deckName").GetString());
+    }
+
+    [Fact]
     public async Task Join_TwoPlayers_ThirdReturns409()
     {
         var client = _factory.CreateClient();

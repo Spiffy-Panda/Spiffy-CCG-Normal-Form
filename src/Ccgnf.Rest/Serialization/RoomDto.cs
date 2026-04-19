@@ -6,7 +6,7 @@ public sealed record RoomCreateRequest(
     int PlayerSlots = 2,
     int DeckSize = 30);
 
-public sealed record RoomPlayerDto(int PlayerId, string Name, bool Connected);
+public sealed record RoomPlayerDto(int PlayerId, string Name, bool Connected, string? DeckName);
 
 public sealed record RoomSummaryDto(
     string RoomId,
@@ -26,7 +26,11 @@ public sealed record RoomDetailDto(
     string LastActivityAt,
     IReadOnlyList<RoomPlayerDto> Players);
 
-public sealed record RoomJoinRequest(string? Name);
+public sealed record RoomDeckSpec(
+    string? Preset,
+    IReadOnlyList<DeckCardEntry>? Cards);
+
+public sealed record RoomJoinRequest(string? Name, RoomDeckSpec? Deck);
 
 public sealed record RoomJoinResponse(
     int PlayerId,

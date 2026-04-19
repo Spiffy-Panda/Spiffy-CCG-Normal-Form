@@ -66,8 +66,15 @@ export const api = {
   createRoom: (req: RoomCreateRequest) => postJson<RoomSummaryDto>("/api/rooms", req),
   listRooms: () => request<RoomSummaryDto[]>("/api/rooms"),
   getRoom: (id: string) => request<RoomDetailDto>(`/api/rooms/${encodeURIComponent(id)}`),
-  joinRoom: (id: string, name: string | null) =>
-    postJson<RoomJoinResponse>(`/api/rooms/${encodeURIComponent(id)}/join`, { name }),
+  joinRoom: (
+    id: string,
+    name: string | null,
+    deck: { preset?: string; cards?: { name: string; count: number }[] } | null = null,
+  ) =>
+    postJson<RoomJoinResponse>(
+      `/api/rooms/${encodeURIComponent(id)}/join`,
+      { name, deck },
+    ),
   submitAction: (id: string, req: RoomActionRequest) =>
     postJson<{ accepted: boolean }>(`/api/rooms/${encodeURIComponent(id)}/actions`, req),
   roomState: (id: string) =>

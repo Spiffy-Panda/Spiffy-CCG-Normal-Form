@@ -168,6 +168,12 @@ export interface RoomPlayerDto {
   playerId: number;
   name: string;
   connected: boolean;
+  deckName?: string | null;
+}
+
+export interface RoomDeckSpec {
+  preset?: string | null;
+  cards?: DeckCardEntry[] | null;
 }
 
 export interface RoomDetailDto extends RoomSummaryDto {

@@ -18,6 +18,8 @@ public sealed class RoomPlayer
     public string Name { get; init; } = "";
     public string Token { get; init; } = "";
     public DateTimeOffset JoinedAt { get; init; }
+    public string? DeckName { get; init; }
+    public IReadOnlyList<string>? DeckCardNames { get; init; }
 }
 
 /// <summary>
@@ -70,7 +72,10 @@ public sealed class Room
         _loggerFactory = loggerFactory;
     }
 
-    public RoomPlayer? TryJoin(string? displayName)
+    public RoomPlayer? TryJoin(
+        string? displayName,
+        string? deckName = null,
+        IReadOnlyList<string>? deckCardNames = null)
     {
         lock (_lock)
         {
@@ -83,6 +88,8 @@ public sealed class Room
                 Name = string.IsNullOrWhiteSpace(displayName) ? $"Player{playerId}" : displayName!.Trim(),
                 Token = GenerateToken(),
                 JoinedAt = DateTimeOffset.UtcNow,
+                DeckName = string.IsNullOrWhiteSpace(deckName) ? null : deckName!.Trim(),
+                DeckCardNames = deckCardNames,
             };
             _players.Add(player);
             LastActivityAt = DateTimeOffset.UtcNow;

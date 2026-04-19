@@ -185,6 +185,32 @@
 .play-topbar-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.play-select {
+  padding: 5px 8px;
+  background: var(--panel);
+  color: inherit;
+  border: 1px solid var(--control-border);
+  border-radius: 4px;
+  font-size: 12.5px;
+}
+
+.play-roster {
+  font-size: 12px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+}
+
+.play-roster em {
+  font-style: normal;
+  color: var(--accent);
+}
+
+.roster-no-deck {
+  opacity: 0.5;
+  font-style: italic;
 }
 
 .play-banner {

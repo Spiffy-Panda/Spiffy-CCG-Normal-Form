@@ -1,15 +1,17 @@
 import "./style.css";
 import { api } from "../../api/client";
-import type { RoomDetailDto, RoomEventFrame } from "../../api/dtos";
+import type { PresetDeckDto, RoomDetailDto, RoomEventFrame } from "../../api/dtos";
 import type { RouteMatch } from "../../router";
 import { renderBoard } from "../../shared/board";
 import { buildView } from "../../shared/play-state";
+import { listSavedDecks, loadDeck } from "../decks/persistence";
 
 interface Identity {
   roomId: string;
   playerId: number;
   token: string;
   name: string;
+  deckName: string | null;
 }
 
 interface TabletopState {
@@ -20,6 +22,8 @@ interface TabletopState {
   identity: Identity | null;
   joining: boolean;
   error: string | null;
+  presets: PresetDeckDto[];
+  selectedDeckKey: string;  // "preset:<id>" | "saved:<name>" | ""
 }
 
 const state: TabletopState = {
@@ -30,6 +34,8 @@ const state: TabletopState = {
   identity: null,
   joining: false,
   error: null,
+  presets: [],
+  selectedDeckKey: "",
 };
 
 let container: HTMLElement | null = null;
@@ -59,6 +65,10 @@ async function refresh(): Promise<void> {
   if (!state.roomId) return;
   renderShell();
   try {
+    if (state.presets.length === 0) {
+      const presetsResult = await api.deckPresets();
+      if (presetsResult.ok) state.presets = presetsResult.body;
+    }
     const { ok, body } = await api.getRoom(state.roomId);
     if (!ok) throw new Error("GET /api/rooms/{id} failed");
     state.room = body;
@@ -110,13 +120,15 @@ async function join(): Promise<void> {
   renderShell();
   try {
     const name = window.prompt("Display name (optional):") ?? "";
-    const { ok, body } = await api.joinRoom(state.roomId, name || null);
+    const deck = resolveSelectedDeck();
+    const { ok, body } = await api.joinRoom(state.roomId, name || null, deck);
     if (!ok) throw new Error("POST /api/rooms/{id}/join failed");
     state.identity = {
       roomId: state.roomId,
       playerId: body.playerId,
       token: body.token,
       name: name || `Player${body.playerId}`,
+      deckName: deckNameForKey(state.selectedDeckKey),
     };
     saveIdentity(state.identity);
     await refresh();
@@ -126,6 +138,29 @@ async function join(): Promise<void> {
   } finally {
     state.joining = false;
   }
+}
+
+function resolveSelectedDeck(): { preset?: string; cards?: { name: string; count: number }[] } | null {
+  const key = state.selectedDeckKey;
+  if (!key) return null;
+  if (key.startsWith("preset:")) {
+    return { preset: key.slice(7) };
+  }
+  if (key.startsWith("saved:")) {
+    const saved = loadDeck("constructed", key.slice(6));
+    if (!saved) return null;
+    return { cards: saved.cards };
+  }
+  return null;
+}
+
+function deckNameForKey(key: string): string | null {
+  if (!key) return null;
+  if (key.startsWith("preset:")) {
+    return state.presets.find((p) => p.id === key.slice(7))?.name ?? null;
+  }
+  if (key.startsWith("saved:")) return key.slice(6);
+  return null;
 }
 
 async function submitAction(action: string): Promise<void> {
@@ -196,11 +231,15 @@ function renderLeft(col: HTMLElement): void {
   const seatInfo = document.createElement("div");
   seatInfo.className = "play-topbar-seat";
   if (state.identity) {
+    const deckLabel = state.identity.deckName
+      ? ` · deck <strong>${escapeHtml(state.identity.deckName)}</strong>`
+      : ` · <span class="muted">no deck</span>`;
     seatInfo.innerHTML =
       `Seat: <strong>${escapeHtml(state.identity.name)}</strong> ` +
-      `<span class="muted">(playerId ${state.identity.playerId})</span>`;
+      `<span class="muted">(playerId ${state.identity.playerId})</span>` +
+      deckLabel;
   } else {
-    seatInfo.innerHTML = `<span class="muted">Not seated — click Claim a seat.</span>`;
+    seatInfo.innerHTML = `<span class="muted">Not seated — pick a deck, then claim a seat.</span>`;
   }
   topBar.appendChild(seatInfo);
 
@@ -215,6 +254,7 @@ function renderLeft(col: HTMLElement): void {
       actions.appendChild(passBtn);
     }
   } else {
+    actions.appendChild(renderDeckPicker());
     const joinBtn = document.createElement("button");
     joinBtn.className = "play-btn primary";
     joinBtn.textContent = state.joining ? "Joining…" : "Claim a seat";
@@ -227,6 +267,18 @@ function renderLeft(col: HTMLElement): void {
   }
   topBar.appendChild(actions);
   col.appendChild(topBar);
+
+  if (state.room && state.room.players.length > 0) {
+    const roster = document.createElement("div");
+    roster.className = "play-roster muted";
+    roster.innerHTML = state.room.players.map((p) => {
+      const deck = p.deckName
+        ? `<em>${escapeHtml(p.deckName)}</em>`
+        : `<span class="roster-no-deck">no deck</span>`;
+      return `<span>P${p.playerId} ${escapeHtml(p.name)} · ${deck}</span>`;
+    }).join("  •  ");
+    col.appendChild(roster);
+  }
 
   const boardWrap = document.createElement("div");
   boardWrap.className = "play-board-wrap";
@@ -254,6 +306,43 @@ function renderLeft(col: HTMLElement): void {
     }
   }
   col.appendChild(boardWrap);
+}
+
+function renderDeckPicker(): HTMLElement {
+  const select = document.createElement("select");
+  select.className = "play-select";
+  select.innerHTML = `<option value="">Pick a deck…</option>`;
+  const presets = state.presets.filter((p) => p.format === "constructed");
+  if (presets.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "Presets";
+    for (const p of presets) {
+      const opt = document.createElement("option");
+      opt.value = `preset:${p.id}`;
+      opt.textContent = p.name;
+      if (state.selectedDeckKey === opt.value) opt.selected = true;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+  }
+  const saved = listSavedDecks("constructed");
+  if (saved.length > 0) {
+    const group = document.createElement("optgroup");
+    group.label = "My saved decks";
+    for (const name of saved) {
+      const opt = document.createElement("option");
+      opt.value = `saved:${name}`;
+      opt.textContent = name;
+      if (state.selectedDeckKey === opt.value) opt.selected = true;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+  }
+  select.addEventListener("change", () => {
+    state.selectedDeckKey = select.value;
+    renderShell();
+  });
+  return select;
 }
 
 function renderEngineBanner(round: number | null, _roomState: string | null): HTMLElement | null {
