@@ -150,7 +150,9 @@ public class EndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         {
             files,
             seed = 42,
-            inputs = new[] { "pass", "pass", "pass", "pass" },
+            // 4 for Mulligan + a pad to carry the run through Main-phase
+            // priority windows (8c). Extra passes sit unused if unreached.
+            inputs = Enumerable.Repeat("pass", 4 + 200).ToArray(),
         });
         response.EnsureSuccessStatusCode();
 
@@ -181,7 +183,7 @@ public class EndpointsTests : IClassFixture<WebApplicationFactory<Program>>
         {
             files,
             seed = 7,
-            inputs = new[] { "pass", "pass", "pass", "pass" },
+            inputs = Enumerable.Repeat("pass", 4 + 200).ToArray(),
         });
         Assert.Equal(HttpStatusCode.Created, create.StatusCode);
 

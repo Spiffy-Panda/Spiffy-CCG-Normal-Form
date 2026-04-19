@@ -31,6 +31,14 @@ public sealed class StateBuilder
         var state = new GameState();
         var evaluator = new Evaluator(state, scheduler);
 
+        // Pass 0: index card declarations. Runtime Card entities are seeded
+        // by name (see Interpreter.SeedDecks); the play protocol looks them
+        // up here to find cost and OnResolve.
+        foreach (var card in file.Declarations.OfType<AstCardDecl>())
+        {
+            state.CardDecls[card.Name] = card;
+        }
+
         // Pass 1: instantiate entities.
         foreach (var decl in file.Declarations.OfType<AstEntityDecl>())
         {

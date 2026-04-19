@@ -35,13 +35,13 @@ public class InterpreterTests
     }
 
     /// <summary>
-    /// Setup's MulliganPhase now fires for real (step 8a fixed the
-    /// <c>Game.max_mulligans</c> reference). Two players × two repeats =
-    /// four pass symbols drain Mulligan's <c>Choice</c> builtin through its
-    /// NoOp branch.
+    /// Setup's MulliganPhase needs four "pass" inputs (two players × two
+    /// repeats) and every Channel phase needs one more — a generous pad
+    /// keeps tests that run multiple rounds from exhausting the input queue.
+    /// Extra inputs sit unused; only empty-and-needed throws.
     /// </summary>
-    private static IEnumerable<RtValue> DefaultMulliganPasses() =>
-        Enumerable.Repeat<RtValue>(new RtSymbol("pass"), 4);
+    private static IEnumerable<RtValue> DefaultMulliganPasses(int channelPasses = 0) =>
+        Enumerable.Repeat<RtValue>(new RtSymbol("pass"), 4 + channelPasses);
 
     /// <summary>
     /// Halt the event loop the first time <c>Event.PhaseBegin(phase=X, ...)</c>
@@ -129,6 +129,8 @@ public class InterpreterTests
     [Fact]
     public void Round1Rise_FirstPlayerDrewOneCardOnRise()
     {
+        // Halt at PhaseBegin(Channel) — pre-dispatch, so Rise's full body
+        // has applied but the Channel handler hasn't asked for input yet.
         var state = RunEncoding(seed: 42, shouldHalt: HaltAtPhase("Channel"));
 
         var firstPlayerRef = (RtEntityRef)state.Game.Characteristics["first_player"];
@@ -163,13 +165,15 @@ public class InterpreterTests
         var load = new ProjectLoader(NullLoggerFactory.Instance)
             .LoadFromDirectory(Path.Combine(repoRoot, "encoding"));
 
-        // Halt the second time second-player's Pass fires — by then we've
-        // seen a full two-player round cycle plus a few more phases.
+        // Halt the second time Pass fires — by then we've seen a full
+        // two-player round cycle. Each round needs a Main-phase pass per
+        // player, so budget a handful of extras on top of the 4 mulligan
+        // passes.
         int passesSeen = 0;
         var state = interpreter.Run(load.File!, new InterpreterOptions
         {
             Seed = 42,
-            Inputs = new QueuedInputs(DefaultMulliganPasses()),
+            Inputs = new QueuedInputs(DefaultMulliganPasses(channelPasses: 4)),
             OnEvent = (ev, _) =>
             {
                 if (ev.TypeName != "PhaseBegin") return;
@@ -190,8 +194,8 @@ public class InterpreterTests
     [Fact]
     public void TurnRotation_RoundCounterIncrementsWhenControlReturnsToFirstPlayer()
     {
-        // Halt at Rise of round 2 — that's the Rise that fires right after
-        // second-player's Pass has incremented the round.
+        // Halt (pre-dispatch) at Rise of round 2. Round 1 spends one pass
+        // per player in Channel.
         var interpreter = new InterpreterRt(NullLogger<InterpreterRt>.Instance, NullLoggerFactory.Instance);
         var repoRoot = FindRepoRoot();
         var load = new ProjectLoader(NullLoggerFactory.Instance)
@@ -200,7 +204,7 @@ public class InterpreterTests
         var state = interpreter.Run(load.File!, new InterpreterOptions
         {
             Seed = 42,
-            Inputs = new QueuedInputs(DefaultMulliganPasses()),
+            Inputs = new QueuedInputs(DefaultMulliganPasses(channelPasses: 4)),
             ShouldHalt = (ev, st) =>
                 ev.TypeName == "PhaseBegin"
                 && ev.Fields.TryGetValue("phase", out var p)
@@ -214,11 +218,10 @@ public class InterpreterTests
     [Fact]
     public void DeckOut_EmitsLoseAndTerminates()
     {
-        // Let the game run freely with both seats just passing mulligan —
-        // each Rise draws one card; 25 rounds in, the player who drew
-        // first (5 cards) runs out. Lose fires; the interpreter flips
-        // GameOver and halts.
-        var state = RunEncoding(seed: 42);
+        // Run to completion. 30-card decks × 2 players, one draw per Rise
+        // for whoever is active — ~50 rounds before the first arsenal
+        // empties. Each round needs two Channel passes; pad generously.
+        var state = RunEncoding(seed: 42, inputs: DefaultMulliganPasses(channelPasses: 200));
         Assert.True(state.GameOver);
         Assert.True(state.StepCount > 0);
     }
@@ -267,8 +270,8 @@ public class InterpreterTests
     [Fact]
     public void SameSeedSameInputs_ProducesIdenticalState()
     {
-        var inputsA = DefaultMulliganPasses().ToList();
-        var inputsB = DefaultMulliganPasses().ToList();
+        var inputsA = DefaultMulliganPasses(channelPasses: 200).ToList();
+        var inputsB = DefaultMulliganPasses(channelPasses: 200).ToList();
 
         var stateA = RunEncoding(seed: 1776, inputs: inputsA);
         var stateB = RunEncoding(seed: 1776, inputs: inputsB);

@@ -41,11 +41,13 @@ public sealed class InterpreterOptions
     public Action<GameEvent, GameState>? OnEvent { get; set; }
 
     /// <summary>
-    /// Optional predicate evaluated after each event dispatch. When it returns
-    /// true, the event loop exits cleanly (no <see cref="GameState.GameOver"/>
-    /// transition). Tests use this to freeze the run at a specific milestone
-    /// (e.g. right after Round-1 Rise) without waiting for a natural
-    /// terminator.
+    /// Optional predicate evaluated <b>before</b> each event dispatch. When
+    /// it returns true, the event loop exits cleanly without firing the
+    /// current event — state reflects everything up to (but not including)
+    /// that event. Tests use this to freeze the run at a phase boundary
+    /// (e.g. halt at <c>PhaseBegin(Channel, …)</c> to capture the end of
+    /// Rise without entering the Main-phase priority window that would
+    /// block on host input).
     /// </summary>
     public Func<GameEvent, GameState, bool>? ShouldHalt { get; set; }
 }
@@ -219,6 +221,26 @@ public sealed class Interpreter
     {
         while (!state.GameOver && state.PendingEvents.TryDequeue(out var current))
         {
+            // Pre-dispatch halt check — lets tests freeze state before a
+            // phase transition that would otherwise require host input.
+            if (shouldHalt is not null)
+            {
+                try
+                {
+                    if (shouldHalt(current, state))
+                    {
+                        // Put the event back at the front; future runs can
+                        // pick up where we left off if this ever gets reused.
+                        state.PendingEvents.EnqueueFront(current);
+                        break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.LogWarning(ex, "Interpreter ShouldHalt predicate threw; continuing");
+                }
+            }
+
             state.StepCount++;
             if (state.StepCount > maxDispatches)
             {
@@ -245,18 +267,6 @@ public sealed class Interpreter
                 catch (Exception ex)
                 {
                     _log.LogWarning(ex, "Interpreter OnEvent handler threw; continuing");
-                }
-            }
-
-            if (shouldHalt is not null)
-            {
-                try
-                {
-                    if (shouldHalt(current, state)) break;
-                }
-                catch (Exception ex)
-                {
-                    _log.LogWarning(ex, "Interpreter ShouldHalt predicate threw; continuing");
                 }
             }
         }

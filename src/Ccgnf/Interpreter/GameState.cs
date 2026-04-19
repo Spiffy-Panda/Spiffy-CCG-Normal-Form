@@ -1,3 +1,5 @@
+using Ccgnf.Ast;
+
 namespace Ccgnf.Interpreter;
 
 /// <summary>
@@ -27,6 +29,15 @@ public sealed class GameState
     public Dictionary<string, Entity> NamedEntities { get; } = new(StringComparer.Ordinal);
 
     public EventQueue PendingEvents { get; } = new();
+
+    /// <summary>
+    /// Card declarations from the loaded <see cref="AstFile"/>, keyed by
+    /// <see cref="AstCardDecl.Name"/>. The runtime looks these up when a
+    /// <see cref="Entity"/> of kind <c>Card</c> is played so it can find the
+    /// card's cost and <c>OnResolve</c> effect without re-walking the AST
+    /// each time.
+    /// </summary>
+    public Dictionary<string, AstCardDecl> CardDecls { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Increments on each event dequeued from the main loop.</summary>
     public long StepCount { get; set; }

@@ -1,0 +1,50 @@
+// =============================================================================
+// Fixture: Card play — no-target, no-cost-free, pure state mutation.
+// =============================================================================
+// Minimum encoding to exercise EnterMainPhase in 8c. Self-contained: does
+// not pull in the real engine files. One card (NoOpBlast) whose OnResolve
+// flips a flag on the controller. Setup trigger draws one card and hands
+// priority to Player1.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  counters: { aether: 3, debt: 0 }
+  zones: {
+    Arsenal: Zone(order: sequential),
+    Hand:    Zone(order: unordered),
+    Cache:   Zone(order: FIFO)
+  }
+  abilities: []
+}
+
+Card NoOpBlast {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(SetCharacteristic(controller, noop_blast_fired, true))
+  ]
+  // text: Test-only. Sets a flag on the caster so tests can observe resolution.
+}
+
+Card CostlyBlast {
+  factions: {NEUTRAL}, type: Maneuver, cost: 99, rarity: C
+  abilities: [
+    OnResolve(SetCharacteristic(controller, costly_blast_fired, true))
+  ]
+  // text: Test-only. Unaffordable at typical aether caps; surfaces only as a
+  //       *not-legal* card in the priority window.
+}
+
+// Setup: draw one card for Player1, then open its Main phase.
+Game.abilities += Triggered(
+  on:     Event.GameStart,
+  effect: Sequence([
+    Draw(Player1, amount: 1),
+    EnterMainPhase(Player1)
+  ]))

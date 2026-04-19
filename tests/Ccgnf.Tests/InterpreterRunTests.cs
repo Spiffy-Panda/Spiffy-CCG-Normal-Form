@@ -59,8 +59,8 @@ public class InterpreterRunTests
     private static InterpreterRt NewInterpreter() =>
         new(NullLogger<InterpreterRt>.Instance, NullLoggerFactory.Instance);
 
-    private static IEnumerable<RtValue> MulliganPasses() =>
-        Enumerable.Repeat<RtValue>(new RtSymbol("pass"), 4);
+    private static IEnumerable<RtValue> MulliganPasses(int channelPasses = 0) =>
+        Enumerable.Repeat<RtValue>(new RtSymbol("pass"), 4 + channelPasses);
 
     // -----------------------------------------------------------------------
     // (a) Determinism regression — Run() still produces the pre-7f state.
@@ -74,12 +74,12 @@ public class InterpreterRunTests
         var a = NewInterpreter().Run(file, new InterpreterOptions
         {
             Seed = 1776,
-            Inputs = new QueuedInputs(MulliganPasses()),
+            Inputs = new QueuedInputs(MulliganPasses(channelPasses: 200)),
         });
         var b = NewInterpreter().Run(file, new InterpreterOptions
         {
             Seed = 1776,
-            Inputs = new QueuedInputs(MulliganPasses()),
+            Inputs = new QueuedInputs(MulliganPasses(channelPasses: 200)),
         });
 
         Assert.Equal(StateSerializer.Serialize(a), StateSerializer.Serialize(b));
@@ -97,11 +97,11 @@ public class InterpreterRunTests
         var sync = NewInterpreter().Run(file, new InterpreterOptions
         {
             Seed = 1776,
-            Inputs = new QueuedInputs(MulliganPasses()),
+            Inputs = new QueuedInputs(MulliganPasses(channelPasses: 200)),
         });
 
         using var handle = NewInterpreter().StartRun(file, new InterpreterOptions { Seed = 1776 });
-        var remaining = new Queue<RtValue>(MulliganPasses());
+        var remaining = new Queue<RtValue>(MulliganPasses(channelPasses: 200));
         while (true)
         {
             var pending = handle.WaitPending();

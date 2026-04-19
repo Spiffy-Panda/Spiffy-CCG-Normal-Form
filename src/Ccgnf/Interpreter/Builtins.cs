@@ -66,7 +66,7 @@ internal static class Builtins
             case "OpenTimingWindow":        result = new RtVoid(); return true;
             case "DrainTriggersFor":        result = new RtVoid(); return true;
             case "BeginPhase":              result = BeginPhase(call, env, ev); return true;
-            case "EnterMainPhase":          result = new RtVoid(); return true;
+            case "EnterMainPhase":          result = EnterMainPhase(call, env, ev); return true;
             case "ResolveClashPhase":       result = new RtVoid(); return true;
 
             // ----- Target / Mulligan helpers — v1 relies on "pass" inputs, never invoked -----
@@ -288,6 +288,147 @@ internal static class Builtins
 
     // -------------------------------------------------------------------------
     // Event ops
+    // -------------------------------------------------------------------------
+
+    // -------------------------------------------------------------------------
+    // Main / Channel phase — v1 priority decision.
+    // -------------------------------------------------------------------------
+
+    private static RtValue EnterMainPhase(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        // EnterMainPhase(player) — single-shot decision: the active player
+        // either passes priority or plays one card from hand. v1 scope (8c);
+        // multi-card-per-turn priority windows land alongside Interrupts.
+        if (call.Args.Count == 0) return new RtVoid();
+        var playerRef = ev.Eval(ExprOf(call.Args[0]), env);
+        if (playerRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var player))
+        {
+            return new RtVoid();
+        }
+
+        int aether = player.Counters.GetValueOrDefault("aether", 0);
+
+        // Enumerate cards in hand the player can afford.
+        var playable = new Dictionary<int, (Ast.AstCardDecl decl, int cost)>();
+        var legal = new List<LegalAction> { new("pass_priority", "pass") };
+
+        if (player.Zones.TryGetValue("Hand", out var hand))
+        {
+            foreach (var cardId in hand.Contents)
+            {
+                if (!ev.State.Entities.TryGetValue(cardId, out var card)) continue;
+                if (!ev.State.CardDecls.TryGetValue(card.DisplayName, out var decl)) continue;
+                int cost = GetCardCost(decl);
+                if (cost > aether) continue;
+                playable[cardId] = (decl, cost);
+                legal.Add(new LegalAction(
+                    Kind: "play_card",
+                    Label: $"play:{cardId}",
+                    Metadata: new Dictionary<string, string>
+                    {
+                        ["entityId"] = cardId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        ["cardName"] = card.DisplayName,
+                        ["cost"] = cost.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    }));
+            }
+        }
+
+        var request = new InputRequest(
+            Prompt: $"MainPhase({player.DisplayName})",
+            PlayerId: player.Id,
+            LegalActions: legal);
+
+        var choice = ev.Scheduler.Inputs.Next(request);
+        string label = choice switch
+        {
+            RtSymbol s => s.Name,
+            RtString s => s.V,
+            _ => choice.ToString() ?? "",
+        };
+
+        if (label == "pass") return new RtVoid();
+
+        if (label.StartsWith("play:") &&
+            int.TryParse(label.AsSpan("play:".Length), out var playId) &&
+            playable.TryGetValue(playId, out var info))
+        {
+            PlayCard(ev, player, ev.State.Entities[playId], info.decl, info.cost);
+        }
+        else
+        {
+            ev.Log.LogDebug("MainPhase: ignored unrecognised choice {Label}", label);
+        }
+        return new RtVoid();
+    }
+
+    private static void PlayCard(
+        Evaluator ev,
+        Entity player,
+        Entity cardEntity,
+        Ast.AstCardDecl decl,
+        int cost)
+    {
+        player.Counters["aether"] = Math.Max(0, player.Counters.GetValueOrDefault("aether", 0) - cost);
+
+        // Move Hand → Cache before resolving so the effect sees the card in
+        // Cache (same as the real §6.2 resolution order once Interrupts land).
+        if (player.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Remove(cardEntity.Id);
+        if (player.Zones.TryGetValue("Cache", out var cache)) cache.Contents.Add(cardEntity.Id);
+
+        // OnResolve effect evaluates with `self` = card, `controller` = player.
+        var onResolve = GetCardOnResolve(decl);
+        if (onResolve is not null)
+        {
+            var resolveEnv = RtEnv.Empty
+                .Extend("self", new RtEntityRef(cardEntity.Id))
+                .Extend("controller", new RtEntityRef(player.Id));
+            ev.Eval(onResolve, resolveEnv);
+        }
+
+        ev.Log.LogInformation("Played card {Name} (#{Id}) for {Cost} aether",
+            cardEntity.DisplayName, cardEntity.Id, cost);
+
+        ev.State.PendingEvents.Enqueue(new GameEvent("CardPlayed",
+            new Dictionary<string, RtValue>
+            {
+                ["player"] = new RtEntityRef(player.Id),
+                ["card"] = new RtEntityRef(cardEntity.Id),
+                ["cost"] = new RtInt(cost),
+            }));
+    }
+
+    private static int GetCardCost(Ast.AstCardDecl decl)
+    {
+        foreach (var f in decl.Body.Fields)
+        {
+            if (f.Key.Name != "cost") continue;
+            if (f.Value is Ast.AstFieldExpr fe && fe.Value is Ast.AstIntLit i) return i.Value;
+        }
+        return 0;
+    }
+
+    private static Ast.AstExpr? GetCardOnResolve(Ast.AstCardDecl decl)
+    {
+        foreach (var f in decl.Body.Fields)
+        {
+            if (f.Key.Name != "abilities") continue;
+            if (f.Value is not Ast.AstFieldExpr fe) continue;
+            if (fe.Value is not Ast.AstListLit list) continue;
+            foreach (var el in list.Elements)
+            {
+                if (el is Ast.AstFunctionCall fc
+                    && fc.Callee is Ast.AstIdent id
+                    && id.Name == "OnResolve"
+                    && fc.Args.Count > 0)
+                {
+                    return ExprOf(fc.Args[0]);
+                }
+            }
+        }
+        return null;
+    }
+
     // -------------------------------------------------------------------------
 
     private static RtValue BeginPhase(AstFunctionCall call, RtEnv env, Evaluator ev)
