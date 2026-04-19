@@ -4,9 +4,12 @@ public sealed record RoomCreateRequest(
     SourceFileDto[]? Files,
     int Seed = 0,
     int PlayerSlots = 2,
-    int DeckSize = 30);
+    int DeckSize = 30,
+    IReadOnlyList<RoomCpuSeatSpec>? CpuSeats = null);
 
-public sealed record RoomPlayerDto(int PlayerId, string Name, bool Connected, string? DeckName);
+public sealed record RoomCpuSeatSpec(string? Name, RoomDeckSpec? Deck);
+
+public sealed record RoomPlayerDto(int PlayerId, string Name, bool Connected, string? DeckName, string SeatKind = "Human");
 
 public sealed record RoomSummaryDto(
     string RoomId,

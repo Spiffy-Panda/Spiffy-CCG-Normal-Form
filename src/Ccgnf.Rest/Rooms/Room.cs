@@ -13,6 +13,12 @@ public enum RoomLifecycle
     Finished,
 }
 
+public enum SeatKind
+{
+    Human,
+    Cpu,
+}
+
 public sealed class RoomPlayer
 {
     public int PlayerId { get; init; }
@@ -21,7 +27,19 @@ public sealed class RoomPlayer
     public DateTimeOffset JoinedAt { get; init; }
     public string? DeckName { get; init; }
     public IReadOnlyList<string>? DeckCardNames { get; init; }
+    public SeatKind SeatKind { get; init; } = SeatKind.Human;
 }
+
+/// <summary>
+/// Seat blueprint used to pre-fill CPU seats at room creation time. Humans
+/// join via the regular <see cref="Room.TryJoin"/> path; CPUs are installed
+/// before any human arrives so <see cref="Room.PlayerSlots"/> + human joins
+/// can trigger the usual start transition.
+/// </summary>
+public sealed record CpuSeatSpec(
+    string? Name,
+    string? DeckName,
+    IReadOnlyList<string>? DeckCardNames);
 
 /// <summary>
 /// Server-authoritative room. Holds the loaded <see cref="AstFile"/>, the
@@ -67,7 +85,8 @@ public sealed class Room : IDisposable
         int seed,
         int playerSlots,
         int deckSize,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IReadOnlyList<CpuSeatSpec>? cpuSeats = null)
     {
         Id = id;
         AstFile = file;
@@ -77,6 +96,40 @@ public sealed class Room : IDisposable
         CreatedAt = DateTimeOffset.UtcNow;
         LastActivityAt = CreatedAt;
         _loggerFactory = loggerFactory;
+
+        if (cpuSeats is not null)
+        {
+            foreach (var spec in cpuSeats)
+            {
+                InstallCpuSeatLocked(spec);
+            }
+            if (_players.Count >= PlayerSlots) StartLocked();
+        }
+    }
+
+    private void InstallCpuSeatLocked(CpuSeatSpec spec)
+    {
+        int playerId = _players.Count + 1;
+        var player = new RoomPlayer
+        {
+            PlayerId = playerId,
+            Name = string.IsNullOrWhiteSpace(spec.Name) ? $"CPU{playerId}" : spec.Name!.Trim(),
+            Token = "cpu", // CPUs don't accept external action POSTs; token unused.
+            JoinedAt = DateTimeOffset.UtcNow,
+            DeckName = string.IsNullOrWhiteSpace(spec.DeckName) ? null : spec.DeckName!.Trim(),
+            DeckCardNames = spec.DeckCardNames,
+            SeatKind = SeatKind.Cpu,
+        };
+        _players.Add(player);
+        Broadcaster.Emit(new RoomEventFrame(
+            Step: 0,
+            EventType: "PlayerJoined",
+            Fields: new Dictionary<string, string>
+            {
+                ["playerId"] = playerId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["name"] = player.Name,
+                ["seatKind"] = "Cpu",
+            }));
     }
 
     public RoomPlayer? TryJoin(
@@ -269,6 +322,25 @@ public sealed class Room : IDisposable
                         ["options"] = string.Join(",", pending.LegalActions.Select(a => a.Label)),
                     }));
 
+                // CPU seats act autonomously: pick the first legal action
+                // (or a "pass" sentinel when the current Choice happens to
+                // have no options exposed). Fed through the same Submit
+                // path so human-vs-CPU runs are indistinguishable from
+                // human-vs-human with pre-sequenced inputs.
+                if (TryResolveCpuSubmission(run, pending, out var cpuSeat, out var cpuValue))
+                {
+                    Broadcaster.Emit(new RoomEventFrame(
+                        Step: (int)run.State.StepCount,
+                        EventType: "CpuAction",
+                        Fields: new Dictionary<string, string>
+                        {
+                            ["playerId"] = cpuSeat!.PlayerId.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                            ["value"] = cpuValue.ToString() ?? "",
+                        }));
+                    run.Submit(cpuValue);
+                    continue;
+                }
+
                 PendingSubmission submission;
                 try
                 {
@@ -297,6 +369,40 @@ public sealed class Room : IDisposable
         };
         if (run.Fault is { } fault) fields["message"] = fault.Message;
         Broadcaster.Emit(new RoomEventFrame((int)run.State.StepCount, terminal, fields));
+    }
+
+    private bool TryResolveCpuSubmission(
+        InterpreterRun run,
+        Ccgnf.Interpreter.InputRequest pending,
+        out RoomPlayer? seat,
+        out RtValue value)
+    {
+        seat = null;
+        value = new RtSymbol("pass");
+        if (pending.PlayerId is not int entityId) return false;
+
+        // pending.PlayerId is a GameState Entity.Id. Map it to roster order
+        // (Players list is in declaration order; roster PlayerId 1 = first
+        // Player entity allocated, 2 = second).
+        int rosterIdx = -1;
+        for (int i = 0; i < run.State.Players.Count; i++)
+        {
+            if (run.State.Players[i].Id == entityId) { rosterIdx = i; break; }
+        }
+        if (rosterIdx < 0) return false;
+
+        lock (_lock)
+        {
+            if (rosterIdx >= _players.Count) return false;
+            seat = _players[rosterIdx];
+        }
+        if (seat.SeatKind != SeatKind.Cpu) return false;
+
+        if (pending.LegalActions.Count > 0)
+        {
+            value = new RtSymbol(pending.LegalActions[0].Label);
+        }
+        return true;
     }
 
     private void EmitGameEvent(GameEvent ev, GameState state)

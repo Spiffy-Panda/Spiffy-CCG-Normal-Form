@@ -54,6 +54,7 @@ internal static class RoomEndpoints
     private static IResult Create(
         RoomCreateRequest req,
         RoomStore store,
+        DeckCatalog decks,
         ILoggerFactory lf)
     {
         var loader = new ProjectLoader(lf);
@@ -69,8 +70,40 @@ internal static class RoomEndpoints
 
         int slots = req.PlayerSlots > 0 ? req.PlayerSlots : 2;
         int deckSize = req.DeckSize > 0 ? req.DeckSize : 30;
-        var room = store.Create(load.File, req.Seed, slots, deckSize);
+
+        List<CpuSeatSpec>? cpuSeats = null;
+        if (req.CpuSeats is { Count: > 0 } specs)
+        {
+            cpuSeats = new List<CpuSeatSpec>(specs.Count);
+            foreach (var s in specs)
+            {
+                var (deckName, deckCardNames, err) = ResolveDeckSpec(s.Deck, decks);
+                if (err is not null) return Results.BadRequest(new { error = err });
+                cpuSeats.Add(new CpuSeatSpec(s.Name, deckName, deckCardNames));
+            }
+        }
+
+        var room = store.Create(load.File, req.Seed, slots, deckSize, cpuSeats);
         return Results.Created($"/api/rooms/{room.Id}", ToSummary(room));
+    }
+
+    private static (string? DeckName, IReadOnlyList<string>? DeckCardNames, string? Error) ResolveDeckSpec(
+        RoomDeckSpec? spec, DeckCatalog decks)
+    {
+        if (spec is null) return (null, null, null);
+        if (!string.IsNullOrWhiteSpace(spec.Preset))
+        {
+            var preset = decks.Get().FirstOrDefault(p => p.Id == spec.Preset);
+            if (preset is null) return (null, null, $"Unknown preset deck '{spec.Preset}'.");
+            return (preset.Name, ExpandDeckCards(preset.Cards), null);
+        }
+        if (spec.Cards is { Count: > 0 } cards)
+        {
+            int total = 0;
+            foreach (var c in cards) total += c.Count;
+            return ($"Custom deck ({total} cards)", ExpandDeckCards(cards), null);
+        }
+        return (null, null, null);
     }
 
     private static IResult List(RoomStore store) =>
@@ -86,28 +119,8 @@ internal static class RoomEndpoints
     {
         if (!store.TryGet(id, out var room)) return Results.NotFound();
 
-        string? deckName = null;
-        IReadOnlyList<string>? deckCardNames = null;
-        if (req.Deck is { } spec)
-        {
-            if (!string.IsNullOrWhiteSpace(spec.Preset))
-            {
-                var preset = decks.Get().FirstOrDefault(p => p.Id == spec.Preset);
-                if (preset is null)
-                {
-                    return Results.BadRequest(new { error = $"Unknown preset deck '{spec.Preset}'." });
-                }
-                deckName = preset.Name;
-                deckCardNames = ExpandDeckCards(preset.Cards);
-            }
-            else if (spec.Cards is { Count: > 0 } cards)
-            {
-                int total = 0;
-                foreach (var c in cards) total += c.Count;
-                deckName = $"Custom deck ({total} cards)";
-                deckCardNames = ExpandDeckCards(cards);
-            }
-        }
+        var (deckName, deckCardNames, err) = ResolveDeckSpec(req.Deck, decks);
+        if (err is not null) return Results.BadRequest(new { error = err });
 
         var player = room.TryJoin(req.Name, deckName, deckCardNames);
         if (player is null) return Results.Conflict(new { error = "Room full or finished." });
@@ -198,6 +211,8 @@ internal static class RoomEndpoints
         CreatedAt: room.CreatedAt.ToString("o"),
         LastActivityAt: room.LastActivityAt.ToString("o"),
         Players: room.Players
-            .Select(p => new RoomPlayerDto(p.PlayerId, p.Name, Connected: true, DeckName: p.DeckName))
+            .Select(p => new RoomPlayerDto(
+                p.PlayerId, p.Name, Connected: true, DeckName: p.DeckName,
+                SeatKind: p.SeatKind.ToString()))
             .ToList());
 }

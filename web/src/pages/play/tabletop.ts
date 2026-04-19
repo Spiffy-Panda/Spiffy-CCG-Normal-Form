@@ -316,7 +316,8 @@ function renderLeft(col: HTMLElement): void {
       const deck = p.deckName
         ? `<em>${escapeHtml(p.deckName)}</em>`
         : `<span class="roster-no-deck">no deck</span>`;
-      return `<span>P${p.playerId} ${escapeHtml(p.name)} · ${deck}</span>`;
+      const badge = p.seatKind === "Cpu" ? "🤖 " : "";
+      return `<span>P${p.playerId} ${badge}${escapeHtml(p.name)} · ${deck}</span>`;
     }).join("  •  ");
     col.appendChild(roster);
   }

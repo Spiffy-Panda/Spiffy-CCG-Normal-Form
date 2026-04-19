@@ -148,11 +148,17 @@ export interface PresetDeckDto {
   unknownCards: string[];
 }
 
+export interface RoomCpuSeatSpec {
+  name?: string | null;
+  deck?: RoomDeckSpec | null;
+}
+
 export interface RoomCreateRequest {
   files: SourceFileDto[];
   seed: number;
   playerSlots?: number;
   deckSize?: number;
+  cpuSeats?: RoomCpuSeatSpec[];
 }
 
 export interface RoomSummaryDto {
@@ -169,6 +175,7 @@ export interface RoomPlayerDto {
   name: string;
   connected: boolean;
   deckName?: string | null;
+  seatKind?: "Human" | "Cpu";
 }
 
 export interface RoomDeckSpec {

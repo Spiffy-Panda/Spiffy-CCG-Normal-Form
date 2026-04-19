@@ -214,6 +214,66 @@ public class RoomEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Create_WithCpuSeat_AutoFillsSlotAndStartsAfterHumanJoins()
+    {
+        var client = _factory.CreateClient();
+        var files = await LoadEncoding();
+
+        var createResp = await client.PostAsJsonAsync("/api/rooms", new
+        {
+            files,
+            seed = 9,
+            playerSlots = 2,
+            cpuSeats = new[]
+            {
+                new { name = (string?)null, deck = new { preset = "bulwark-control" } },
+            },
+        });
+        Assert.Equal(HttpStatusCode.Created, createResp.StatusCode);
+        var createBody = await createResp.Content.ReadFromJsonAsync<JsonElement>();
+        var roomId = createBody.GetProperty("roomId").GetString()!;
+        // CPU occupies one slot immediately.
+        Assert.Equal(1, createBody.GetProperty("occupied").GetInt32());
+
+        var detail = await (await client.GetAsync($"/api/rooms/{roomId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        var players = detail.GetProperty("players").EnumerateArray().ToArray();
+        Assert.Single(players);
+        Assert.Equal("Cpu", players[0].GetProperty("seatKind").GetString());
+        Assert.Equal("BULWARK Control", players[0].GetProperty("deckName").GetString());
+
+        // Human joins; room should transition to Active with CPU auto-driving
+        // any pending choices (none in v1's encoding, but the wiring must hold).
+        var joinResp = await client.PostAsJsonAsync(
+            $"/api/rooms/{roomId}/join",
+            new { name = "alice", deck = new { preset = "ember-aggro" } });
+        joinResp.EnsureSuccessStatusCode();
+
+        var detail2 = await (await client.GetAsync($"/api/rooms/{roomId}"))
+            .Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(2, detail2.GetProperty("occupied").GetInt32());
+        // State shouldn't remain WaitingForPlayers once both seats are filled.
+        Assert.NotEqual("WaitingForPlayers", detail2.GetProperty("state").GetString());
+
+        var stateResp = await client.GetAsync($"/api/rooms/{roomId}/state");
+        stateResp.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Create_WithUnknownCpuDeck_Returns400()
+    {
+        var client = _factory.CreateClient();
+        var files = await LoadEncoding();
+        var resp = await client.PostAsJsonAsync("/api/rooms", new
+        {
+            files,
+            seed = 1,
+            cpuSeats = new[] { new { deck = new { preset = "does-not-exist" } } },
+        });
+        Assert.Equal(HttpStatusCode.BadRequest, resp.StatusCode);
+    }
+
+    [Fact]
     public async Task Delete_ReturnsNoContent_ThenNotFound()
     {
         var client = _factory.CreateClient();

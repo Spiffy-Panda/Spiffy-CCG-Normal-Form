@@ -17,7 +17,12 @@ public sealed class RoomStore
         _loggerFactory = loggerFactory;
     }
 
-    public Room Create(AstFile astFile, int seed, int playerSlots, int deckSize)
+    public Room Create(
+        AstFile astFile,
+        int seed,
+        int playerSlots,
+        int deckSize,
+        IReadOnlyList<CpuSeatSpec>? cpuSeats = null)
     {
         string id;
         do
@@ -25,11 +30,11 @@ public sealed class RoomStore
             id = GenerateId();
         } while (_rooms.ContainsKey(id));
 
-        var room = new Room(id, astFile, seed, playerSlots, deckSize, _loggerFactory);
+        var room = new Room(id, astFile, seed, playerSlots, deckSize, _loggerFactory, cpuSeats);
         _rooms[id] = room;
         _log.LogInformation(
-            "Room {Id} created (seed={Seed}, slots={Slots}, deckSize={DeckSize}).",
-            id, seed, playerSlots, deckSize);
+            "Room {Id} created (seed={Seed}, slots={Slots}, deckSize={DeckSize}, cpus={Cpus}).",
+            id, seed, playerSlots, deckSize, cpuSeats?.Count ?? 0);
         return room;
     }
 
