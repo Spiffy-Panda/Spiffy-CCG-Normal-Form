@@ -17,4 +17,8 @@
     <ProjectReference Include="..\Ccgnf\Ccgnf.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Ccgnf.Bots.Tests" />
+  </ItemGroup>
+
 </Project>

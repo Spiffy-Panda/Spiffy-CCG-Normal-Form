@@ -57,6 +57,97 @@ public class BotMatchRunnerTests
         Assert.True(result.StepCount > 0);
     }
 
+    /// <summary>
+    /// Step 12.2 knob 3 — the harness integrity tiebreaker. When both seats
+    /// still have the same number of standing Conduits at cap-hit (which is
+    /// what produces the bulk of the "draws" in the tournament JSONs), the
+    /// winner is the seat with more integrity remaining across its Conduits.
+    /// </summary>
+    [Fact]
+    public void IntegrityTiebreaker_EqualConduits_WinnerHasMoreIntegrity()
+    {
+        var state = new Ccgnf.Interpreter.GameState();
+
+        var p0 = state.AllocateEntity("Player", "Player1");
+        var p1 = state.AllocateEntity("Player", "Player2");
+        state.Players.Add(p0);
+        state.Players.Add(p1);
+
+        // Each seat has three standing Conduits, but P1 is more damaged.
+        foreach (int integ in new[] { 7, 7, 7 })
+        {
+            var c = state.AllocateEntity("Conduit", "P0-Conduit");
+            c.OwnerId = p0.Id;
+            c.Counters["integrity"] = integ;
+        }
+        foreach (int integ in new[] { 3, 4, 5 })
+        {
+            var c = state.AllocateEntity("Conduit", "P1-Conduit");
+            c.OwnerId = p1.Id;
+            c.Counters["integrity"] = integ;
+        }
+
+        Assert.Equal(0, BotMatchRunner.DetermineWinnerSeat(state));
+    }
+
+    [Fact]
+    public void IntegrityTiebreaker_EqualIntegrity_ReturnsDraw()
+    {
+        var state = new Ccgnf.Interpreter.GameState();
+
+        var p0 = state.AllocateEntity("Player", "Player1");
+        var p1 = state.AllocateEntity("Player", "Player2");
+        state.Players.Add(p0);
+        state.Players.Add(p1);
+
+        foreach (int integ in new[] { 5, 5, 5 })
+        {
+            var c = state.AllocateEntity("Conduit", "P0-Conduit");
+            c.OwnerId = p0.Id;
+            c.Counters["integrity"] = integ;
+        }
+        foreach (int integ in new[] { 5, 5, 5 })
+        {
+            var c = state.AllocateEntity("Conduit", "P1-Conduit");
+            c.OwnerId = p1.Id;
+            c.Counters["integrity"] = integ;
+        }
+
+        Assert.Equal(-1, BotMatchRunner.DetermineWinnerSeat(state));
+    }
+
+    [Fact]
+    public void StandingConduitCount_TakesPrecedenceOverIntegrity()
+    {
+        var state = new Ccgnf.Interpreter.GameState();
+
+        var p0 = state.AllocateEntity("Player", "Player1");
+        var p1 = state.AllocateEntity("Player", "Player2");
+        state.Players.Add(p0);
+        state.Players.Add(p1);
+
+        // P0 has only 2 standing Conduits but huge integrity; P1 has all 3
+        // standing but crumbling. Standing count is the primary rule — P1 wins.
+        var cCollapsed = state.AllocateEntity("Conduit", "P0-Collapsed");
+        cCollapsed.OwnerId = p0.Id;
+        cCollapsed.Tags.Add("collapsed");
+        cCollapsed.Counters["integrity"] = 0;
+        foreach (int integ in new[] { 7, 7 })
+        {
+            var c = state.AllocateEntity("Conduit", "P0-Conduit");
+            c.OwnerId = p0.Id;
+            c.Counters["integrity"] = integ;
+        }
+        foreach (int integ in new[] { 1, 1, 1 })
+        {
+            var c = state.AllocateEntity("Conduit", "P1-Conduit");
+            c.OwnerId = p1.Id;
+            c.Counters["integrity"] = integ;
+        }
+
+        Assert.Equal(1, BotMatchRunner.DetermineWinnerSeat(state));
+    }
+
     [Fact]
     public void TournamentCompletesSmallRun()
     {
