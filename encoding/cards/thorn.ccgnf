@@ -395,3 +395,71 @@ Card Thornlord {
   ]
   // text: Rally. THORN 3: Friendly Units in this Arena have +1/+0.
 }
+
+// =============================================================================
+// Step 12.3 — THORN closer batch (2 cards).
+// Role: closer. THORN already had 3 closers (Thicketwarden, Myrrhan,
+// Thornlord). The two additions make the 1-cost Rally tokens project real
+// Force at payoff turns — turning the Sprawl / Rally tempo engine into
+// actual Conduit lethal.
+// =============================================================================
+
+/*
+ * Sprawl Vanguard [U] (THORN, Unit) — 3 — 2/2
+ * Rally. While you control 3+ Saplings, this and your Saplings have Blitz.
+ *
+ * Sprawl-Blitz slot #1. Flips the Sapling swarm from a scaffolding deck
+ * into one that can actually swing real Force through suppressed
+ * Deployment Sickness. The 3-Sapling gate lands naturally on turn 3-4
+ * of a Sprawl-forward hand.
+ */
+Card SprawlVanguard {
+  factions: {THORN}, type: Unit, cost: 3, force: 2, ramparts: 2, rarity: U
+  keywords: [ Rally, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: KeywordSet(self),
+      check_at: continuously,
+      rule: If(Count(Filter(AllUnits,
+                            u -> u.controller == self.controller
+                               ∧ u.type == Unit
+                               ∧ u.rarity == Token
+                               ∧ u.name == "Thorn Sapling")) >= 3,
+               Sequence([
+                 GrantKeyword(self, Blitz),
+                 ForEach(t -> t.controller == self.controller
+                            ∧ t.type == Unit
+                            ∧ t.rarity == Token
+                            ∧ t.name == "Thorn Sapling",
+                   GrantKeyword(t, Blitz))
+               ]),
+               NoOp))
+  ]
+  // text: Rally. While you control 3 or more Saplings, this and your
+  //       Saplings have Blitz.
+}
+
+/*
+ * Overgrowth Surge [U] (THORN, Maneuver) — 3
+ * Deal damage to target Conduit equal to the number of Saplings you
+ * control (cap 4).
+ *
+ * Sprawl-count slot #2. The Sprawl-count payoff Maneuver — THORN's
+ * equivalent to EMBER's Maneuver-scaling pattern. Caps at 4 so a
+ * runaway Sapling count doesn't one-shot a Conduit.
+ */
+Card OvergrowthSurge {
+  factions: {THORN}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        DealDamage(target,
+          Min(4, Count(Filter(AllUnits,
+                              u -> u.controller == self.controller
+                                 ∧ u.type == Unit
+                                 ∧ u.rarity == Token
+                                 ∧ u.name == "Thorn Sapling"))))))
+  ]
+  // text: Deal damage to target Conduit equal to the number of Saplings
+  //       you control (cap 4).
+}

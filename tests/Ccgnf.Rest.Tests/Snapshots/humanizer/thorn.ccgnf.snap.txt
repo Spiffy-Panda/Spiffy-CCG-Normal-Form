@@ -62,3 +62,9 @@ When this enters play: if not this Arena has collapsed for you, if Peak THORN, f
 === Thornlord ===
 Static (force on target_unit): when THORN 3, for each friendly Unit in this Arena, u gets +1 force.
 
+=== SprawlVanguard ===
+Static (KeywordSet(self)): if count of Filter(AllUnits, u -> u.controller == self.controller ∧ u.type == Unit ∧ u.rarity == Token ∧ u.name == "Thorn Sapling") >= 3, grant Blitz to this; for each friendly Unit where t.rarity is Token and t.name is Thorn Sapling, grant Blitz to t.
+
+=== OvergrowthSurge ===
+Resolves: target Conduit: deal Min(4, Count(Filter(AllUnits, u -> u.controller == self.controller ∧ u.type == Unit ∧ u.rarity == Token ∧ u.name == "Thorn Sapling"))) damage to target.
+
