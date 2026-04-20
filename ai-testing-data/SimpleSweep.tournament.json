@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "name": "SimpleSweep",
+  "description": "Step 12.0 baseline — mirror variant. Every available bot pilots the SAME deck (bulwark-control) so any win-rate spread is attributable to pilot skill, not deck choice. bulwark-control is chosen because it's the closer-less deck surfaced by 12.0's first run; if any bot can make it win, that's a meaningful result. Includes self-mirrors so we see per-bot seed variance. Pairs with the canonical PairCorrectly run to separate deck signal from bot signal in 12.0's baseline artifacts.",
+  "pairs": [
+    {
+      "pairId": "Fort",
+      "deckId": "bulwark-control",
+      "botProfile": "experimental/2026-04-19-fortress",
+      "label": "Fort"
+    },
+    {
+      "pairId": "Hell",
+      "deckId": "bulwark-control",
+      "botProfile": "experimental/2026-04-19-hellfire",
+      "label": "Hell"
+    },
+    {
+      "pairId": "Reap",
+      "deckId": "bulwark-control",
+      "botProfile": "experimental/2026-04-19-reaper",
+      "label": "Reap"
+    },
+    {
+      "pairId": "Wave",
+      "deckId": "bulwark-control",
+      "botProfile": "experimental/2026-04-19-wavebreaker",
+      "label": "Wave"
+    },
+    {
+      "pairId": "Util",
+      "deckId": "bulwark-control",
+      "botProfile": "utility",
+      "label": "Util"
+    },
+    {
+      "pairId": "Fixed",
+      "deckId": "bulwark-control",
+      "botProfile": "fixed",
+      "label": "Fixed"
+    }
+  ],
+  "matchups": null,
+  "includeMirror": true,
+  "gamesPerMatchup": 40,
+  "baseSeed": 1,
+  "maxInputsPerGame": 6000,
+  "maxEventsPerGame": 150000,
+  "logLevel": "llm"
+}

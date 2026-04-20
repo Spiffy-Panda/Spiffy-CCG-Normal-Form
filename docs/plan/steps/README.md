@@ -22,6 +22,13 @@ updates if a threshold crossed, and an entry goes in
 | 10 | [10-long-term-ai.md](10-long-term-ai.md) | 7+ | Utility-AI-first CPU with a top-level BT shell. No look-ahead search. |
 | 10.2 | [10.2-long-term-ai-plan.md](10.2-long-term-ai-plan.md) | 10 | Concrete 10 plan: `Ccgnf.Bots`, UtilityBot + phase-BT + sticky intent, `/api/ai/*`, deck archetypes, tournament harness, `#/ai` editor. **Shipped.** |
 | 11 | [11-humanizer-templates.md](11-humanizer-templates.md) | 3+ | Move the per-builtin humanizer table to a data-driven, user-overridable template library. |
+| 12.0 | [12.0-balance-baseline.md](12.0-balance-baseline.md) | 10.2 | Balance arc opener: measurement-only baseline tournament runs, no tuning. |
+| 12.1 | [12.1-ai-floor-fix.md](12.1-ai-floor-fix.md) | 12.0 | AI floor rule (`conduit_softness ≥ threat_avoidance` under pushing / lethal_check). Also the iteration point re-run after every later step. |
+| 12.2 | [12.2-engine-sanity-pass.md](12.2-engine-sanity-pass.md) | 12.1 | Rule audit: min-turns-to-lethal + draw-guard catalogue. Engine knobs documented, touched only if necessary. |
+| 12.3 | [12.3-card-threat-audit.md](12.3-card-threat-audit.md) | 12.2 | Per-card tag pass + per-faction closer/setup/disruption/filler ratios. Author closers where gaps exist. |
+| 12.4 | [12.4-deck-construction.md](12.4-deck-construction.md) | 12.3 | Reference decks swap fillers for cards from the cleaned pool. Archetype tags and `suggested_ai` pinned. |
+| 12.5 | [12.5-matched-ai-tune.md](12.5-matched-ai-tune.md) | 12.4 | Re-converge matched AI weights under the new card pool. Matched pair beats mismatched by ≥ 15 pp. |
+| 12.6 | [12.6-cross-matchup-polish.md](12.6-cross-matchup-polish.md) | 12.5 | Tech-slot card edits to pull every cross-matchup into `[25%, 75%]`. Closes the step-12 arc. |
 
 Steps 3 / 4 / 5 are parallelisable after 1 + 2. Step 6 is the largest;
 it can begin once 1 and 2 land. Step 7 reshapes the interpreter as a

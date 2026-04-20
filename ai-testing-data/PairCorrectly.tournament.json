@@ -1,0 +1,38 @@
+{
+  "version": 2,
+  "name": "PairCorrectly",
+  "description": "Step 12.0 baseline — matched-pair round-robin. Every archetype paired with its designed bot: bulwark-control+fortress, ember-aggro+hellfire, hollow-disruption+reaper, tide-thorn-combo+wavebreaker. Cross-pair only (no mirror) so cells are about matched-pair-A vs matched-pair-B, not self-variance. logLevel=llm so the JSONL learning log lands under logs/tournaments/.",
+  "pairs": [
+    {
+      "pairId": "BulFort",
+      "deckId": "bulwark-control",
+      "botProfile": "experimental/2026-04-19-fortress",
+      "label": "Fort"
+    },
+    {
+      "pairId": "EmbHell",
+      "deckId": "ember-aggro",
+      "botProfile": "experimental/2026-04-19-hellfire",
+      "label": "Hell"
+    },
+    {
+      "pairId": "HolReap",
+      "deckId": "hollow-disruption",
+      "botProfile": "experimental/2026-04-19-reaper",
+      "label": "Reap"
+    },
+    {
+      "pairId": "TiThWave",
+      "deckId": "tide-thorn-combo",
+      "botProfile": "experimental/2026-04-19-wavebreaker",
+      "label": "Wave"
+    }
+  ],
+  "matchups": null,
+  "includeMirror": false,
+  "gamesPerMatchup": 40,
+  "baseSeed": 1,
+  "maxInputsPerGame": 6000,
+  "maxEventsPerGame": 150000,
+  "logLevel": "llm"
+}
