@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "name": "AiDeckMatrix",
+  "description": "4 AIs × 4 decks = 16 pairs, cross-round-robin. Matrix view of which pilot plays which archetype best, and which deck tolerates which AI. Diagnostic for 12.5 matched-AI tune. Slice rows by AI (aggregate the 4 deck rows per bot) or by deck (aggregate the 4 AI rows per deck).",
+  "pairs": [
+    { "pairId": "FoBC", "deckId": "bulwark-control",   "botProfile": "experimental/2026-04-19-fortress",    "label": "Fo/BC" },
+    { "pairId": "FoEA", "deckId": "ember-aggro",       "botProfile": "experimental/2026-04-19-fortress",    "label": "Fo/EA" },
+    { "pairId": "FoHD", "deckId": "hollow-disruption", "botProfile": "experimental/2026-04-19-fortress",    "label": "Fo/HD" },
+    { "pairId": "FoTC", "deckId": "tide-thorn-combo",  "botProfile": "experimental/2026-04-19-fortress",    "label": "Fo/TC" },
+    { "pairId": "HeBC", "deckId": "bulwark-control",   "botProfile": "experimental/2026-04-19-hellfire",    "label": "He/BC" },
+    { "pairId": "HeEA", "deckId": "ember-aggro",       "botProfile": "experimental/2026-04-19-hellfire",    "label": "He/EA" },
+    { "pairId": "HeHD", "deckId": "hollow-disruption", "botProfile": "experimental/2026-04-19-hellfire",    "label": "He/HD" },
+    { "pairId": "HeTC", "deckId": "tide-thorn-combo",  "botProfile": "experimental/2026-04-19-hellfire",    "label": "He/TC" },
+    { "pairId": "ReBC", "deckId": "bulwark-control",   "botProfile": "experimental/2026-04-19-reaper",      "label": "Re/BC" },
+    { "pairId": "ReEA", "deckId": "ember-aggro",       "botProfile": "experimental/2026-04-19-reaper",      "label": "Re/EA" },
+    { "pairId": "ReHD", "deckId": "hollow-disruption", "botProfile": "experimental/2026-04-19-reaper",      "label": "Re/HD" },
+    { "pairId": "ReTC", "deckId": "tide-thorn-combo",  "botProfile": "experimental/2026-04-19-reaper",      "label": "Re/TC" },
+    { "pairId": "WaBC", "deckId": "bulwark-control",   "botProfile": "experimental/2026-04-19-wavebreaker", "label": "Wa/BC" },
+    { "pairId": "WaEA", "deckId": "ember-aggro",       "botProfile": "experimental/2026-04-19-wavebreaker", "label": "Wa/EA" },
+    { "pairId": "WaHD", "deckId": "hollow-disruption", "botProfile": "experimental/2026-04-19-wavebreaker", "label": "Wa/HD" },
+    { "pairId": "WaTC", "deckId": "tide-thorn-combo",  "botProfile": "experimental/2026-04-19-wavebreaker", "label": "Wa/TC" }
+  ],
+  "matchups": null,
+  "includeMirror": false,
+  "gamesPerMatchup": 6,
+  "baseSeed": 1,
+  "maxInputsPerGame": 6000,
+  "maxEventsPerGame": 150000,
+  "logLevel": "normal"
+}
