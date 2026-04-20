@@ -252,3 +252,190 @@ Card BishopOfMending {
   ]
   // text: Mend 2. BULWARK 3: When you play another BULWARK card, Mend 1.
 }
+
+// =============================================================================
+// Step 12.3 — BULWARK closer batch (7 cards).
+// Role: closer. These cards give BULWARK real lethal pressure without
+// abandoning its wall identity — every closer scales off defensive
+// investment (Sentinel density, Fortify, high-Rampart bodies) instead of
+// projecting raw aggro Force.
+// =============================================================================
+
+/*
+ * Watchtower Archer [U] (BULWARK, Unit) — 4 — 2/4
+ * Sentinel. Fortify 2.
+ * At End of Clash, deal 1 damage to the opposing Conduit in this Arena.
+ *
+ * Fortify-siege slot #1 from the 12.3 follow-up queue. Sentinel keeps the
+ * wall up (Force 2 flows into Fortification); the End-of-Clash ping turns
+ * that wall into a siege engine, no extra play required.
+ */
+Card WatchtowerArcher {
+  factions: {BULWARK}, type: Unit, cost: 4, force: 2, ramparts: 4, rarity: U
+  keywords: [ Sentinel, Fortify(2), DeploymentSickness ]
+  abilities: [
+    EndOfClash(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+         NoOp))
+  ]
+  // text: Sentinel. Fortify 2. At End of Clash, deal 1 damage to the
+  //       opposing Conduit in this Arena.
+}
+
+/*
+ * Retribution Strike [U] (BULWARK, Maneuver) — 3
+ * Deal damage to target Conduit equal to the number of Sentinel Units
+ * you control (cap 4).
+ *
+ * Retaliation-strike slot #2. Pure defensive-density payoff — scales off
+ * the wall BULWARK has already committed to the board, so it rewards the
+ * archetype's natural line instead of forcing new play patterns.
+ */
+Card RetributionStrike {
+  factions: {BULWARK}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        DealDamage(target,
+          Min(4, Count(Filter(AllUnits,
+                              u -> u.controller == self.controller
+                                 ∧ u.type == Unit
+                                 ∧ has_keyword(u, Sentinel)))))))
+  ]
+  // text: Deal damage to target Conduit equal to the number of Sentinel
+  //       Units you control (cap 4).
+}
+
+/*
+ * Banners of Vigilance [R] (BULWARK, Standard — attaches to Player) — 4
+ * At start of your turn, if you control 2+ Sentinel Units, deal 1 damage
+ * to target opposing Conduit. Peak BULWARK: Deal 2 instead.
+ *
+ * Sentinel-density Standard slot #3. Win-con turned on by the archetype's
+ * own board-building pattern; costs no further plays once resolved.
+ */
+Card BannersOfVigilance {
+  factions: {BULWARK}, type: Standard, subtype: attaches_to_player, cost: 4, rarity: R
+  abilities: [
+    StartOfYourTurn(
+      If(Count(Filter(AllUnits,
+                      u -> u.controller == self.controller
+                         ∧ u.type == Unit
+                         ∧ has_keyword(u, Sentinel))) >= 2,
+        Target(c -> c.kind == Conduit ∧ c.owner != self.controller
+                    ∧ not collapsed_for(c.owner, c.arena),
+          Tiers([
+            (Peak(BULWARK), DealDamage(target, 2)),
+            (Default,       DealDamage(target, 1))
+          ])),
+        NoOp))
+  ]
+  // text: At start of your turn, if you control 2+ Sentinel Units, deal 1
+  //       damage to target opposing Conduit. Peak BULWARK: Deal 2 instead.
+}
+
+/*
+ * Siege Captain [U] (BULWARK, Unit) — 4 — 3/4
+ * Fortify 1. When this enters play, deal 1 damage to the opposing Conduit
+ * in this Arena. At End of Clash, deal 1 damage to the opposing Conduit
+ * in this Arena.
+ *
+ * Siege-attacker slot #4. A real Force body (no Sentinel) that doubles as
+ * a Conduit-pressure source — covers the matchup where BULWARK needs to
+ * actually push damage, not just stall.
+ */
+Card SiegeCaptain {
+  factions: {BULWARK}, type: Unit, cost: 4, force: 3, ramparts: 4, rarity: U
+  keywords: [ Fortify(1), DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+         NoOp)),
+    EndOfClash(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+         NoOp))
+  ]
+  // text: Fortify 1. When this enters play, deal 1 damage to the opposing
+  //       Conduit in this Arena. At End of Clash, deal 1 damage to the
+  //       opposing Conduit in this Arena.
+}
+
+/*
+ * Wallbreaker Incarnate [M] (BULWARK, Unit) — 6 — 5/6, unique
+ * Sentinel. Fortify 3.
+ * BULWARK 4: At End of Clash, deal 3 damage to the opposing Conduit in
+ * this Arena. Peak BULWARK: Deal 5 instead.
+ *
+ * Attrition-capstone slot #5. The mono-BULWARK mythic closer. At Peak
+ * this lands a 5-damage siege ping per Clash — enough to collapse a
+ * 7-Integrity Conduit in two turns of Peak BULWARK.
+ */
+Card WallbreakerIncarnate {
+  factions: {BULWARK}, type: Unit, cost: 6, force: 5, ramparts: 6, rarity: M, unique: true
+  keywords: [ Sentinel, Fortify(3), Unique, DeploymentSickness ]
+  abilities: [
+    EndOfClash(
+      When(Resonance(BULWARK, 4),
+        If(Exists(Conduit[other_player(self.controller), self.arena])
+           ∧ not collapsed_for(other_player(self.controller), self.arena),
+           Tiers([
+             (Peak(BULWARK), DealDamage(Conduit[other_player(self.controller), self.arena], 5)),
+             (Default,       DealDamage(Conduit[other_player(self.controller), self.arena], 3))
+           ]),
+           NoOp)))
+  ]
+  // text: Sentinel. Fortify 3.
+  //       BULWARK 4: At End of Clash, deal 3 damage to the opposing Conduit
+  //       in this Arena. Peak BULWARK: Deal 5 instead.
+}
+
+/*
+ * Breach and Seize [C] (BULWARK, Maneuver) — 2
+ * Deal 1 damage to target Conduit. BULWARK 3: Deal 2 instead.
+ *
+ * Prevent-payoff slot #6 — retuned to a simple direct-Conduit Maneuver.
+ * BULWARK needed a 2-cost damage stapled to tier so the deck has any
+ * reliable low-curve Conduit pressure at all. Mirrors EMBER's MatchStrike
+ * in BULWARK flavour.
+ */
+Card BreachAndSeize {
+  factions: {BULWARK}, type: Maneuver, cost: 2, rarity: C
+  abilities: [
+    OnResolve(
+      Target(t -> t.kind == Conduit,
+        Tiers([
+          (Resonance(BULWARK, 3), DealDamage(target, 2)),
+          (Default,               DealDamage(target, 1))
+        ])))
+  ]
+  // text: Deal 1 damage to target Conduit. BULWARK 3: Deal 2 instead.
+}
+
+/*
+ * Rampart Charger [C] (BULWARK, Unit) — 3 — 2/3
+ * Fortify 1. When this enters play, deal 1 damage to the opposing Conduit
+ * in this Arena.
+ *
+ * Rampart-wave slot #7. Low-curve closer body: the Fortify makes it a
+ * real 2/4 once BULWARK's Conduit is healthy, and the on-enter chip
+ * guarantees a tempo damage contribution on the turn it's deployed.
+ */
+Card RampartCharger {
+  factions: {BULWARK}, type: Unit, cost: 3, force: 2, ramparts: 3, rarity: C
+  keywords: [ Fortify(1), DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+         NoOp))
+  ]
+  // text: Fortify 1. When this enters play, deal 1 damage to the opposing
+  //       Conduit in this Arena.
+}
