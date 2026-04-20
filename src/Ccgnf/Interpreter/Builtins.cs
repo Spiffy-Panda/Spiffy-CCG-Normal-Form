@@ -667,6 +667,13 @@ internal static class Builtins
         // during Clash without re-walking the AST.
         KeywordRuntime.ApplyKeywords(cardEntity, KeywordRuntime.ReadKeywords(decl));
 
+        // Triggered / Static abilities declared on the card (OnEnter,
+        // EndOfClash, OnCardPlayed, etc. — after the trigger-shorthand
+        // macros expand to Triggered(...)) get attached to the runtime Unit
+        // so DispatchEvent walks them. v1 only acts on Triggered in this
+        // pass; Static still runs via KeywordRuntime's direct helpers.
+        AttachCardAbilities(cardEntity, decl);
+
         // OnResolve, if any, fires after the Unit enters play. Most real
         // Units have no OnResolve (enter-the-battlefield triggers are a
         // different phase of §6.2), but the hook is free.
@@ -692,6 +699,62 @@ internal static class Builtins
         if (arenaEntityId is int aid2) fields["arena"] = new RtEntityRef(aid2);
         ev.State.PendingEvents.Enqueue(new GameEvent("UnitEntered", fields));
         ev.State.PendingEvents.Enqueue(new GameEvent("CardPlayed", fields));
+        // EnterPlay is the trigger that every OnEnter / OnArenaEnter macro
+        // in encoding/engine/02-trigger-shorthands.ccgnf expands to match.
+        // Carry the Unit as `target` so `Event.EnterPlay(target=self)`
+        // patterns on that same Unit (and on neighbours in the same arena
+        // for OnArenaEnter) fire correctly.
+        var enterFields = new Dictionary<string, RtValue>
+        {
+            ["target"] = new RtEntityRef(cardEntity.Id),
+            ["player"] = new RtEntityRef(player.Id),
+        };
+        if (arenaEntityId is int aid3) enterFields["arena"] = new RtEntityRef(aid3);
+        ev.State.PendingEvents.Enqueue(new GameEvent("EnterPlay", enterFields));
+    }
+
+    /// <summary>
+    /// Copy <c>Triggered(...)</c> abilities off a card's declaration onto
+    /// the runtime entity so <see cref="Interpreter.DispatchEvent"/> can walk
+    /// them. Static / Replacement entries are parsed too (so they show up
+    /// in diagnostics and in the serializer) but currently ride on the
+    /// KeywordRuntime direct-check path for wired keywords, not on this
+    /// dispatcher.
+    /// </summary>
+    private static void AttachCardAbilities(Entity unit, Ast.AstCardDecl decl)
+    {
+        foreach (var f in decl.Body.Fields)
+        {
+            if (f.Key.Name != "abilities") continue;
+            if (f.Value is not Ast.AstFieldExpr fe) continue;
+            if (fe.Value is not Ast.AstListLit list) continue;
+            foreach (var el in list.Elements)
+            {
+                if (el is not Ast.AstFunctionCall fc) continue;
+                if (fc.Callee is not Ast.AstIdent id) continue;
+                AbilityKind kind = id.Name switch
+                {
+                    "Triggered" => AbilityKind.Triggered,
+                    "Static" => AbilityKind.Static,
+                    "Replacement" => AbilityKind.Replacement,
+                    _ => (AbilityKind)(-1),
+                };
+                if (kind == (AbilityKind)(-1)) continue;
+
+                var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal);
+                var positional = new List<Ast.AstExpr>();
+                foreach (var a in fc.Args)
+                {
+                    switch (a)
+                    {
+                        case Ast.AstArgNamed n: named[n.Name] = n.Value; break;
+                        case Ast.AstArgBinding b: named[b.Name] = b.Value; break;
+                        case Ast.AstArgPositional p: positional.Add(p.Value); break;
+                    }
+                }
+                unit.Abilities.Add(new AbilityInstance(kind, unit.Id, named, positional));
+            }
+        }
     }
 
     private static int GetCardCost(Ast.AstCardDecl decl) => GetCardIntField(decl, "cost");

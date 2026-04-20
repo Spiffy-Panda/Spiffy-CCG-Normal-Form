@@ -274,22 +274,55 @@ public sealed class Interpreter
 
     private void DispatchEvent(GameEvent current, GameState state, Evaluator ev)
     {
-        var game = state.Game;
-        if (game is null) return;
-
         // v1: no Replacement handling. Fire each matching Triggered ability on
-        // Game in declaration order.
-        foreach (var ability in game.Abilities)
+        // every entity in declaration order — Game first (historical
+        // ordering), then every other entity whose ability list is non-empty.
+        // Non-Game entities bind `self` to the owner, so their patterns can
+        // gate on "this event's target IS me" (the usual OnEnter / EndOfClash
+        // shape).
+        var game = state.Game;
+        if (game is not null)
+        {
+            FireTriggers(game, current, ev, selfEntityId: null);
+        }
+
+        // Snapshot the entity list before iterating — a trigger might
+        // instantiate a new entity (InstantiateEntity builtin), and we don't
+        // want that fresh entity to fire on the event that spawned it.
+        var entitySnapshot = state.Entities.Values.ToList();
+        foreach (var entity in entitySnapshot)
+        {
+            if (entity.Kind == "Game") continue;
+            if (entity.Abilities.Count == 0) continue;
+            FireTriggers(entity, current, ev, selfEntityId: entity.Id);
+        }
+    }
+
+    private static void FireTriggers(
+        Entity owner,
+        GameEvent current,
+        Evaluator ev,
+        int? selfEntityId)
+    {
+        foreach (var ability in owner.Abilities)
         {
             if (ability.Kind != AbilityKind.Triggered) continue;
             if (ability.OnPattern is null || ability.Effect is null) continue;
-            if (TryMatchPattern(ability.OnPattern, current, out var bindings))
+            if (!TryMatchPattern(ability.OnPattern, current, selfEntityId, out var bindings))
             {
-                var env = bindings.Count == 0
-                    ? RtEnv.Empty
-                    : RtEnv.Empty.Extend(bindings);
-                ev.Eval(ability.Effect, env);
+                continue;
             }
+            var env = RtEnv.Empty;
+            if (selfEntityId is int sid)
+            {
+                env = env.Extend("self", new RtEntityRef(sid));
+                if (owner.OwnerId is int ownerPlayerId)
+                {
+                    env = env.Extend("controller", new RtEntityRef(ownerPlayerId));
+                }
+            }
+            if (bindings.Count > 0) env = env.Extend(bindings);
+            ev.Eval(ability.Effect, env);
         }
     }
 
@@ -368,6 +401,13 @@ public sealed class Interpreter
     internal static bool TryMatchPattern(
         AstExpr pattern,
         GameEvent current,
+        out List<(string, RtValue)> bindings) =>
+        TryMatchPattern(pattern, current, selfEntityId: null, out bindings);
+
+    internal static bool TryMatchPattern(
+        AstExpr pattern,
+        GameEvent current,
+        int? selfEntityId,
         out List<(string, RtValue)> bindings)
     {
         bindings = new();
@@ -397,6 +437,17 @@ public sealed class Interpreter
 
                 if (!current.Fields.TryGetValue(fieldName, out var fieldValue))
                 {
+                    return false;
+                }
+
+                // `self` is special: when we're dispatching a Triggered
+                // ability attached to a non-Game entity, the pattern value
+                // `self` means "this event must reference me". The current
+                // entity's id was threaded in via selfEntityId.
+                if (selfEntityId is int sid &&
+                    valueExpr is AstIdent { Name: "self" })
+                {
+                    if (fieldValue is RtEntityRef er && er.Id == sid) continue;
                     return false;
                 }
 

@@ -191,6 +191,65 @@ public class KeywordWiringTests
     }
 
     // -----------------------------------------------------------------------
+    // Triggered-on-Unit dispatch — guide §3.2 wave 2.
+    //   DebtPinger's `Triggered(on: Event.EnterPlay(target=self),
+    //   effect: SetCounter(Player2, debt, 42))` fires when the Unit lands.
+    //   The observable side-effect is Player2.debt flipping 0 → 42.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void TriggeredOnUnit_OnEnterFires_WhenUnitEntersBattlefield()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "DebtPinger" }, Array.Empty<string>()));
+
+        // P2 has no cards; pass.
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+
+        // Before DebtPinger enters play, Player2.debt sits at the fixture
+        // default (0). Snapshot it, then play the pinger and let the event
+        // loop dispatch EnterPlay.
+        var player2 = run.State.NamedEntities["Player2"];
+        int debtBefore = player2.Counters.GetValueOrDefault("debt", 0);
+        Assert.Equal(0, debtBefore);
+
+        // P1 plays DebtPinger; arena pick; Clash hold (no damage).
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        // EnterPlay was dispatched during the event loop; the Triggered
+        // ability on DebtPinger fired, setting Player2.debt = 42.
+        Assert.Equal(42, run.State.NamedEntities["Player2"].Counters["debt"]);
+    }
+
+    [Fact]
+    public void TriggeredOnUnit_EnterPlayEvent_IsEmittedForEachUnitPlaced()
+    {
+        var file = LoadClashSentinelFixture();
+        var seen = new List<GameEvent>();
+        var opts = WithDecks(new[] { "HeavyStriker" }, Array.Empty<string>());
+        opts.OnEvent = (e, _) => seen.Add(e);
+        using var run = NewInterpreter().StartRun(file, opts);
+
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        var enterPlay = Assert.Single(seen, e => e.TypeName == "EnterPlay");
+        Assert.True(enterPlay.Fields.TryGetValue("target", out var targetVal));
+        Assert.IsType<RtEntityRef>(targetVal);
+    }
+
+    // -----------------------------------------------------------------------
     // Sub-step C — per-Arena incoming formula.
     //   incoming[defender] = max(0, projected_force[attacker]
     //                           - fortification[defender])

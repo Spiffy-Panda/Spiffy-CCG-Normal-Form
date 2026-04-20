@@ -51,6 +51,19 @@ Card FortifyWall {
   abilities: []
 }
 
+// Triggered-on-Unit probe: a 1-drop whose only text is "when this enters
+// play, set Player2.debt = 42". Uses the raw Triggered form so the probe
+// exercises the dispatch path without depending on the OnEnter shorthand
+// macro being in scope for this fixture.
+Card DebtPinger {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  abilities: [
+    Triggered(
+      on:     Event.EnterPlay(target=self),
+      effect: SetCounter(Player2, debt, 42))
+  ]
+}
+
 // Setup: conduits per (owner, arena), both players draw, both get a Main
 // Phase so either side can commit a Unit to the board. Player1 then drives
 // a single Clash pass.
