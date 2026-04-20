@@ -77,6 +77,16 @@ Ship one keyword (or keyword family) per commit; each lands with a
    trigger on a non-Game entity. Most of the step-12.3 closer pool
    (RampartCharger, SiegeCaptain, WatchtowerArcher, WallbreakerIncarnate,
    BishopOfMending, …) becomes real text the moment this lands.
+   *Dispatch landed 2026-04-20* — `DispatchEvent` walks every entity,
+   `PlaceUnit` copies the card's `abilities:` list onto the runtime
+   Unit, `EnterPlay(target=self)` is now emitted, and the pattern
+   matcher gained a `selfEntityId` path so `target=self` is an
+   entity-ref equality check rather than a lowercase binding. One
+   `DebtPinger.OnEnter` probe fires end-to-end. Remaining work on
+   this wave: re-bench the full cards/*.ccgnf corpus (which already
+   declares the shorthand `OnEnter` / `EndOfClash` / ...) — if the
+   preprocessor expands those inside the corpus, the real closer
+   pool should activate and move numbers again.
 3. **Replacement-ability dispatch.** Unlocks Recur, Unique, Shroud
    target-legality, Harborkeeper's redirect. Harder than Triggered:
    Replacement interposes on an event *before* it commits, so the
