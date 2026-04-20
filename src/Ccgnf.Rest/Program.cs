@@ -47,6 +47,7 @@ CardsEndpoints.Map(app);
 ProjectEndpoints.Map(app);
 DecksEndpoints.Map(app);
 RoomEndpoints.Map(app);
+AiEndpoints.Map(app);
 
 app.Run();
 

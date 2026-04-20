@@ -40,4 +40,6 @@ public sealed record PresetDeckDto(
     string Description,
     IReadOnlyList<DeckCardEntry> Cards,
     int CardCount,
-    IReadOnlyList<string> UnknownCards);
+    IReadOnlyList<string> UnknownCards,
+    IReadOnlyList<string> Archetypes,
+    string? SuggestedAi);

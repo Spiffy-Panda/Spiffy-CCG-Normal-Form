@@ -4,6 +4,7 @@
   "format": "constructed",
   "factions": ["EMBER"],
   "description": "Low-curve burn and fast Blitz/Surge bodies. Threatens the opposing Conduit before defenders stabilize.",
+  "archetypes": ["aggro", "tempo"],
   "cards": [
     { "name": "Cinderling", "count": 3 },
     { "name": "Spark", "count": 3 },

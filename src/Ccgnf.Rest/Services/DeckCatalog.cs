@@ -92,7 +92,9 @@ public sealed class DeckCatalog
                     Description: file.Description ?? "",
                     Cards: entries,
                     CardCount: total,
-                    UnknownCards: unknown));
+                    UnknownCards: unknown,
+                    Archetypes: file.Archetypes ?? Array.Empty<string>(),
+                    SuggestedAi: string.IsNullOrWhiteSpace(file.SuggestedAi) ? null : file.SuggestedAi));
             }
             catch (Exception ex)
             {
@@ -110,7 +112,9 @@ public sealed class DeckCatalog
         string? Format,
         IReadOnlyList<string>? Factions,
         string? Description,
-        IReadOnlyList<DeckCardFile>? Cards);
+        IReadOnlyList<DeckCardFile>? Cards,
+        IReadOnlyList<string>? Archetypes,
+        string? SuggestedAi);
 
     private sealed record DeckCardFile(string? Name, int Count);
 

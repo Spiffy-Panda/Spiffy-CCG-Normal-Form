@@ -4,6 +4,7 @@
   "format": "constructed",
   "factions": ["BULWARK"],
   "description": "Wall up, mend the Conduit, and grind the opponent out of threats.",
+  "archetypes": ["control", "midrange"],
   "cards": [
     { "name": "Palisade", "count": 3 },
     { "name": "WardenInitiate", "count": 3 },
