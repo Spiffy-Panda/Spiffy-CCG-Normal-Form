@@ -106,6 +106,38 @@ public class AiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
+    public async Task Tournament_ResolvesExperimentalProfile()
+    {
+        Environment.SetEnvironmentVariable("CCGNF_AI_EDITOR", "1");
+        try
+        {
+            using var client = _factory.CreateClient();
+            var req = new
+            {
+                deckId = "ember-aggro",
+                games = 1,
+                seed = 1,
+                bots = new[] { "fixed", "utility", "experimental/2026-04-19-fortress" },
+                maxInputsPerGame = 2000,
+                maxEventsPerGame = 50_000,
+            };
+            var response = await client.PostAsJsonAsync("/api/ai/tournament", req);
+            response.EnsureSuccessStatusCode();
+
+            var doc = await response.Content.ReadFromJsonAsync<JsonElement>();
+            var names = doc.GetProperty("rows").EnumerateArray()
+                .Select(r => r.GetProperty("botName").GetString())
+                .ToList();
+            Assert.Contains("experimental/2026-04-19-fortress", names);
+            Assert.Equal(3, names.Count);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("CCGNF_AI_EDITOR", null);
+        }
+    }
+
+    [Fact]
     public async Task PresetsIncludeArchetypes()
     {
         using var client = _factory.CreateClient();

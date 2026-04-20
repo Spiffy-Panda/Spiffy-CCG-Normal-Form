@@ -222,6 +222,27 @@ internal static class AiEndpoints
         var entries = new List<TournamentRunner.Entry>();
         foreach (var name in requested)
         {
+            if (name.StartsWith("experimental/", StringComparison.Ordinal))
+            {
+                var slug = name.Substring("experimental/".Length);
+                var path = Path.Combine(FindRepoRoot(), "encoding", "ai",
+                                        "experimental", slug, "weights.json");
+                if (!File.Exists(path)) continue;
+                WeightTable weights;
+                try
+                {
+                    weights = WeightTable.FromJson(File.ReadAllText(path));
+                }
+                catch (WeightTableFormatException)
+                {
+                    continue;
+                }
+                entries.Add(new TournamentRunner.Entry(name,
+                    () => UtilityBotFactory.Build(
+                        weights: weights, memory: new PhaseMemory())));
+                continue;
+            }
+
             TournamentRunner.BotBuilder? builder = name switch
             {
                 "fixed" => () => new FixedLadderBot(),
