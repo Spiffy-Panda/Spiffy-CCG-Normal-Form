@@ -1,0 +1,24 @@
+{
+  "id": "thorn-sprawl-tokens",
+  "name": "THORN Sprawl Tokens",
+  "format": "constructed",
+  "factions": ["THORN"],
+  "description": "Flood arenas with Sapling tokens via Sprawl, then pay off with Rally + overgrowth buffs. Exercises Sprawl(X) CreateToken, KindlingBrazier's Kindle-fire effect, and on-enter token generators (ThornseedPlanter, TanglevineDruid, Vinemother).",
+  "archetypes": ["swarm", "combo"],
+  "suggested_ai": "experimental/2026-04-19-wavebreaker",
+  "cards": [
+    { "name": "Thornling", "count": 3 },
+    { "name": "SaplingScout", "count": 3 },
+    { "name": "Thornpup", "count": 2 },
+    { "name": "Bramblepup", "count": 3 },
+    { "name": "Vinegrowth", "count": 3 },
+    { "name": "TakeRoot", "count": 2 },
+    { "name": "KindlingBrazier", "count": 2 },
+    { "name": "SprawlVanguard", "count": 3 },
+    { "name": "ThornseedPlanter", "count": 2 },
+    { "name": "TanglevineDruid", "count": 2 },
+    { "name": "Thicketwarden", "count": 2 },
+    { "name": "HardenedGrowth", "count": 1 },
+    { "name": "OvergrowthSurge", "count": 2 }
+  ]
+}

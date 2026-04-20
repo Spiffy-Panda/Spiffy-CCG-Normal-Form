@@ -549,6 +549,8 @@ internal static class Builtins
         Ast.AstCardDecl decl,
         int cost)
     {
+        CastLog.RecordCast(cardEntity, player, decl, cost, "Maneuver", arenaPos: null);
+
         // Move Hand → Cache before resolving so the effect sees the card in
         // Cache (same as the real §6.2 resolution order once Interrupts land).
         if (player.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Remove(cardEntity.Id);
@@ -645,6 +647,8 @@ internal static class Builtins
         int? arenaEntityId,
         RtSymbol? arenaPos)
     {
+        CastLog.RecordCast(cardEntity, player, decl, cost, "Unit", arenaPos);
+
         // Move Hand → Battlefield (falls back to Cache if fixture didn't
         // declare a Battlefield zone).
         if (player.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Remove(cardEntity.Id);

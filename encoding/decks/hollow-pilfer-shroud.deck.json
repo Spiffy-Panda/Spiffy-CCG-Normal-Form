@@ -1,0 +1,24 @@
+{
+  "id": "hollow-pilfer-shroud",
+  "name": "HOLLOW Pilfer Shroud",
+  "format": "constructed",
+  "factions": ["HOLLOW"],
+  "description": "Untargetable board (Shroud) plus hand-stealing Maneuvers (Pilfer). Exercises Shroud's TargetLegality check, Pilfer's RevealHand + MoveTo(exiled) chain, and the HOLLOW disruption suite (Whisperthief, QuietTheft, MindRazor).",
+  "archetypes": ["control", "disruption"],
+  "suggested_ai": "experimental/2026-04-19-reaper",
+  "cards": [
+    { "name": "Veilslip", "count": 2 },
+    { "name": "Greyface", "count": 3 },
+    { "name": "PaleStalker", "count": 3 },
+    { "name": "ShadowExecutor", "count": 3 },
+    { "name": "Oreth_TheUnseenAuthor", "count": 1 },
+    { "name": "Whisperthief", "count": 3 },
+    { "name": "QuietTheft", "count": 3 },
+    { "name": "VeiledStrike", "count": 2 },
+    { "name": "MindRazor", "count": 2 },
+    { "name": "Unmake", "count": 2 },
+    { "name": "TheLastWhisper", "count": 2 },
+    { "name": "TheUnreadPage", "count": 2 },
+    { "name": "PrivateThought", "count": 2 }
+  ]
+}

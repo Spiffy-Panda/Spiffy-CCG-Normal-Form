@@ -1,0 +1,25 @@
+{
+  "id": "hollow-phantom-fade",
+  "name": "HOLLOW Phantom Fade",
+  "format": "constructed",
+  "factions": ["HOLLOW"],
+  "description": "Phantom-dense board: every Unit can fade at Start of Clash, reducing base cost and returning to hand. Exercises Phantom's StartOfClash Choice, ScheduleAt end_of_clash, Event.PhantomReturn, and cost-reduction plumbing.",
+  "archetypes": ["tempo", "combo"],
+  "suggested_ai": "experimental/2026-04-19-reaper",
+  "cards": [
+    { "name": "Veilslip", "count": 3 },
+    { "name": "BlankfaceCultist", "count": 3 },
+    { "name": "Veilwraith", "count": 3 },
+    { "name": "Veilstrike", "count": 2 },
+    { "name": "ErasureProphet", "count": 2 },
+    { "name": "TheHollowSovereign", "count": 2 },
+    { "name": "Oreth_TheUnseenAuthor", "count": 1 },
+    { "name": "PhantomStrike", "count": 2 },
+    { "name": "VanishingWord", "count": 2 },
+    { "name": "HollowEcho", "count": 2 },
+    { "name": "TheFacelessVerdict", "count": 2 },
+    { "name": "PrivateThought", "count": 2 },
+    { "name": "Unmake", "count": 2 },
+    { "name": "Devour", "count": 2 }
+  ]
+}

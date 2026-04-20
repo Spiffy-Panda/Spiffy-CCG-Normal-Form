@@ -1,0 +1,27 @@
+{
+  "id": "tide-drift-recur-reshape",
+  "name": "TIDE Drift Recur Reshape",
+  "format": "constructed",
+  "factions": ["TIDE"],
+  "description": "Reshape TIDE Echoes to hit Peak, Drift Units across arenas at end of your turn, and Recur Units out of the Cache back to the bottom of Arsenal. Exercises Drift EndOfYourTurn Choice, Recur Replacement on destroy, Reshape swap, and TheStandingWave's Peak triggers.",
+  "archetypes": ["combo", "tempo"],
+  "suggested_ai": "experimental/2026-04-19-wavebreaker",
+  "cards": [
+    { "name": "Ripplekin", "count": 3 },
+    { "name": "Tidewatcher", "count": 2 },
+    { "name": "Currentkin", "count": 3 },
+    { "name": "Refract", "count": 2 },
+    { "name": "CurrentsPull", "count": 2 },
+    { "name": "Brinescribe", "count": 2 },
+    { "name": "DriftStriker", "count": 2 },
+    { "name": "RippleBreaker", "count": 2 },
+    { "name": "Tidalshaper", "count": 2 },
+    { "name": "ReshapeTheCurrent", "count": 2 },
+    { "name": "EchoingWave", "count": 2 },
+    { "name": "Marshlord", "count": 2 },
+    { "name": "Thessa_WhoReturns", "count": 1 },
+    { "name": "Currentmaster", "count": 1 },
+    { "name": "TheStandingWave", "count": 1 },
+    { "name": "ReturningWave", "count": 1 }
+  ]
+}

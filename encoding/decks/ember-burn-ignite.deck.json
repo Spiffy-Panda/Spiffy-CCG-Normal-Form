@@ -1,0 +1,25 @@
+{
+  "id": "ember-burn-ignite",
+  "name": "EMBER Burn + Ignite",
+  "format": "constructed",
+  "factions": ["EMBER"],
+  "description": "Direct-damage Maneuvers stapled to Ignite bodies. Exercises Ignite(N) StartOfYourTurn damage, EMBER Resonance tiers on SearingVolley/SearingWave, ChoirOfTheBlaze's Kindle-ish StartOfYourTurn, and the base burn suite.",
+  "archetypes": ["aggro", "combo"],
+  "suggested_ai": "experimental/2026-04-19-hellfire",
+  "cards": [
+    { "name": "Cinderling", "count": 3 },
+    { "name": "Coalkin", "count": 3 },
+    { "name": "Sparkbearer", "count": 3 },
+    { "name": "Spark", "count": 2 },
+    { "name": "MatchStrike", "count": 2 },
+    { "name": "Pyrearrow", "count": 2 },
+    { "name": "IgnitingWord", "count": 2 },
+    { "name": "Smolder", "count": 2 },
+    { "name": "Pyrebrand", "count": 3 },
+    { "name": "ChoirOfTheBlaze", "count": 2 },
+    { "name": "SearingVolley", "count": 2 },
+    { "name": "WarCry", "count": 2 },
+    { "name": "SearingWave", "count": 1 },
+    { "name": "Stokefire", "count": 1 }
+  ]
+}

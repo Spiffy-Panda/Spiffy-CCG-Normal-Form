@@ -1,0 +1,25 @@
+{
+  "id": "thorn-rally-force",
+  "name": "THORN Rally",
+  "format": "constructed",
+  "factions": ["THORN", "EMBER"],
+  "description": "Dense Rally bodies stacked in one arena so every subsequent THORN Unit entering triggers +Force until end of turn. Exercises Rally OnArenaEnter, GrantKeyword/ModifyCharacteristic auras, and the THORN capstones (Thornlord, Myrrhan).",
+  "archetypes": ["tempo", "midrange"],
+  "suggested_ai": "experimental/2026-04-19-wavebreaker",
+  "cards": [
+    { "name": "Thornling", "count": 3 },
+    { "name": "Bramblepup", "count": 3 },
+    { "name": "SaplingScout", "count": 3 },
+    { "name": "SprawlVanguard", "count": 2 },
+    { "name": "BriarWatcher", "count": 3 },
+    { "name": "AshrootWhelp", "count": 2 },
+    { "name": "Thicketwarden", "count": 2 },
+    { "name": "CradleMother", "count": 2 },
+    { "name": "ThornbroodPatriarch", "count": 2 },
+    { "name": "Thornlord", "count": 2 },
+    { "name": "Myrrhan_KeeperOfGrowth", "count": 1 },
+    { "name": "Bloom", "count": 2 },
+    { "name": "HardenedGrowth", "count": 2 },
+    { "name": "TakeRoot", "count": 1 }
+  ]
+}

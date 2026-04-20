@@ -1,0 +1,24 @@
+{
+  "id": "bulwark-peak",
+  "name": "BULWARK Peak",
+  "format": "constructed",
+  "factions": ["BULWARK"],
+  "description": "Mono-BULWARK pressure cooker designed to reach Peak(BULWARK) and Resonance(BULWARK, 4). Every Echo pushed is BULWARK so the tier-gated text on TheQuietWall, BannersOfVigilance, Vaen, and WallbreakerIncarnate actually fires. Exercises Peak/Resonance predicates + ClashContribution overrides.",
+  "archetypes": ["control", "midrange"],
+  "suggested_ai": "experimental/2026-04-19-fortress",
+  "cards": [
+    { "name": "Palisade", "count": 3 },
+    { "name": "WardenInitiate", "count": 3 },
+    { "name": "Stonewatcher", "count": 3 },
+    { "name": "BreachAndSeize", "count": 3 },
+    { "name": "SealTheBreach", "count": 2 },
+    { "name": "Stonewright", "count": 3 },
+    { "name": "WatchtowerArcher", "count": 2 },
+    { "name": "BannersOfVigilance", "count": 2 },
+    { "name": "TheQuietWall", "count": 2 },
+    { "name": "Vaen_ArchitectOfTheLastHour", "count": 1 },
+    { "name": "WallbreakerIncarnate", "count": 2 },
+    { "name": "ReinforceWalls", "count": 2 },
+    { "name": "RampartCharger", "count": 2 }
+  ]
+}

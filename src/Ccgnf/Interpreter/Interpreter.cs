@@ -320,6 +320,7 @@ public sealed class Interpreter
                 {
                     env = env.Extend("controller", new RtEntityRef(ownerPlayerId));
                 }
+                CastLog.RecordTrigger(owner, ability.OnPattern, current);
             }
             if (bindings.Count > 0) env = env.Extend(bindings);
             ev.Eval(ability.Effect, env);

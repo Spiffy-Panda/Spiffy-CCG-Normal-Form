@@ -1,0 +1,25 @@
+{
+  "id": "bulwark-mend",
+  "name": "BULWARK Mend",
+  "format": "constructed",
+  "factions": ["BULWARK", "NEUTRAL"],
+  "description": "Mend-heavy wall: every body enters with a Mend trigger, every Maneuver heals. Exercises Mend(N) OnEnter, Heal(cap: starting_integrity), and the Reconstitute un-collapse path.",
+  "archetypes": ["control"],
+  "suggested_ai": "experimental/2026-04-19-fortress",
+  "cards": [
+    { "name": "Palisade", "count": 2 },
+    { "name": "ConduitTender", "count": 3 },
+    { "name": "Lodgekeeper", "count": 3 },
+    { "name": "WardenInitiate", "count": 2 },
+    { "name": "SealTheBreach", "count": 2 },
+    { "name": "BishopOfMending", "count": 3 },
+    { "name": "WardenOfTheMendedWall", "count": 3 },
+    { "name": "Reconstitute", "count": 2 },
+    { "name": "TheMendedVault", "count": 2 },
+    { "name": "Vaen_ArchitectOfTheLastHour", "count": 1 },
+    { "name": "WallOfConviction", "count": 2 },
+    { "name": "ReinforceWalls", "count": 2 },
+    { "name": "CohortCaptain", "count": 2 },
+    { "name": "HoldTheLine", "count": 1 }
+  ]
+}
