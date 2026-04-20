@@ -161,6 +161,7 @@ export interface AiWeightsDto {
   path?: string | null;
   considerationKeys: string[];
   json: string;
+  editorEnabled: boolean;
 }
 
 export interface AiPreviewRow {

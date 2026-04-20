@@ -11,6 +11,7 @@ interface PageState {
   decks: PresetDeckDto[];
   saveStatus: "idle" | "saving" | "saved" | "error";
   saveError: string | null;
+  /** Mirrors CCGNF_AI_EDITOR on the server. False → Save + Run buttons 404. */
   editorEnabled: boolean;
   tournament: AiTournamentResponse | null;
   tournamentRunning: boolean;
@@ -28,7 +29,7 @@ const state: PageState = {
   decks: [],
   saveStatus: "idle",
   saveError: null,
-  editorEnabled: true,
+  editorEnabled: false,
   tournament: null,
   tournamentRunning: false,
   tournamentError: null,
@@ -45,6 +46,7 @@ export async function renderAi(container: HTMLElement): Promise<void> {
         for a preset deck, and (with <code>CCGNF_AI_EDITOR=1</code>) save
         edited weights back to <code>encoding/ai/utility-weights.json</code>.
       </p>
+      <div id="ai-banner"></div>
       <section id="ai-bots" class="ai-section"></section>
       <section id="ai-weights" class="ai-section"></section>
       <section id="ai-tournament" class="ai-section"></section>
@@ -52,9 +54,28 @@ export async function renderAi(container: HTMLElement): Promise<void> {
   `;
 
   await loadInitial();
+  renderBanner();
   renderBotsSection();
   renderWeightsSection();
   renderTournamentSection();
+}
+
+function renderBanner(): void {
+  const el = document.getElementById("ai-banner");
+  if (!el) return;
+  if (state.editorEnabled) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `
+    <div class="ai-banner ai-banner-warning" role="status">
+      <strong>Read-only mode.</strong>
+      Saving weights and running tournaments are disabled because the
+      server was started without <code>CCGNF_AI_EDITOR=1</code>. Restart
+      the REST host with that environment variable set to enable the
+      full editor.
+    </div>
+  `;
 }
 
 async function loadInitial(): Promise<void> {
@@ -70,6 +91,7 @@ async function loadInitial(): Promise<void> {
     state.weightsSource = weightsRes.body.source;
     state.weightsPath = weightsRes.body.path ?? null;
     state.considerationKeys = weightsRes.body.considerationKeys;
+    state.editorEnabled = weightsRes.body.editorEnabled;
   }
   if (decksRes.ok) {
     state.decks = decksRes.body;
@@ -128,7 +150,7 @@ function renderWeightsSection(): void {
     </p>
     <textarea id="ai-weights-json" spellcheck="false" rows="24">${escapeHtml(state.weightsJson)}</textarea>
     <div class="ai-weights-actions">
-      <button id="ai-weights-save" class="ai-btn">Save</button>
+      <button id="ai-weights-save" class="ai-btn" ${state.editorEnabled ? "" : "disabled title=\"Set CCGNF_AI_EDITOR=1 to enable saving.\""}>Save</button>
       <span id="ai-weights-status" class="ai-status">${renderSaveStatus()}</span>
     </div>
   `;
@@ -181,7 +203,7 @@ function renderTournamentSection(): void {
       <label>Games
         <input id="ai-tournament-games" type="number" min="2" max="40" step="2" value="${state.tournamentGames}">
       </label>
-      <button id="ai-tournament-run" class="ai-btn" ${state.tournamentRunning ? "disabled" : ""}>Run</button>
+      <button id="ai-tournament-run" class="ai-btn" ${state.tournamentRunning || !state.editorEnabled ? "disabled" : ""}${state.editorEnabled ? "" : " title=\"Set CCGNF_AI_EDITOR=1 to enable.\""}>Run</button>
     </div>
     <div id="ai-tournament-result">${renderTournamentResult()}</div>
   `;

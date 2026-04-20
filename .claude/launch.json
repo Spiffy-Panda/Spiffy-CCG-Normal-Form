@@ -5,7 +5,10 @@
       "name": "ccgnf-rest",
       "runtimeExecutable": "dotnet",
       "runtimeArgs": ["run", "--project", "src/Ccgnf.Rest", "--no-launch-profile"],
-      "port": 19397
+      "port": 19397,
+      "env": {
+        "CCGNF_AI_EDITOR": "1"
+      }
     }
   ]
 }

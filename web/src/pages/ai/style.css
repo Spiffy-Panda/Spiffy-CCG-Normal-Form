@@ -16,6 +16,29 @@
   font-size: 13px;
 }
 
+.ai-banner {
+  padding: 10px 14px;
+  margin: 0 0 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ai-banner-warning {
+  background: rgba(210, 184, 106, 0.12);
+  border-left: 3px solid #d2b86a;
+  color: #e9d79b;
+}
+.ai-banner code {
+  background: rgba(0, 0, 0, 0.35);
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-size: 12px;
+}
+.ai-banner strong {
+  color: #fbbf24;
+  margin-right: 4px;
+}
+
 .ai-section {
   padding: 16px 18px;
   margin-bottom: 20px;

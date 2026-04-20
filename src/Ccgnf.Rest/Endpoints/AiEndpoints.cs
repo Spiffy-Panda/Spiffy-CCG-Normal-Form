@@ -49,14 +49,16 @@ internal static class AiEndpoints
                 Source: "default",
                 Path: null,
                 ConsiderationKeys: DefaultConsiderations.Keys().ToArray(),
-                Json: ""));
+                Json: "",
+                EditorEnabled: EditorOn));
         }
         var json = File.ReadAllText(path);
         return Results.Ok(new AiWeightsDto(
             Source: "file",
             Path: path,
             ConsiderationKeys: DefaultConsiderations.Keys().ToArray(),
-            Json: json));
+            Json: json,
+            EditorEnabled: EditorOn));
     }
 
     // ─── PUT /api/ai/weights ───────────────────────────────────────────
@@ -260,7 +262,8 @@ public sealed record AiWeightsDto(
     string Source,
     string? Path,
     IReadOnlyList<string> ConsiderationKeys,
-    string Json);
+    string Json,
+    bool EditorEnabled);
 
 public sealed record AiWeightsWriteRequest(string Json);
 
