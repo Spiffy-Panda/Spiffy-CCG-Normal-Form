@@ -424,12 +424,20 @@ function renderLeft(col: HTMLElement): void {
     } else {
       const banner = renderEngineBanner(view.round, state.room?.state ?? null);
       if (banner) boardWrap.appendChild(banner);
-      const actionBar = renderActionBar();
-      if (actionBar) boardWrap.appendChild(actionBar);
+      const relevantIds = computeRelevantCardIds();
       boardWrap.appendChild(renderBoard(view, {
         viewerPlayerId: state.identity?.playerId ?? null,
-        onCardClick: onCardClicked,
+        onCardClick: (entity) => onCardClicked(entity, relevantIds),
+        onCardInfo: onCardInspected,
+        catalog: state.cardCatalog,
+        relevantCardIds: relevantIds,
       }));
+      // Action bar sits *below* the board so it's visually glued to the
+      // viewer's hand strip, not floating above the arenas. When the
+      // hand cards themselves are the buttons (play_card actions), the
+      // bar collapses to just the non-card controls (Pass, target, etc.).
+      const actionBar = renderActionBar();
+      if (actionBar) boardWrap.appendChild(actionBar);
     }
   }
   col.appendChild(boardWrap);
@@ -487,8 +495,38 @@ function renderTurnChip(): string {
   return `<span class="${tone}">${who} · ${escapeHtml(phase.phase)}</span>`;
 }
 
-function onCardClicked(entity: EntityDto): void {
+function onCardClicked(entity: EntityDto, relevantIds: ReadonlySet<number>): void {
+  // If this hand card is the subject of a pending play_card action,
+  // clicking it submits the play directly — the card itself *is* the
+  // button. Inspector is still reachable via the ⓘ corner badge.
+  if (relevantIds.has(entity.id)) {
+    const play = state.pendingInput?.legalActions.find(
+      (a) => a.kind === "play_card" && a.metadata?.entityId === String(entity.id),
+    );
+    if (play) {
+      void submitAction(play.label);
+      return;
+    }
+  }
+  onCardInspected(entity);
+}
+
+function onCardInspected(entity: EntityDto): void {
   openInspector(fromEntity(entity, state.cardCatalog), rightColEl ?? undefined);
+}
+
+function computeRelevantCardIds(): Set<number> {
+  const ids = new Set<number>();
+  const pending = state.pendingInput;
+  if (!pending) return ids;
+  for (const action of pending.legalActions) {
+    if (action.kind !== "play_card") continue;
+    const raw = action.metadata?.entityId;
+    if (!raw) continue;
+    const id = parseInt(raw, 10);
+    if (Number.isFinite(id)) ids.add(id);
+  }
+  return ids;
 }
 
 function renderActionBar(): HTMLElement | null {
@@ -507,15 +545,21 @@ function renderActionBar(): HTMLElement | null {
         })()
       : false;
 
+  // Split actions: card plays get represented by the hand itself (the
+  // cards carry the relevant outline + click), so we only render the
+  // non-card controls in the bar — Pass, targets, attackers, choices.
+  const hasPlayCard = pending.legalActions.some((a) => a.kind === "play_card");
+  const barActions = pending.legalActions.filter((a) => a.kind !== "play_card");
+
   const bar = document.createElement("div");
   bar.className = "play-action-bar";
 
   const label = document.createElement("span");
   label.className = "play-action-bar-label";
-  label.textContent = isForViewer ? "Your choice:" : "Waiting on opponent:";
+  label.textContent = buildActionLabel(pending, isForViewer, hasPlayCard);
   bar.appendChild(label);
 
-  for (const action of pending.legalActions) {
+  for (const action of barActions) {
     const btn = document.createElement("button");
     btn.className = "play-action-btn";
     btn.textContent = humanizeAction(action);
@@ -525,12 +569,64 @@ function renderActionBar(): HTMLElement | null {
     bar.appendChild(btn);
   }
 
+  if (hasPlayCard && isForViewer) {
+    const hint = document.createElement("span");
+    hint.className = "play-action-hint";
+    hint.textContent = "↓ Click a highlighted card in your hand to play it";
+    bar.appendChild(hint);
+  }
+
   const note = document.createElement("span");
   note.className = "play-action-note";
   note.textContent = pending.prompt;
   bar.appendChild(note);
 
   return bar;
+}
+
+function buildActionLabel(
+  pending: PendingInputView,
+  isForViewer: boolean,
+  hasPlayCard: boolean,
+): string {
+  // Prefer the decision prompt when it names a phase (e.g. "Clash.Left(...)"
+  // fires without a fresh PhaseBegin event, so currentPhase would still say
+  // "Channel"). Otherwise fall back to the last-seen phase marker.
+  const promptPhase = inferPhaseFromPrompt(pending.prompt);
+  const phase = promptPhase ?? state.currentPhase?.phase ?? "";
+  const who = isForViewer ? "Your" : "Opponent's";
+  const prefix = phase ? `${who} ${phase}:` : `${who} turn:`;
+
+  const kinds = new Set(pending.legalActions.map((a) => a.kind));
+  let verb: string;
+  if (kinds.has("declare_attacker")) {
+    verb = "Attack or hold";
+  } else if (kinds.has("target_entity")) {
+    verb = "Pick a target";
+  } else if (kinds.has("target_arena")) {
+    verb = "Pick an Arena";
+  } else if (hasPlayCard) {
+    verb = "Play a card or pass";
+  } else if (kinds.has("choice_option")) {
+    verb = "Choose";
+  } else if (kinds.has("pass_priority") && kinds.size === 1) {
+    verb = "Pass priority";
+  } else {
+    verb = "Choose an action";
+  }
+  return `${prefix} ${verb}`;
+}
+
+function inferPhaseFromPrompt(prompt: string): string | null {
+  // Prompts carry the decision kind as a bare identifier before "(…)":
+  //   "MainPhase(Player2)"      → Rise (main phase happens within Rise)
+  //   "PickArena(Ripplekin)"    → use currentPhase (no override)
+  //   "Clash.Left(Ripplekin)"   → Clash
+  //   "Choice(p)"               → null (mulligan / generic)
+  if (!prompt) return null;
+  if (prompt.startsWith("Clash")) return "Clash";
+  if (prompt.startsWith("MainPhase")) return "Rise";
+  return null;
 }
 
 function humanizeAction(a: LegalActionView): string {

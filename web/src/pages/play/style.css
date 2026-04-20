@@ -304,10 +304,37 @@
 
 .seat-hand {
   display: flex;
-  gap: 4px;
+  gap: 6px;
   flex-wrap: wrap;
   min-height: 88px;
   align-items: flex-start;
+}
+
+/* The viewer's own hand is the primary interaction surface (click to
+   play, inspect via ⓘ). Bump the face-up hand cards above the default
+   "sm" chit size so their glyph rows are legible at rest — opponent's
+   face-down strip and arena units keep the compact sizing. */
+.seat-strip.seat-bottom .seat-hand .play-card {
+  width: 92px;
+  height: 130px;
+  font-size: 11px;
+}
+
+.seat-strip.seat-bottom .seat-hand .play-card .play-card-glyph-row {
+  font-size: 12px;
+}
+
+.seat-strip.seat-bottom .seat-hand .play-card .play-card-glyph-echo {
+  font-size: 14px;
+}
+
+.seat-strip.seat-bottom .seat-hand .play-card .play-card-glyph-type {
+  font-size: 9.5px;
+}
+
+.seat-strip.seat-bottom .seat-hand .play-card:hover {
+  /* Larger baseline makes the 1.6× hover scale feel huge; ease up. */
+  transform: scale(1.25);
 }
 
 .seat-hand-empty {
@@ -390,21 +417,97 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #1e222a;
+  /* Mild faction tint layered over the base panel. color-mix gracefully
+     degrades to the fallback color on older browsers. */
+  background:
+    color-mix(in srgb, var(--card-faction-color) 14%, #1e222a);
   border: 1px solid var(--card-faction-color);
   border-radius: 4px;
-  overflow: hidden;
-  transition: transform 120ms ease;
+  overflow: visible;
+  transition: transform 120ms ease, outline-color 120ms ease;
   flex: 0 0 auto;
 }
 
-.play-card-sm { width: 56px; height: 80px; font-size: 9.5px; }
-.play-card-md { width: 72px; height: 102px; font-size: 10.5px; }
+.play-card-sm { width: 64px; height: 92px; font-size: 9.5px; }
+.play-card-md { width: 80px; height: 114px; font-size: 10.5px; }
 .play-card-lg { width: 100px; height: 140px; font-size: 12px; }
 
 .play-card:hover { transform: scale(1.6); z-index: 10; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
 .play-card.play-card-clickable { cursor: pointer; }
 .play-card-subtle { opacity: 0.6; }
+
+/* Playable / targetable right now — the card is the button. */
+.play-card-relevant {
+  outline: 2px solid #fbbf24;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 0 12px rgba(251, 191, 36, 0.35);
+  animation: play-card-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes play-card-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35), 0 0 6px rgba(251, 191, 36, 0.25); }
+  50%      { box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.55), 0 0 14px rgba(251, 191, 36, 0.55); }
+}
+
+/* Three compact glyph rows: cost / echo / type, stacked. */
+.play-card-glyphs {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 4px 3px;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  line-height: 1.05;
+}
+
+.play-card-glyph-row {
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.play-card-glyph-cost {
+  font-weight: 700;
+  color: #f0a846;
+}
+
+.play-card-glyph-echo {
+  font-size: 11px;
+}
+
+.play-card-glyph-type {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 8.5px;
+  opacity: 0.75;
+}
+
+/* Corner "ⓘ" badge — secondary action to inspect a relevant card
+   without taking the primary play action. */
+.play-card-info-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  line-height: 12px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.play-card-info-btn:hover {
+  background: rgba(0, 0, 0, 0.75);
+}
 
 .play-card-stripe {
   height: 4px;
@@ -624,6 +727,14 @@
   opacity: 0.7;
   align-self: center;
   margin-left: auto;
+}
+
+.play-action-hint {
+  font-size: 11px;
+  font-style: italic;
+  opacity: 0.8;
+  align-self: center;
+  color: #fbbf24;
 }
 
 /* ── Turn chip (header) ─────────────────────────────────────────────────── */

@@ -28,7 +28,13 @@ export interface CardRenderOptions {
   faceDown?: boolean;
   size?: "sm" | "md" | "lg";
   onClick?: (view: CardView) => void;
+  onInfo?: (view: CardView) => void;
   subtle?: boolean;
+  // When true, mark the card as relevant to the current pending decision
+  // (e.g. playable from hand under a play_card legal action). Rendered as
+  // a bright outline + pointer affordance; typically combined with an
+  // onClick handler that submits the action.
+  relevant?: boolean;
 }
 
 export function renderCard(view: CardView, opts: CardRenderOptions = {}): HTMLElement {
@@ -36,6 +42,7 @@ export function renderCard(view: CardView, opts: CardRenderOptions = {}): HTMLEl
   el.className = `play-card play-card-${opts.size ?? "md"}`;
   if (opts.faceDown) el.classList.add("play-card-back");
   if (opts.subtle) el.classList.add("play-card-subtle");
+  if (opts.relevant) el.classList.add("play-card-relevant");
 
   if (opts.faceDown) {
     const back = document.createElement("div");
@@ -58,19 +65,45 @@ export function renderCard(view: CardView, opts: CardRenderOptions = {}): HTMLEl
   name.className = "play-card-name";
   name.textContent = view.name;
   header.appendChild(name);
-  if (view.cost !== null && view.cost !== undefined) {
-    const cost = document.createElement("div");
-    cost.className = "play-card-cost";
-    cost.textContent = String(view.cost);
-    header.appendChild(cost);
-  }
   el.appendChild(header);
 
-  if (view.type) {
-    const typeLine = document.createElement("div");
-    typeLine.className = "play-card-type";
-    typeLine.textContent = view.type;
-    el.appendChild(typeLine);
+  // Three compact glyph rows — cost / echoes pushed / card type — when
+  // the card carries resolved catalog data. Runtime entity-only chits
+  // (no factions, no type) skip this and fall back to just the name.
+  const hasMeta = (view.cost !== null && view.cost !== undefined) || view.factions.length > 0 || !!view.type;
+  if (hasMeta) {
+    const glyphs = document.createElement("div");
+    glyphs.className = "play-card-glyphs";
+
+    const costRow = document.createElement("div");
+    costRow.className = "play-card-glyph-row play-card-glyph-cost";
+    if (view.cost !== null && view.cost !== undefined) {
+      costRow.textContent = `⚡${view.cost}`;
+    } else {
+      costRow.textContent = "";
+    }
+    glyphs.appendChild(costRow);
+
+    const echoRow = document.createElement("div");
+    echoRow.className = "play-card-glyph-row play-card-glyph-echo";
+    if (view.factions.length > 0) {
+      echoRow.textContent = view.factions.map(factionEchoGlyph).join(" ");
+      echoRow.title = `Pushes ${view.factions.join(" + ")} echo${view.factions.length > 1 ? "es" : ""}`;
+    } else {
+      echoRow.textContent = "·";
+    }
+    glyphs.appendChild(echoRow);
+
+    const typeRow = document.createElement("div");
+    typeRow.className = "play-card-glyph-row play-card-glyph-type";
+    if (view.type) {
+      typeRow.textContent = `${typeGlyph(view.type)} ${view.type}`;
+    } else {
+      typeRow.textContent = "";
+    }
+    glyphs.appendChild(typeRow);
+
+    el.appendChild(glyphs);
   }
 
   if (view.abilitiesText.length > 0) {
@@ -83,6 +116,19 @@ export function renderCard(view: CardView, opts: CardRenderOptions = {}): HTMLEl
   if (opts.onClick) {
     el.classList.add("play-card-clickable");
     el.addEventListener("click", () => opts.onClick!(view));
+  }
+
+  if (opts.onInfo) {
+    const info = document.createElement("button");
+    info.className = "play-card-info-btn";
+    info.type = "button";
+    info.textContent = "ⓘ";
+    info.title = "Inspect card";
+    info.addEventListener("click", (e) => {
+      e.stopPropagation();
+      opts.onInfo!(view);
+    });
+    el.appendChild(info);
   }
 
   return el;
@@ -99,10 +145,29 @@ export function renderCardFromDto(card: CardDto, opts: CardRenderOptions = {}): 
   }, opts);
 }
 
-// Renders a runtime card entity. Until decks are wired to rooms (7c),
-// the entity only carries a placeholder displayName — produce a
-// minimal chit with the entity id visible for debugging.
-export function renderCardFromEntity(entity: EntityDto, opts: CardRenderOptions = {}): HTMLElement {
+// Renders a runtime card entity. When the entity's displayName matches a
+// CardDto in the supplied catalog, we promote to a fully-resolved face
+// (cost / faction / type glyphs). Otherwise we fall back to a minimal
+// chit with just the entity name — this still happens for anonymous
+// tokens created by the engine at runtime, or when the catalog hasn't
+// loaded yet.
+export function renderCardFromEntity(
+  entity: EntityDto,
+  opts: CardRenderOptions = {},
+  catalog?: readonly CardDto[],
+): HTMLElement {
+  const resolved = catalog?.find((c) => c.name === entity.displayName);
+  if (resolved) {
+    return renderCard({
+      name: resolved.name,
+      factions: resolved.factions,
+      type: resolved.type,
+      cost: resolved.cost,
+      rarity: resolved.rarity,
+      abilitiesText: resolved.abilitiesText ?? [],
+      entityId: entity.id,
+    }, opts);
+  }
   return renderCard({
     name: friendlyName(entity),
     factions: [],
@@ -131,4 +196,29 @@ const FACTION_COLORS: Record<string, string> = {
 
 function factionColor(faction: string): string {
   return FACTION_COLORS[faction] ?? FACTION_COLORS.NEUTRAL;
+}
+
+const FACTION_ECHO_GLYPHS: Record<string, string> = {
+  EMBER: "🔥",
+  BULWARK: "🛡",
+  TIDE: "🌊",
+  THORN: "🌿",
+  HOLLOW: "🌌",
+  NEUTRAL: "⚪",
+};
+
+function factionEchoGlyph(faction: string): string {
+  return FACTION_ECHO_GLYPHS[faction] ?? "◆";
+}
+
+const TYPE_GLYPHS: Record<string, string> = {
+  Unit: "⚔",
+  Maneuver: "✦",
+  Standard: "◈",
+  Gambit: "◇",
+  Card: "▫",
+};
+
+function typeGlyph(type: string): string {
+  return TYPE_GLYPHS[type] ?? "▫";
 }

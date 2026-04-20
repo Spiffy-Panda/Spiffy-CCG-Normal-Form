@@ -26,6 +26,7 @@
 //     attach to rooms in 7c.
 
 import { renderCardFromEntity } from "./card";
+import type { CardDto } from "../api/dtos";
 import {
   arenaPos,
   playerAether,
@@ -42,6 +43,14 @@ export interface BoardRenderOptions {
   // Game=1), and we map roster id → state.Players order positionally.
   viewerPlayerId: number | null;
   onCardClick?: (entity: EntityDto) => void;
+  // Optional: secondary action wired up to the "ⓘ" corner badge on
+  // playable hand cards. When omitted, primary click handles inspection.
+  onCardInfo?: (entity: EntityDto) => void;
+  catalog?: readonly CardDto[];
+  // Entity ids that are the subject of a pending legal action (e.g.
+  // play_card from hand). Rendered with a bright outline to signal
+  // "this card is a button right now."
+  relevantCardIds?: ReadonlySet<number>;
 }
 
 export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLElement {
@@ -57,9 +66,17 @@ export function renderBoard(view: PlayView, opts: BoardRenderOptions): HTMLEleme
   const bottom = (viewerIdx >= 0 ? players[viewerIdx] : null) ?? players[0] ?? null;
   const top = players.find((p) => p.id !== bottom?.id) ?? players[1] ?? null;
 
-  root.appendChild(renderSeatStrip(top, view, { side: "top", faceDown: true, isViewer: false, onCardClick: opts.onCardClick }));
-  root.appendChild(renderArenaRow(view, top, bottom, opts.onCardClick));
-  root.appendChild(renderSeatStrip(bottom, view, { side: "bottom", faceDown: false, isViewer: true, onCardClick: opts.onCardClick }));
+  root.appendChild(renderSeatStrip(top, view, {
+    side: "top", faceDown: true, isViewer: false,
+    onCardClick: opts.onCardClick, onCardInfo: opts.onCardInfo,
+    catalog: opts.catalog, relevantCardIds: opts.relevantCardIds,
+  }));
+  root.appendChild(renderArenaRow(view, top, bottom, opts.onCardClick, opts.catalog));
+  root.appendChild(renderSeatStrip(bottom, view, {
+    side: "bottom", faceDown: false, isViewer: true,
+    onCardClick: opts.onCardClick, onCardInfo: opts.onCardInfo,
+    catalog: opts.catalog, relevantCardIds: opts.relevantCardIds,
+  }));
 
   return root;
 }
@@ -69,6 +86,9 @@ interface SeatOptions {
   faceDown: boolean;
   isViewer: boolean;
   onCardClick?: (entity: EntityDto) => void;
+  onCardInfo?: (entity: EntityDto) => void;
+  catalog?: readonly CardDto[];
+  relevantCardIds?: ReadonlySet<number>;
 }
 
 function renderSeatStrip(
@@ -112,13 +132,18 @@ function renderSeatStrip(
     for (const cardId of handIds) {
       const entity = view.cardsById.get(cardId);
       if (entity) {
+        const relevant = opts.relevantCardIds?.has(entity.id) === true;
         hand.appendChild(renderCardFromEntity(entity, {
           faceDown: opts.faceDown,
           size: "sm",
+          relevant,
           onClick: opts.faceDown || !opts.onCardClick
             ? undefined
             : () => opts.onCardClick!(entity),
-        }));
+          onInfo: opts.faceDown || !relevant || !opts.onCardInfo
+            ? undefined
+            : () => opts.onCardInfo!(entity),
+        }, opts.catalog));
       }
     }
   }
@@ -132,6 +157,7 @@ function renderArenaRow(
   top: EntityDto | null,
   bottom: EntityDto | null,
   onCardClick?: (entity: EntityDto) => void,
+  catalog?: readonly CardDto[],
 ): HTMLElement {
   const row = document.createElement("div");
   row.className = "arena-row";
@@ -147,8 +173,8 @@ function renderArenaRow(
     col.appendChild(label);
 
     col.appendChild(renderConduit(view, top, arena, "top"));
-    col.appendChild(renderUnitLane(view, top, arena, "top", onCardClick));
-    col.appendChild(renderUnitLane(view, bottom, arena, "bottom", onCardClick));
+    col.appendChild(renderUnitLane(view, top, arena, "top", onCardClick, catalog));
+    col.appendChild(renderUnitLane(view, bottom, arena, "bottom", onCardClick, catalog));
     col.appendChild(renderConduit(view, bottom, arena, "bottom"));
 
     row.appendChild(col);
@@ -188,6 +214,7 @@ function renderUnitLane(
   arena: EntityDto,
   side: "top" | "bottom",
   onCardClick?: (entity: EntityDto) => void,
+  catalog?: readonly CardDto[],
 ): HTMLElement {
   const lane = document.createElement("div");
   lane.className = `unit-lane unit-lane-${side}`;
@@ -217,7 +244,7 @@ function renderUnitLane(
     lane.appendChild(renderCardFromEntity(unit, {
       size: "sm",
       onClick: onCardClick ? () => onCardClick(unit) : undefined,
-    }));
+    }, catalog));
   }
   return lane;
 }
