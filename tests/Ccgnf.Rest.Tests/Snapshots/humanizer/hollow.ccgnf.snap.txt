@@ -58,3 +58,18 @@ Resolves: if HOLLOW 4, pilfer 3; otherwise, pilfer 2.
 === TheFacelessVerdict ===
 Resolves: for each opposing Unit, grant Phantom to u until end of turn; when Peak HOLLOW, RandomExileFromHand(opponent_of(self.controller), count: 1).
 
+=== HollowEcho ===
+Resolves: target Conduit: deal Min(5, Count(opponent_of(self.controller).Cache)) damage to target.
+
+=== Veilstrike ===
+Triggered (Event.PhantomReturn(target=self)): if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 1 damage to Conduit[other_player(self.controller), self.arena].
+
+=== MindRazor ===
+Resolves: target Conduit: deal Max(0, Min(4, Count(opponent_of(self.controller).Hand) - 3)) damage to target.
+
+=== ShadowExecutor ===
+Static (KeywordSet(self)): if count of Filter(AllUnits, u -> u != self ∧ u.controller == self.controller ∧ u.type == Unit ∧ has_keyword(u, Shroud)) >= 1, grant Blitz to this.
+
+=== ErasureProphet ===
+⟪EndOfClash(If(Exists(Conduit[other_player(self.controller), self.arena]) ∧ not collapsed_for(other_player(self.controller), self.arena), Tiers([(Peak(HOLLOW), DealDamage(Conduit[other_player(self.controller), self.arena], 3)), (Default, DealDamage(Conduit[other_player(self.controller), self.arena], 2))]), NoOp))⟫
+

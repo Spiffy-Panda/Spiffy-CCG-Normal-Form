@@ -3,17 +3,22 @@
   "name": "HOLLOW Disruption",
   "format": "constructed",
   "factions": ["HOLLOW"],
-  "description": "Pilfer and strike from hiding. Deny the opponent's best plays while building pressure.",
+  "description": "Pilfer and strike from hiding. Deny the opponent's best plays while building pressure. Post-12.3: Cache-scaling Maneuvers and Phantom-return Conduit pings turn HOLLOW's evasion pattern into a real damage clock.",
+  "archetypes": ["disruption", "combo"],
   "cards": [
     { "name": "Veilslip", "count": 3 },
     { "name": "PrivateThought", "count": 3 },
-    { "name": "Greyface", "count": 3 },
+    { "name": "Greyface", "count": 2 },
     { "name": "Unmake", "count": 3 },
-    { "name": "BlankfaceCultist", "count": 3 },
-    { "name": "QuietTheft", "count": 3 },
-    { "name": "Whisperthief", "count": 3 },
-    { "name": "VeiledStrike", "count": 3 },
-    { "name": "Devour", "count": 3 },
-    { "name": "Veilwraith", "count": 3 }
+    { "name": "BlankfaceCultist", "count": 2 },
+    { "name": "QuietTheft", "count": 2 },
+    { "name": "Whisperthief", "count": 2 },
+    { "name": "VeiledStrike", "count": 2 },
+    { "name": "Veilwraith", "count": 2 },
+    { "name": "Veilstrike", "count": 3 },
+    { "name": "MindRazor", "count": 2 },
+    { "name": "HollowEcho", "count": 2 },
+    { "name": "ShadowExecutor", "count": 1 },
+    { "name": "ErasureProphet", "count": 1 }
   ]
 }

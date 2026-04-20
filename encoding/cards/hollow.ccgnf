@@ -308,3 +308,130 @@ Card TheFacelessVerdict {
   // text: Each opposing Unit gains Phantom until end of turn.
   //       Peak HOLLOW: Opponent exiles a card from their hand at random.
 }
+
+// =============================================================================
+// Step 12.3 — HOLLOW closer batch (5 cards).
+// Role: closer. HOLLOW's closer identity is corroding what the opponent has —
+// Cache, hand, board — and turning evasion into Conduit pressure.
+// Phantom/Shroud-turned-damage is the native pattern.
+// =============================================================================
+
+/*
+ * Hollow Echo [U] (HOLLOW, Maneuver) — 4
+ * Deal damage to target Conduit equal to cards in opponent's Cache (cap 5).
+ *
+ * Cache-scaling Maneuver slot #1. Pays off the Pilfer/Destroy churn the
+ * faction already forces on the opponent; scales cleanly with game length.
+ */
+Card HollowEcho {
+  factions: {HOLLOW}, type: Maneuver, cost: 4, rarity: U
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        DealDamage(target,
+          Min(5, Count(opponent_of(self.controller).Cache)))))
+  ]
+  // text: Deal damage to target Conduit equal to cards in your opponent's
+  //       Cache (cap 5).
+}
+
+/*
+ * Veilstrike [C] (HOLLOW, Unit) — 3 — 2/2
+ * Phantom. When this returns to your hand via Phantom, deal 1 damage to the
+ * opposing Conduit in this Arena.
+ *
+ * Phantom-damage slot #2. Turns the existing Phantom evasion pattern into
+ * Conduit pressure — Veilstrike can evade Clash and still chip 1 damage on
+ * its way out. Reuses the Event.PhantomReturn trigger BlankfaceCultist
+ * established, so no engine changes needed.
+ */
+Card Veilstrike {
+  factions: {HOLLOW}, type: Unit, cost: 3, force: 2, ramparts: 2, rarity: C
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    Triggered(
+      on:     Event.PhantomReturn(target=self),
+      effect: If(Exists(Conduit[other_player(self.controller), self.arena])
+                 ∧ not collapsed_for(other_player(self.controller), self.arena),
+                 DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+                 NoOp))
+  ]
+  // text: Phantom. When this returns to your hand via Phantom, deal 1 damage
+  //       to the opposing Conduit in this Arena.
+}
+
+/*
+ * Mind Razor [C] (HOLLOW, Maneuver) — 3
+ * Deal damage to target Conduit equal to cards in opponent's hand, minus 3
+ * (min 0, cap 4).
+ *
+ * Hand-pressure slot #3. Works the opposite of HollowEcho: scales while
+ * the opponent is still holding threats, punishing a hoarded hand. HOLLOW's
+ * Pilfer plays keep the value window moving — empty the hand and this
+ * deals 0 again, but by then Pilfer has already delivered the pressure.
+ */
+Card MindRazor {
+  factions: {HOLLOW}, type: Maneuver, cost: 3, rarity: C
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        DealDamage(target,
+          Max(0, Min(4, Count(opponent_of(self.controller).Hand) - 3)))))
+  ]
+  // text: Deal damage to target Conduit equal to cards in your opponent's
+  //       hand, minus 3 (min 0, cap 4).
+}
+
+/*
+ * Shadow Executor [R] (HOLLOW, Unit) — 4 — 4/3
+ * Shroud. While you control another Shroud Unit, this has Blitz.
+ *
+ * Shroud-finisher slot #4. A real 4-Force body HOLLOW badly needed; the
+ * Blitz condition is on-theme (Shroud pairs hide each other's signal)
+ * and gives HOLLOW a one-shot tempo closer when it commits to the
+ * evasion plan.
+ */
+Card ShadowExecutor {
+  factions: {HOLLOW}, type: Unit, cost: 4, force: 4, ramparts: 3, rarity: R
+  keywords: [ Shroud, DeploymentSickness ]
+  abilities: [
+    Static(
+      modifies: KeywordSet(self),
+      check_at: continuously,
+      rule: If(Count(Filter(AllUnits,
+                            u -> u != self
+                               ∧ u.controller == self.controller
+                               ∧ u.type == Unit
+                               ∧ has_keyword(u, Shroud))) >= 1,
+               GrantKeyword(self, Blitz),
+               NoOp))
+  ]
+  // text: Shroud. While you control another Shroud Unit, this has Blitz.
+}
+
+/*
+ * Erasure Prophet [R] (HOLLOW, Unit) — 5 — 3/3
+ * Phantom. At End of Clash, deal 2 damage to the opposing Conduit in this
+ * Arena. Peak HOLLOW: Deal 3 instead.
+ *
+ * Erasure-capstone slot #5. Phantom keeps the body evasive; the
+ * End-of-Clash trigger means the Conduit ping fires whether or not this
+ * Phantoms away, as long as it's on the board at End of Clash. Peak
+ * HOLLOW turns it into a 3-ping-per-turn siege engine.
+ */
+Card ErasureProphet {
+  factions: {HOLLOW}, type: Unit, cost: 5, force: 3, ramparts: 3, rarity: R
+  keywords: [ Phantom, DeploymentSickness ]
+  abilities: [
+    EndOfClash(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         Tiers([
+           (Peak(HOLLOW), DealDamage(Conduit[other_player(self.controller), self.arena], 3)),
+           (Default,      DealDamage(Conduit[other_player(self.controller), self.arena], 2))
+         ]),
+         NoOp))
+  ]
+  // text: Phantom. At End of Clash, deal 2 damage to the opposing Conduit
+  //       in this Arena. Peak HOLLOW: Deal 3 instead.
+}
