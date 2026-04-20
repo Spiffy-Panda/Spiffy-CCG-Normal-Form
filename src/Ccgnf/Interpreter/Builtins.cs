@@ -662,6 +662,11 @@ internal static class Builtins
         if (arenaEntityId is int aid) cardEntity.Parameters["arena_entity"] = new RtEntityRef(aid);
         if (arenaPos is not null) cardEntity.Parameters["arena"] = arenaPos;
 
+        // Keywords declared on the card (Sentinel, Fortify(N), etc.) get
+        // stamped onto the runtime Unit so KeywordRuntime can consult them
+        // during Clash without re-walking the AST.
+        KeywordRuntime.ApplyKeywords(cardEntity, KeywordRuntime.ReadKeywords(decl));
+
         // OnResolve, if any, fires after the Unit enters play. Most real
         // Units have no OnResolve (enter-the-battlefield triggers are a
         // different phase of §6.2), but the hook is free.

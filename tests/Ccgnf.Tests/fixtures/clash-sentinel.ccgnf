@@ -1,0 +1,69 @@
+// =============================================================================
+// Fixture: Sentinel + Fortify keyword wiring probes.
+// =============================================================================
+// Same two-arena / two-conduit shape as clash.ccgnf, but both players get a
+// Main Phase + cards so the defender can put a Sentinel / Fortify Unit on
+// the board before Player1 clashes. Used by KeywordWiringTests.
+
+Entity Game {
+  kind: Game
+  characteristics: { round: 1, first_player: Unbound }
+  abilities: []
+}
+
+Entity Player[i] for i ∈ {1, 2} {
+  kind: Player
+  characteristics: { integrity_start: 7 }
+  counters: { aether: 10, debt: 0 }
+  zones: {
+    Arsenal:     Zone(order: sequential),
+    Hand:        Zone(order: unordered),
+    Battlefield: Zone(order: unordered),
+    Cache:       Zone(order: FIFO)
+  }
+  abilities: []
+}
+
+Entity Arena[pos] for pos ∈ {Left, Right} {
+  kind: Arena
+  characteristics: { position: pos }
+}
+
+// A vanilla attacker — Force 4, Ramparts 1, no keywords.
+Card HeavyStriker {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 4, ramparts: 1, rarity: C
+  abilities: []
+}
+
+// Plain Sentinel body — Force 3 / Ramparts 2. Per Keyword_Sentinel:
+// projects 0 Force, adds its Force to its side's Fortification.
+Card SentinelWall {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 3, ramparts: 2, rarity: C
+  keywords: [ Sentinel ]
+  abilities: []
+}
+
+// Fortify 2 body — Ramparts 3 base + 2 while controller's Conduit in this
+// Arena is at integrity ≥ 4.
+Card FortifyWall {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 2, ramparts: 3, rarity: C
+  keywords: [ Fortify(2) ]
+  abilities: []
+}
+
+// Setup: conduits per (owner, arena), both players draw, both get a Main
+// Phase so either side can commit a Unit to the board. Player1 then drives
+// a single Clash pass.
+Game.abilities += Triggered(
+  on:     Event.GameStart,
+  effect: Sequence([
+    InstantiateEntity(kind: Conduit, owner: Player1, arena: Left,  initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player1, arena: Right, initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, arena: Left,  initial_counters: { integrity: 7 }),
+    InstantiateEntity(kind: Conduit, owner: Player2, arena: Right, initial_counters: { integrity: 7 }),
+    Draw(Player1, amount: 1),
+    Draw(Player2, amount: 1),
+    EnterMainPhase(Player2),
+    EnterMainPhase(Player1),
+    ResolveClashPhase(active_player: Player1)
+  ]))
