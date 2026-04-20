@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "intents": {
+    "default": {
+      "on_curve": 1.5,
+      "tempo_per_aether": 2.5,
+      "lowest_live_hp": 1.5,
+      "opponent_priority": 2.5,
+      "overlap": 1.5,
+      "conduit_softness": 3.0,
+      "threat_avoidance": 0.0
+    },
+    "early_tempo": {
+      "on_curve": 2.0,
+      "tempo_per_aether": 2.5,
+      "lowest_live_hp": 1.2,
+      "opponent_priority": 2.0,
+      "overlap": 1.5,
+      "conduit_softness": 2.5,
+      "threat_avoidance": 0.0
+    },
+    "pushing": {
+      "on_curve": 1.5,
+      "tempo_per_aether": 2.5,
+      "lowest_live_hp": 1.5,
+      "opponent_priority": 2.5,
+      "overlap": 1.5,
+      "conduit_softness": 3.5,
+      "threat_avoidance": 0.0
+    },
+    "defend_conduit": {
+      "on_curve": 1.5,
+      "tempo_per_aether": 2.5,
+      "lowest_live_hp": 2.0,
+      "opponent_priority": 2.5,
+      "overlap": 1.8,
+      "conduit_softness": 3.0,
+      "threat_avoidance": 0.5
+    },
+    "lethal_check": {
+      "on_curve": 1.0,
+      "tempo_per_aether": 2.0,
+      "lowest_live_hp": 1.5,
+      "opponent_priority": 3.0,
+      "overlap": 1.2,
+      "conduit_softness": 4.0,
+      "threat_avoidance": 0.0
+    }
+  }
+}
