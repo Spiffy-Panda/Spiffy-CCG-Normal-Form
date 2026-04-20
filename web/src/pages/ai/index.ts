@@ -18,6 +18,8 @@ interface PageState {
   tournamentError: string | null;
   selectedDeckId: string | null;
   tournamentGames: number;
+  /** Bot ids checked in the Suggest-an-AI section. Defaults to every bot on load. */
+  selectedBotIds: Set<string>;
 }
 
 const state: PageState = {
@@ -35,6 +37,7 @@ const state: PageState = {
   tournamentError: null,
   selectedDeckId: null,
   tournamentGames: 4,
+  selectedBotIds: new Set(),
 };
 
 export async function renderAi(container: HTMLElement): Promise<void> {
@@ -85,7 +88,11 @@ async function loadInitial(): Promise<void> {
     api.deckPresets(),
   ]);
 
-  if (botsRes.ok) state.bots = botsRes.body;
+  if (botsRes.ok) {
+    state.bots = botsRes.body;
+    // Default: every bot participates in a fresh tournament run.
+    state.selectedBotIds = new Set(botsRes.body.map((b) => b.id));
+  }
   if (weightsRes.ok) {
     state.weightsJson = weightsRes.body.json || defaultWeightsSkeleton(weightsRes.body.considerationKeys);
     state.weightsSource = weightsRes.body.source;
@@ -190,10 +197,22 @@ function renderTournamentSection(): void {
   const deckOptions = state.decks
     .map((d) => `<option value="${escapeHtml(d.id)}"${d.id === state.selectedDeckId ? " selected" : ""}>${escapeHtml(d.name)}${d.archetypes.length ? ` [${d.archetypes.join(", ")}]` : ""}</option>`)
     .join("");
+  const botCheckboxes = state.bots
+    .map((b) => {
+      const checked = state.selectedBotIds.has(b.id) ? " checked" : "";
+      const experimental = b.id.startsWith("experimental/") ? " ai-bot-check-experimental" : "";
+      return `
+        <label class="ai-bot-check${experimental}" title="${escapeHtml(b.description)}">
+          <input type="checkbox" data-bot-id="${escapeHtml(b.id)}"${checked}>
+          <code>${escapeHtml(b.id)}</code>
+        </label>`;
+    })
+    .join("");
+  const canRun = state.tournamentRunning || !state.editorEnabled || state.selectedBotIds.size < 1;
   el.innerHTML = `
     <h2>Suggest an AI (mirror tournament)</h2>
     <p class="muted">
-      Plays the selected deck against itself with every available bot, N
+      Plays the selected deck against itself with every checked bot, N
       games per bot. Top win-rate wins. Requires <code>CCGNF_AI_EDITOR=1</code>.
     </p>
     <div class="ai-tournament-form">
@@ -203,8 +222,12 @@ function renderTournamentSection(): void {
       <label>Games
         <input id="ai-tournament-games" type="number" min="2" max="40" step="2" value="${state.tournamentGames}">
       </label>
-      <button id="ai-tournament-run" class="ai-btn" ${state.tournamentRunning || !state.editorEnabled ? "disabled" : ""}${state.editorEnabled ? "" : " title=\"Set CCGNF_AI_EDITOR=1 to enable.\""}>Run</button>
+      <button id="ai-tournament-run" class="ai-btn" ${canRun ? "disabled" : ""}${state.editorEnabled ? "" : " title=\"Set CCGNF_AI_EDITOR=1 to enable.\""}>Run</button>
     </div>
+    <fieldset class="ai-bot-checks">
+      <legend>Bots</legend>
+      ${botCheckboxes || "<span class=\"muted\">No bots available.</span>"}
+    </fieldset>
     <div id="ai-tournament-result">${renderTournamentResult()}</div>
   `;
   document.getElementById("ai-tournament-deck")?.addEventListener("change", (ev) => {
@@ -213,6 +236,16 @@ function renderTournamentSection(): void {
   document.getElementById("ai-tournament-games")?.addEventListener("change", (ev) => {
     const n = parseInt((ev.target as HTMLInputElement).value, 10);
     if (!isNaN(n) && n > 0) state.tournamentGames = n;
+  });
+  el.querySelectorAll<HTMLInputElement>(".ai-bot-check input[type=checkbox]").forEach((box) => {
+    box.addEventListener("change", () => {
+      const id = box.getAttribute("data-bot-id");
+      if (!id) return;
+      if (box.checked) state.selectedBotIds.add(id);
+      else state.selectedBotIds.delete(id);
+      // Re-render so the Run button's disabled state tracks the checks.
+      renderTournamentSection();
+    });
   });
   document.getElementById("ai-tournament-run")?.addEventListener("click", runTournament);
 }
@@ -244,11 +277,13 @@ function renderTournamentResult(): string {
 
 async function runTournament(): Promise<void> {
   if (!state.selectedDeckId) return;
+  if (state.selectedBotIds.size === 0) return;
   state.tournamentRunning = true;
   state.tournamentError = null;
   state.tournament = null;
   renderTournamentSection();
-  const res = await api.aiTournament(state.selectedDeckId, state.tournamentGames, 1);
+  const bots = Array.from(state.selectedBotIds);
+  const res = await api.aiTournament(state.selectedDeckId, state.tournamentGames, 1, bots);
   state.tournamentRunning = false;
   if (res.ok) {
     state.tournament = res.body;

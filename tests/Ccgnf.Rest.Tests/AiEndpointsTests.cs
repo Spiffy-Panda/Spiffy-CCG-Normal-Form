@@ -21,17 +21,22 @@ public class AiEndpointsTests : IClassFixture<WebApplicationFactory<Program>>
     }
 
     [Fact]
-    public async Task GetBots_ReturnsFixedAndUtility()
+    public async Task GetBots_IncludesBaselinesAndExperimentals()
     {
         using var client = _factory.CreateClient();
         var response = await client.GetAsync("/api/ai/bots");
         response.EnsureSuccessStatusCode();
 
         var bots = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal(2, bots.GetArrayLength());
-        var ids = new[] { bots[0].GetProperty("id").GetString(), bots[1].GetProperty("id").GetString() };
+        var ids = bots.EnumerateArray()
+            .Select(b => b.GetProperty("id").GetString())
+            .ToList();
+        // Baselines always present.
         Assert.Contains("fixed", ids);
         Assert.Contains("utility", ids);
+        // At least one experimental profile ships with the repo; listing
+        // must surface all well-formed ones under encoding/ai/experimental/.
+        Assert.Contains(ids, id => id is not null && id.StartsWith("experimental/"));
     }
 
     [Fact]

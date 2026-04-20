@@ -30,12 +30,70 @@ internal static class AiEndpoints
 
     private static IResult GetBots()
     {
-        var bots = new[]
+        var bots = new List<BotProfileDto>
         {
-            new BotProfileDto("fixed", "Fixed Ladder", "Baseline ladder policy."),
-            new BotProfileDto("utility", "Utility (default)", "Utility bot with default weights + phase BT."),
+            new("fixed", "Fixed Ladder", "Baseline ladder policy."),
+            new("utility", "Utility (default)", "Utility bot with default weights + phase BT."),
         };
+        bots.AddRange(ScanExperimentalBots());
         return Results.Ok(bots);
+    }
+
+    /// <summary>
+    /// Enumerate <c>encoding/ai/experimental/*/weights.json</c> and project
+    /// each one as a <see cref="BotProfileDto"/> with id
+    /// <c>experimental/&lt;slug&gt;</c>. Skips directories whose weights
+    /// file is missing or malformed so a bad experiment never breaks
+    /// the <c>GET /api/ai/bots</c> call.
+    /// </summary>
+    private static IEnumerable<BotProfileDto> ScanExperimentalBots()
+    {
+        string dir;
+        try { dir = ExperimentalDir(); }
+        catch { yield break; }
+
+        if (!Directory.Exists(dir)) yield break;
+
+        foreach (var sub in Directory.EnumerateDirectories(dir).OrderBy(p => p, StringComparer.Ordinal))
+        {
+            var weightsPath = Path.Combine(sub, "weights.json");
+            if (!File.Exists(weightsPath)) continue;
+
+            // Parse lazily — a malformed weights file shouldn't crash the
+            // listing, but we do want to exclude it so the web dropdown
+            // never offers something the tournament runner will drop.
+            try { WeightTable.FromJson(File.ReadAllText(weightsPath)); }
+            catch (WeightTableFormatException) { continue; }
+
+            var slug = Path.GetFileName(sub);
+            var description = ReadFirstParagraph(Path.Combine(sub, "notes.md"))
+                ?? "Experimental weight profile.";
+
+            yield return new BotProfileDto(
+                Id: $"experimental/{slug}",
+                Name: slug,
+                Description: description);
+        }
+    }
+
+    /// <summary>
+    /// Pull the first non-empty, non-heading paragraph from a markdown
+    /// file as the bot's one-line description. Bounded to ~160 chars so
+    /// the web dropdown can render it inline.
+    /// </summary>
+    private static string? ReadFirstParagraph(string path)
+    {
+        if (!File.Exists(path)) return null;
+        var text = File.ReadAllText(path);
+        foreach (var block in text.Split("\n\n", StringSplitOptions.RemoveEmptyEntries))
+        {
+            var trimmed = block.Trim();
+            if (trimmed.Length == 0) continue;
+            if (trimmed.StartsWith("#")) continue;
+            var flat = trimmed.Replace('\n', ' ').Replace('\r', ' ');
+            return flat.Length > 160 ? flat[..157] + "..." : flat;
+        }
+        return null;
     }
 
     // ─── GET /api/ai/weights ───────────────────────────────────────────
@@ -261,6 +319,12 @@ internal static class AiEndpoints
     {
         string projectRootName = Environment.GetEnvironmentVariable("CCGNF_PROJECT_ROOT") ?? "encoding";
         return Path.Combine(FindRepoRoot(), projectRootName, "ai", "utility-weights.json");
+    }
+
+    private static string ExperimentalDir()
+    {
+        string projectRootName = Environment.GetEnvironmentVariable("CCGNF_PROJECT_ROOT") ?? "encoding";
+        return Path.Combine(FindRepoRoot(), projectRootName, "ai", "experimental");
     }
 
     private static string FindRepoRoot()

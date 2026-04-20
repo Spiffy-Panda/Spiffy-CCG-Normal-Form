@@ -150,6 +150,44 @@
 }
 .ai-tournament-form input[type=number] { min-width: 80px; }
 
+.ai-bot-checks {
+  border: 1px solid #2f353f;
+  border-radius: 4px;
+  padding: 8px 10px 10px;
+  margin: 0 0 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.ai-bot-checks legend {
+  padding: 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #aaa;
+}
+
+.ai-bot-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.ai-bot-check input[type=checkbox] {
+  accent-color: #2a5a8a;
+  margin: 0;
+}
+
+.ai-bot-check code { color: #c9d1db; }
+
+.ai-bot-check-experimental code {
+  color: #d2b86a;
+}
+
 .ai-tournament-table {
   width: 100%;
   border-collapse: collapse;
