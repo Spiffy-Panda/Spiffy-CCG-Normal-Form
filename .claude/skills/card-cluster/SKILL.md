@@ -9,9 +9,10 @@ Creates a self-consistent cluster of cards for **Resonance** (the reference CCG 
 
 ## Core contract
 
-- **Structural choices come from a seeded PRNG, not the LLM.** Rarity, faction, card type, and keyword selection are `python3 random.choices()` calls, not "what feels right." The seed is recorded in the working file header and a re-roll uses `seed + 1`.
+- **Structural choices come from a seeded PRNG, not the LLM.** Rarity, faction, card type, keyword, and **role** selection are `python3 random.choices()` calls, not "what feels right." The seed is recorded in the working file header and a re-roll uses `seed + 1`.
 - **Narrative content comes from the LLM.** Card names, flavor text, rules prose — creativity is fine for these.
 - **Every card carries two representations in the working file** — a human-readable block comment styled like `design/Supplement.md`, followed by the CCGNF `Card NAME { ... }` declaration. These MUST stay in sync after every edit.
+- **Every card carries a role tag** — `closer | setup | disruption | filler` — in its block comment, and role selection is PRNG-weighted by the gap surfaced by the latest `docs/plan/balance/card-pool-<date>.md` audit note. Cards never ship with the role tag missing; the Sync check fails if the tag disagrees with the ability body.
 - **Nothing ships without a clean toolchain pass.** Parser-clean is the minimum; when the validator exists, validator-clean is required.
 
 ## Inputs to parse from the user prompt
@@ -141,7 +142,39 @@ for slot in slots:
 
 (See `design/Supplement.md §2.4` and `§2.6` for the canonical lists.)
 
-Offsetting seed between calls (`seed`, `seed+100`, `seed+200`, ...) keeps the streams independent.
+**Role per slot** (runs *after* faction and type are picked, *before* keyword-driven ability authoring in step 4):
+
+Read the target closer % per faction from the latest audit note
+`docs/plan/balance/card-pool-<date>.md`. For each slot, compute
+`deficit = max(0, target_closer_pct − current_closer_pct)` for that slot's
+faction. Then:
+
+- `closer_weight    = 1 + 5 * deficit`   (bigger gap → more closer slots)
+- `setup_weight     = 1`
+- `disruption_weight = 1`
+- `filler_weight    = 0.3`              (filler is a fallback, not a target)
+
+Normalize and `random.choices`. Example sketch:
+
+```python
+random.seed(seed + 400)
+for slot in slots:
+    d = max(0, faction_target[slot.faction] - faction_current[slot.faction])
+    weights = [1 + 5*d, 1, 1, 0.3]   # closer, setup, disruption, filler
+    slot.role = random.choices(['closer', 'setup', 'disruption', 'filler'],
+                               weights=weights)[0]
+```
+
+Seed offset `+400` keeps the role stream independent of the earlier
+rarity / faction / type / keyword rolls (which use `+0/+100/+200/+300`).
+
+**Gap-aware cluster** (default mode): when the user runs `/card-cluster`
+with *no* filter, run the role roll in *gap-first* mode — override the
+weights above to bias toward `closer` for the faction(s) with the
+largest deficit. The user can still request `/card-cluster 10 HOLLOW
+setups` or similar; explicit filters always override the default.
+
+Offsetting seed between calls (`seed`, `seed+100`, `seed+200`, `seed+300`, `seed+400`) keeps the streams independent.
 
 ### 4. Generate each card
 
@@ -150,9 +183,24 @@ For each slot, assemble:
 - **Name**: thematic, from a PRNG-picked seed word expanded by the LLM.
 - **Cost and stats**: derive from rarity and type per `design/Supplement.md §5` power-budget. Cost typically [1..6] for C/U, [3..7] for R/M.
 - **Keywords**: the PRNG pick from step 3.
-- **Ability text**: LLM-authored, matching the keyword behavior defined in `design/GameRules.md §11` and `encoding/engine/03-keyword-macros.ccgnf`.
+- **Role**: the PRNG pick from step 3's role-per-slot roll (`closer` / `setup` / `disruption` / `filler`). The role drives the ability-text family.
+- **Ability text**: LLM-authored, matching the keyword behavior defined in `design/GameRules.md §11` and `encoding/engine/03-keyword-macros.ccgnf`, **and** staying inside the role's ability-template family below.
 - **Flavor text**: one-liner, LLM-authored.
 - **Check for name collision**: grep the existing `encoding/cards/*.ccgnf` for the proposed name. If taken, re-roll the name (PRNG `seed + offset`).
+
+**Per-role ability templates** — pick one pattern from the slot's role
+family rather than free-styling; the role tag on the card must be a
+truthful description of what the ability actually does.
+
+| Role         | Ability patterns                                                                                                                                                                                                       |
+|--------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `closer`     | Direct-Conduit-damage Maneuver; Force-3+ Unit with a trigger that reaches the opposing Conduit (OnEnter, EndOfClash, EndOfYourTurn); Standard that deals 1+ damage per turn to a Conduit; faction-pattern payoff where damage scales off a faction-native resource (Sentinel count, Phantom returns, Cache size, Sapling count). |
+| `setup`      | Card draw; Aether acceleration; tutor; Banner builder; Sprawl / Rally / Sapling generator; token creator; Resonance-field manipulation.                                                                                |
+| `disruption` | Removal; bounce; counter; Pilfer / hand-attack; Mend / heal; Prevent; Fortify grant to self side; Sentinel grant.                                                                                                     |
+| `filler`     | Vanilla body; narrow-effect support. Strongly discouraged by the role-weight (0.3); only author filler if the PRNG forces it *and* the slot genuinely has nothing better. Filler is the "we needed a 1-cost body" slot, not the default. |
+
+A `closer` tag with no Conduit-damage line (direct or conditional via
+trigger) is a sync-check failure in step 7.
 
 **Sanity check the rarity × type combo before authoring.** Some combinations are legal-but-unusual; if the PRNG lands on one, pause to confirm the design space is real:
 
@@ -221,6 +269,7 @@ Walk each card and verify the block comment and CCGNF agree:
 - Stats: `cost N — F/R` in the comment matches `cost: N, force: F, ramparts: R`.
 - Rarity: `[C/U/R/M]` matches `rarity: C|U|R|M`.
 - Type and faction: `(EMBER, Unit)` matches `factions: {EMBER}, type: Unit`.
+- Role: the `closer | setup | disruption | filler` tag in the block comment matches what the ability actually does. A `closer` tag with no Conduit-damage line (direct or via trigger that reaches a Conduit), a `setup` tag on a removal card, or a `filler` tag on a card with a real trigger are all sync failures.
 - Rules text: the comment describes what the CCGNF does.
 
 Any mismatch → fix the appropriate side before presenting.
@@ -239,10 +288,13 @@ Working file: encoding-artifacts/working-20260417T210000.ccgnf
 Then each card as:
 
 ```
-**Cinderling** [C] *(EMBER, Unit) — 1 — 2/1*
+**Cinderling** [C] *(EMBER, Unit, closer) — 1 — 2/1*
 Blitz.
 *A 1-drop that pressures the Conduit immediately.*
 ```
+
+Role tag renders alongside faction and type so the reader sees at a
+glance how each card slots into the closer / setup / disruption mix.
 
 ### 9. Handle feedback
 
@@ -276,7 +328,9 @@ When the user says "looks good" / "ship it" / equivalent:
    python3 tools/update-card-distribution.py
    ```
 
-   The Python script is the real worker; `make card-distribution` is just a wrapper. Either is fine. The script scans every faction file, counts rarity × faction, handles dual pairs, and rewrites the table.
+   The Python script is the real worker; `make card-distribution` is just a wrapper. Either is fine. The script scans every faction file, counts rarity × faction, handles dual pairs, and rewrites the tables.
+
+   Two tables live in DISTRIBUTION.md: the legacy rarity × faction table, and — as of step 12.3 — a role × faction table with the closer / setup / disruption / filler counts. The next audit at `docs/plan/balance/card-pool-<date>.md` reads from that second table, closing the audit → skill → audit loop. If the regeneration script hasn't grown the role column yet, update it (`tools/update-card-distribution.py`) before finalizing.
 
 4. **Run the encoding corpus test** to confirm the appended cards still parse cleanly when combined with the rest of the set:
    ```bash
