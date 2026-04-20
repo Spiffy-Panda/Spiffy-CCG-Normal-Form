@@ -3,6 +3,34 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 13: Fortify + Sentinel wired; BulFort stall cell breaks
+
+Opened [step 13](steps/13-engine-completion.md) to execute the
+[engine completion guide](engine-completion-guide.md). Landed §2's
+three-sub-step pass as three commits:
+
+- **A.** `KeywordRuntime` helper reads a Card's `keywords:` list onto
+  the runtime Unit; `PlaceUnit` calls `ApplyKeywords`; helpers for
+  `GetClashProjectedForce` / `GetClashFortification` honour Sentinel.
+- **B.** `EffectiveRamparts` gates Fortify(N) on the controller's
+  Conduit at integrity ≥ 4, re-evaluated live (no counter mutation).
+- **C.** `ResolveClashPhase` replaces the per-attacker Force loop
+  with the per-Arena `incoming = max(0, projected − fortification)`
+  formula; emits one `DamageDealt` per Arena carrying the math.
+
+8 keyword probes land in
+[`tests/Ccgnf.Tests/KeywordWiringTests.cs`](../../tests/Ccgnf.Tests/KeywordWiringTests.cs);
+all 135 Ccgnf + 93 Bots + 53 REST tests pass.
+
+Post-wiring bench (guide §2.3 prediction: ≥ 5 pp on BulFort-vs-EmbHell):
+**+56.8 pp** on the bulwark-ctl × hellfire matrix cell (10.3 % →
+67.1 %). PairCorrectly draws drop 37.1 → 21.7 %; BulFort decisive
+WR 36.1 → 71.6 %. BULWARK is finally a wall; EMBER's raw Force no
+longer torches through. Artifacts:
+`ai-testing-data/post-wiring-fortify.{PairCorrectly,AiDeckMatrix}.results.json`.
+
+Next: Triggered-on-Unit dispatch (guide §3.2 wave 2).
+
 ## 2026-04-20 — Step 12.2 + 12.3: engine audit + card threat audit
 
 Ran both audits in one session; no engine or card edits yet.

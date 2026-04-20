@@ -58,7 +58,8 @@ to be readable in a single pass.
 - [steps/12.3-card-threat-audit.md](steps/12.3-card-threat-audit.md) — card tags + per-faction closer ratios. *(closed — 19 new closers authored)*
 - [steps/12.4-deck-construction.md](steps/12.4-deck-construction.md) — decks use the fixed pool honestly. *(shipped, partial — matched-AI bar deferred to 12.5)*
 - [steps/12.5-matched-ai-tune.md](steps/12.5-matched-ai-tune.md) — each deck's matched AI beats mismatched by 15 pp. *(open — next)*
-- [steps/12.6-cross-matchup-polish.md](steps/12.6-cross-matchup-polish.md) — matrix inside [25%, 75%]. *(blocked on 12.5)*
+- [steps/12.6-cross-matchup-polish.md](steps/12.6-cross-matchup-polish.md) — matrix inside [25%, 75%]. *(blocked on 12.5, now behind step 13)*
+- [steps/13-engine-completion.md](steps/13-engine-completion.md) — wire every ccgnf keyword macro so benches measure the real game. *(open — Sentinel + Fortify landed 2026-04-20; Triggered-on-Unit dispatch next.)*
 
 ## Progress
 
