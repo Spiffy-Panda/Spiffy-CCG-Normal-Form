@@ -190,6 +190,74 @@ public class KeywordWiringTests
         Assert.Equal(5, KeywordRuntime.GetClashFortification(wall, run.State));
     }
 
+    // -----------------------------------------------------------------------
+    // Sub-step C — per-Arena incoming formula.
+    //   incoming[defender] = max(0, projected_force[attacker]
+    //                           - fortification[defender])
+    // Replaces the per-attacker raw-Force loop in ResolveClashPhase.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Clash_SentinelDefender_AbsorbsForceIntoFortification_ConduitUntouched()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "HeavyStriker" }, new[] { "SentinelWall" }));
+
+        // P2 plays SentinelWall into Left: fortification = force(3) + ramparts(2) = 5.
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        // P1 plays HeavyStriker into Left: projected_force = 4.
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        // Clash prompt for HeavyStriker: attack.
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("attack"));
+        Assert.Null(run.WaitPending());
+
+        // incoming = max(0, 4 - 5) = 0. Player2's Left conduit stays at 7.
+        int p2Id = run.State.NamedEntities["Player2"].Id;
+        var p2LeftConduit = run.State.Entities.Values.Single(e =>
+            e.Kind == "Conduit" && e.OwnerId == p2Id &&
+            e.Parameters.TryGetValue("arena", out var a) &&
+            a is RtSymbol s && s.Name == "Left");
+        Assert.Equal(7, p2LeftConduit.Counters["integrity"]);
+    }
+
+    [Fact]
+    public void Clash_DamageDealtEvent_CarriesFortificationAndProjectedForce()
+    {
+        var file = LoadClashSentinelFixture();
+        var seen = new List<GameEvent>();
+        var opts = WithDecks(new[] { "HeavyStriker" }, new[] { "FortifyWall" });
+        opts.OnEvent = (e, _) => seen.Add(e);
+        using var run = NewInterpreter().StartRun(file, opts);
+
+        // P2 plays FortifyWall Left: force 2, effective ramparts 5, fortification 5.
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        // P1 plays HeavyStriker Left, attacks.
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("attack"));
+        Assert.Null(run.WaitPending());
+
+        // Fortify(2) suppresses HeavyStriker's 4 Force: incoming = max(0, 4 - 5) = 0.
+        int p2Id = run.State.NamedEntities["Player2"].Id;
+        var p2LeftConduit = run.State.Entities.Values.Single(e =>
+            e.Kind == "Conduit" && e.OwnerId == p2Id &&
+            e.Parameters.TryGetValue("arena", out var a) &&
+            a is RtSymbol s && s.Name == "Left");
+        Assert.Equal(7, p2LeftConduit.Counters["integrity"]);
+
+        // No DamageDealt event was emitted at all when incoming is 0 — the
+        // new formula skips the zero-damage beat to avoid false triggers.
+        Assert.DoesNotContain(seen, e => e.TypeName == "DamageDealt");
+    }
+
     [Fact]
     public void VanillaUnit_ClashHelpers_ReturnForceAndRampartsUnchanged()
     {

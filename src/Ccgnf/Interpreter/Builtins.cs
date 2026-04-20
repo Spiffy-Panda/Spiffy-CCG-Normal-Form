@@ -819,25 +819,40 @@ internal static class Builtins
                 if (label == "attack") attackers.Add(unit);
             }
 
-            // Damage: each attacker's Force hits the opponent's Conduit
-            // sitting in the same arena (if any). Multiple attackers in one
-            // arena stack straight onto the same conduit.
+            // Per-Arena formula (encoding/engine/09-clash.ccgnf:46-51):
+            //   incoming[defender] = max(0, projected_force[attacker]
+            //                           - fortification[defender])
+            // Projected Force is the attacker-side sum after Sentinel zeroes
+            // its contributors; fortification is the defender-side sum of
+            // effective Ramparts (Fortify bonus included) plus any Sentinel
+            // redirect of Force into Fortification. A single DamageDealt
+            // event is emitted per Arena so later triggers see one damage
+            // beat per Arena rather than one per attacker.
             if (opponent is not null && attackers.Count > 0)
             {
                 Entity? conduit = FindConduit(ev, opponent.Id, pos.Name);
+                int projectedForce = 0;
                 foreach (var a in attackers)
                 {
-                    int force = a.Counters.GetValueOrDefault("force", 0);
-                    if (conduit is null || force <= 0) continue;
+                    projectedForce += KeywordRuntime.GetClashProjectedForce(a, ev.State);
+                }
+                int fortification = DefenderArenaFortification(ev, opponent.Id, pos.Name);
+                int incoming = Math.Max(0, projectedForce - fortification);
+
+                if (conduit is not null && incoming > 0)
+                {
                     int before = conduit.Counters.GetValueOrDefault("integrity", 0);
-                    conduit.Counters["integrity"] = Math.Max(0, before - force);
+                    conduit.Counters["integrity"] = Math.Max(0, before - incoming);
                     ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
                         new Dictionary<string, RtValue>
                         {
-                            ["source"] = new RtEntityRef(a.Id),
+                            ["source"] = new RtEntityRef(attacker.Id),
                             ["target"] = new RtEntityRef(conduit.Id),
                             ["counter"] = new RtSymbol("integrity"),
-                            ["amount"] = new RtInt(force),
+                            ["amount"] = new RtInt(incoming),
+                            ["arena"] = new RtEntityRef(arena.Id),
+                            ["projected_force"] = new RtInt(projectedForce),
+                            ["fortification"] = new RtInt(fortification),
                         }));
                 }
             }
@@ -867,6 +882,23 @@ internal static class Builtins
             units.Add(e);
         }
         return units;
+    }
+
+    /// <summary>
+    /// Sum of per-Unit Fortification on the defender's side of one Arena —
+    /// effective Ramparts plus any Sentinel Force redirect (both computed
+    /// per-Unit by <see cref="KeywordRuntime.GetClashFortification"/>). This
+    /// is what the attacker's projected Force must overcome before Conduit
+    /// integrity starts dropping.
+    /// </summary>
+    private static int DefenderArenaFortification(Evaluator ev, int defenderId, string arenaPos)
+    {
+        int total = 0;
+        foreach (var unit in UnitsOnArena(ev, defenderId, arenaPos))
+        {
+            total += KeywordRuntime.GetClashFortification(unit, ev.State);
+        }
+        return total;
     }
 
     private static Entity? FindConduit(Evaluator ev, int ownerId, string arenaPos)
