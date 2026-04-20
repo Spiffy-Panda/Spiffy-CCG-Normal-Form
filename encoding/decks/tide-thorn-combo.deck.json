@@ -3,17 +3,22 @@
   "name": "TIDE + THORN Combo",
   "format": "constructed",
   "factions": ["TIDE", "THORN"],
-  "description": "Reshape the board with TIDE shifts while THORN grows tempo through sticky low-cost units.",
+  "description": "Reshape the board with TIDE shifts while THORN grows tempo through sticky low-cost units. Post-12.3: TIDE now carries real closers — Drift-pings, Reshape-payoff Conduit damage, and an End-of-Turn Peak-TIDE siege — so the combo actually closes.",
+  "archetypes": ["combo", "tempo"],
   "cards": [
     { "name": "Ripplekin", "count": 3 },
-    { "name": "Refract", "count": 3 },
-    { "name": "Brinescribe", "count": 3 },
-    { "name": "Tidewatcher", "count": 3 },
-    { "name": "Currentkin", "count": 3 },
+    { "name": "Refract", "count": 2 },
+    { "name": "Brinescribe", "count": 2 },
+    { "name": "Tidewatcher", "count": 2 },
+    { "name": "Currentkin", "count": 2 },
     { "name": "Thornling", "count": 3 },
-    { "name": "TakeRoot", "count": 3 },
-    { "name": "Bramblepup", "count": 3 },
-    { "name": "SaplingScout", "count": 3 },
-    { "name": "Thornpup", "count": 3 }
+    { "name": "TakeRoot", "count": 2 },
+    { "name": "Bramblepup", "count": 2 },
+    { "name": "SaplingScout", "count": 2 },
+    { "name": "Thornpup", "count": 2 },
+    { "name": "DriftStriker", "count": 3 },
+    { "name": "RippleBreaker", "count": 2 },
+    { "name": "WaveCount", "count": 2 },
+    { "name": "TidebreakerSage", "count": 1 }
   ]
 }

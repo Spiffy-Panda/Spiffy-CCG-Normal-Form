@@ -65,3 +65,18 @@ At start of your turn: Reshape(1).
 === Currentmaster ===
 When a card matching TIDE friendly is played: Reshape(1).
 
+=== RippleBreaker ===
+When a card matching TIDE friendly Maneuver is played: if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 1 damage to Conduit[other_player(self.controller), self.arena].
+
+=== WaveCount ===
+Resolves: target Conduit: deal Min(5, Count(self.controller.Cache, card -> TIDE ∈ card.factions)) damage to target.
+
+=== DriftStriker ===
+When this enters play: if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 1 damage to Conduit[other_player(self.controller), self.arena].
+
+=== WaveFinisher ===
+Resolves: target Conduit: if TIDE 4, deal 5 damage to target; otherwise, deal 3 damage to target; choose one — you.
+
+=== TidebreakerSage ===
+⟪EndOfYourTurn(If(Exists(Conduit[other_player(self.controller), self.arena]) ∧ not collapsed_for(other_player(self.controller), self.arena), Tiers([(Peak(TIDE), DealDamage(Conduit[other_player(self.controller), self.arena], 3)), (Default, DealDamage(Conduit[other_player(self.controller), self.arena], 2))]), NoOp))⟫
+

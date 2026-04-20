@@ -328,3 +328,149 @@ Card Currentmaster {
   ]
   // text: When you play a TIDE card, Reshape once.
 }
+
+// =============================================================================
+// Step 12.3 — TIDE closer batch (5 cards).
+// Role: closer. TIDE's closer identity is repositioning payoff: every card
+// here either triggers on a TIDE Maneuver / Reshape, scales with TIDE
+// Cache churn, or turns Drift into Conduit damage. No raw aggro bodies —
+// the faction's vocabulary stays about moving pieces, but now moving them
+// actually threatens lethal.
+// =============================================================================
+
+/*
+ * Ripple Breaker [U] (TIDE, Unit) — 3 — 2/2
+ * Drift. Whenever you play another TIDE Maneuver, deal 1 damage to the
+ * opposing Conduit in this Arena.
+ *
+ * Reshape-damage slot #1 (proxied via TIDE-Maneuver-played trigger, since
+ * most TIDE Maneuvers Reshape). Every Reshape-adjacent play now chips a
+ * Conduit; a deck stacked with ReshapeTheCurrent / DriftingMist / Undertow
+ * turns into a real damage clock while Ripple Breaker survives.
+ */
+Card RippleBreaker {
+  factions: {TIDE}, type: Unit, cost: 3, force: 2, ramparts: 2, rarity: U
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.controller == self.controller
+                 ∧ TIDE ∈ c.factions
+                 ∧ c.type == Maneuver
+                 ∧ c != self,
+      effect: If(Exists(Conduit[other_player(self.controller), self.arena])
+                 ∧ not collapsed_for(other_player(self.controller), self.arena),
+                 DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+                 NoOp))
+  ]
+  // text: Drift. Whenever you play another TIDE Maneuver, deal 1 damage to
+  //       the opposing Conduit in this Arena.
+}
+
+/*
+ * Wave Count [U] (TIDE, Maneuver) — 3
+ * Deal damage to target Conduit equal to the number of TIDE cards in your
+ * Cache (cap 5).
+ *
+ * Reshape-count slot #2. Proxies "Units you've Reshaped this game" with
+ * "TIDE cards you've played and sent to Cache" — the deck's natural churn
+ * (Reshape-heavy Maneuvers, Recur bodies dying and re-entering) directly
+ * inflates the counter. Recur pulls cards back out of Cache, so the line
+ * has a real ceiling and self-balances.
+ */
+Card WaveCount {
+  factions: {TIDE}, type: Maneuver, cost: 3, rarity: U
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        DealDamage(target,
+          Min(5, Count(self.controller.Cache, card -> TIDE ∈ card.factions)))))
+  ]
+  // text: Deal damage to target Conduit equal to the number of TIDE cards
+  //       in your Cache (cap 5).
+}
+
+/*
+ * Drift Striker [C] (TIDE, Unit) — 3 — 3/3
+ * Drift. When this enters play, deal 1 damage to the opposing Conduit in
+ * this Arena.
+ *
+ * Drift-closer slot #3. 3-Force body with Drift means this can re-enter
+ * the pressure zone turn after turn; the OnEnter ping guarantees an
+ * immediate tempo damage contribution. The cleanest curve-3 closer
+ * TIDE has.
+ */
+Card DriftStriker {
+  factions: {TIDE}, type: Unit, cost: 3, force: 3, ramparts: 3, rarity: C
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: [
+    OnEnter(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         DealDamage(Conduit[other_player(self.controller), self.arena], 1),
+         NoOp))
+  ]
+  // text: Drift. When this enters play, deal 1 damage to the opposing
+  //       Conduit in this Arena.
+}
+
+/*
+ * Wave Finisher [R] (TIDE, Maneuver) — 5
+ * Deal 3 damage to target Conduit. Then, you may return a non-Unique TIDE
+ * Maneuver from your Cache to your hand. TIDE 4: Deal 5 damage instead.
+ *
+ * Wave-finisher slot #4. Real Conduit damage bundled with TIDE's Cache
+ * recurrence pattern — 5 damage at TIDE 4 is real lethal pressure, and
+ * the recurred Maneuver keeps the engine primed for next turn.
+ */
+Card WaveFinisher {
+  factions: {TIDE}, type: Maneuver, cost: 5, rarity: R
+  abilities: [
+    OnResolve(
+      Target(c -> c.kind == Conduit,
+        Sequence([
+          Tiers([
+            (Resonance(TIDE, 4), DealDamage(target, 5)),
+            (Default,            DealDamage(target, 3))
+          ]),
+          Choice(self.controller, {
+            pass:  NoOp,
+            recur: Target(card -> card ∈ self.controller.Cache
+                                ∧ TIDE ∈ card.factions
+                                ∧ card.type == Maneuver
+                                ∧ not (Unique ∈ card.keywords),
+              MoveTo(target, self.controller.Hand))
+          })
+        ])))
+  ]
+  // text: Deal 3 damage to target Conduit. Then, you may return a
+  //       non-Unique TIDE Maneuver from your Cache to your hand.
+  //       TIDE 4: Deal 5 damage instead.
+}
+
+/*
+ * Tidebreaker Sage [R] (TIDE, Unit) — 5 — 4/4
+ * Drift. At end of your turn, if this is in play and the opposing Conduit
+ * in this Arena exists, deal 2 damage to it. Peak TIDE: Deal 3 instead.
+ *
+ * Tide capstone slot #5. The End-of-Turn trigger means Tidebreaker Sage
+ * doesn't need to survive Clash to deal its damage — its Drift lets it
+ * pick the Arena it pings each turn, so the opponent can't safely stack
+ * Fortification in one spot. Peak TIDE makes the loop a 3-per-turn
+ * siege.
+ */
+Card TidebreakerSage {
+  factions: {TIDE}, type: Unit, cost: 5, force: 4, ramparts: 4, rarity: R
+  keywords: [ Drift, DeploymentSickness ]
+  abilities: [
+    EndOfYourTurn(
+      If(Exists(Conduit[other_player(self.controller), self.arena])
+         ∧ not collapsed_for(other_player(self.controller), self.arena),
+         Tiers([
+           (Peak(TIDE), DealDamage(Conduit[other_player(self.controller), self.arena], 3)),
+           (Default,    DealDamage(Conduit[other_player(self.controller), self.arena], 2))
+         ]),
+         NoOp))
+  ]
+  // text: Drift. At end of your turn, deal 2 damage to the opposing
+  //       Conduit in this Arena. Peak TIDE: Deal 3 instead.
+}
