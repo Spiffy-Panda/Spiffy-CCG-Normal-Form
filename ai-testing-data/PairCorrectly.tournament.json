@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "PairCorrectly",
-  "description": "Step 12.0 baseline — matched-pair round-robin. Every archetype paired with its designed bot: bulwark-control+fortress, ember-aggro+hellfire, hollow-disruption+reaper, tide-thorn-combo+wavebreaker. Cross-pair only (no mirror) so cells are about matched-pair-A vs matched-pair-B, not self-variance. logLevel=llm so the JSONL learning log lands under logs/tournaments/.",
+  "description": "Matched-pair round-robin across the four archetype-bot pairs: bulwark-control+fortress, ember-aggro+hellfire, hollow-disruption+reaper, tide-thorn-combo+wavebreaker. Cross-pair only (no mirror). Knob 3 (harness integrity-delta tiebreaker) is active, so a cap-hit game whose Conduits are unevenly damaged becomes a decisive result by the integrity side. ENGINE STATUS (2026-04-20): the v1 interpreter wires raw Force -> Conduit damage and atomic DealDamage, but Fortification, Sentinel, Fortify, Phantom, Shroud, and several other keyword macros are declared in CCGNF but not yet dispatched at runtime -- see docs/plan/engine-completion-guide.md. Numbers in this bench are interpretable relative to the 12.0 baseline, but an unknown fraction of card text is currently cosmetic. Baseline-seed artifact for regression diffing lives at ai-testing-data/PairCorrectly.baseline.results.json.",
   "pairs": [
     {
       "pairId": "BulFort",
