@@ -8,6 +8,7 @@ to be readable in a single pass.
 
 - [00-overview.md](00-overview.md) — goals, scope, delivery sequence, what's in vs out.
 - [01-architecture.md](01-architecture.md) — system shape (pipeline, data model, host composition) as UML-flat markdown.
+- **[engine-completion-guide.md](engine-completion-guide.md) — finish the v1 interpreter.** Most ccgnf keyword abilities (Sentinel, Fortify, Mend, Phantom, Shroud, Ignite, Drift, Rally, etc.) are declared but not dispatched; read this before any interpreter work. Starts with a worked Fortify/Sentinel wiring plan and a per-keyword audit methodology.
 
 ## APIs
 
