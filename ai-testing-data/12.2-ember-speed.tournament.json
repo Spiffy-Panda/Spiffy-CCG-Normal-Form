@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "12.2-ember-speed",
+  "description": "Step 12.2 engine-sanity probe — Hellfire + ember-aggro mirror. Shortest-path lethal-check. If the engine can close fast anywhere, it's here. 40 games, mirror included, same caps as baseline.",
+  "pairs": [
+    {
+      "pairId": "HellA",
+      "deckId": "ember-aggro",
+      "botProfile": "experimental/2026-04-19-hellfire",
+      "label": "HellA"
+    },
+    {
+      "pairId": "HellB",
+      "deckId": "ember-aggro",
+      "botProfile": "experimental/2026-04-19-hellfire",
+      "label": "HellB"
+    }
+  ],
+  "matchups": null,
+  "includeMirror": true,
+  "gamesPerMatchup": 40,
+  "baseSeed": 1,
+  "maxInputsPerGame": 6000,
+  "maxEventsPerGame": 150000,
+  "logLevel": "llm"
+}

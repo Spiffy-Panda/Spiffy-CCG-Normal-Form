@@ -3,6 +3,47 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 12.2 + 12.3: engine audit + card threat audit
+
+Ran both audits in one session; no engine or card edits yet.
+
+**12.2 (engine).** Probed with a Hellfire + `ember-aggro` mirror — the
+most damage-dense configuration the pool allows. Result: `2-1-117`
+over 120 games, **97.5 % draw rate** at 428 avg steps. Even with
+aggressive cards and aggressive weights on both sides, the 1:1
+Force-minus-Fortification Clash formula absorbs almost all damage
+in a symmetric matchup. Verdict: **rules need a knob**.
+
+Queued knobs (none shipped). Knob 1 (Clash Incoming ×2) is the
+primary candidate; Knob 3 (harness-only tiebreaker) can ship
+independently when useful. 12.2's follow-up sequencing is explicitly
+gated behind 12.3's first authoring pass — see the updated
+[`12.2`](steps/12.2-engine-sanity-pass.md) doc.
+
+Full writeup: [`docs/plan/balance/engine-audit-2026-04-20.md`](balance/engine-audit-2026-04-20.md).
+Probe artifact: [`ai-testing-data/12.2-ember-speed.results.json`](../../ai-testing-data/12.2-ember-speed.results.json).
+
+**12.3 (cards).** Tagged every one of 115 cards in
+`encoding/cards/*.ccgnf` as closer / setup / disruption / filler.
+Faction health: EMBER 83 %, BULWARK **0 %**, TIDE **0 %**, HOLLOW
+**0 %**, THORN 14 %. Three of five mono-factions ship with literally
+zero Conduit-damage cards. That's the dominant cause of the 80 %
+baseline draw rate.
+
+Updated [`12.3`](steps/12.3-card-threat-audit.md) with the full
+authoring queue (19 closers across 4 factions with design hooks),
+the `card-cluster` SKILL.md update plan (role-bucket awareness,
+gap-aware default, role tags in DISTRIBUTION.md), and the 12.4
+coordination contract. Full card-by-card audit at
+[`docs/plan/balance/card-pool-2026-04-20.md`](balance/card-pool-2026-04-20.md).
+
+No card files edited this session — authoring is the next action,
+per-card-per-commit with bench attached. Engine knobs stay queued;
+pull only if the card-authoring pass doesn't reach the ≤ 40 %
+draw-rate target.
+
+---
+
 ## 2026-04-20 — Step 12.1: AI floor fix (no promotion)
 
 Audited all four experimental bots for
