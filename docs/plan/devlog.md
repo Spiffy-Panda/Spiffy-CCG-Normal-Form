@@ -3,6 +3,33 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 12.0: balance baseline captured
+
+Ran the two reference tournaments at post-bump defaults (40 games /
+matchup, 6000 inputs, 150000 events) and checked the artifacts in:
+
+- [`ai-testing-data/PairCorrectly.baseline.results.json`](../../ai-testing-data/PairCorrectly.baseline.results.json) + `.learning.jsonl`
+- [`ai-testing-data/SimpleSweep.baseline.results.json`](../../ai-testing-data/SimpleSweep.baseline.results.json) + `.learning.jsonl`
+
+Human summary: [`docs/plan/balance/baseline-2026-04-20.md`](balance/baseline-2026-04-20.md).
+
+Key numbers: PairCorrectly drew 196/240 (81.7 %), SimpleSweep drew
+659/840 (78.5 %). Average game length 374–393 steps. Matched-pair
+leaderboard: Wave > Fort ≫ Hell > Reap. Mirror-deck leaderboard (on
+`bulwark-control`): Wave ≈ Reap ≈ Fort > Hell > Util ≫ Fixed.
+
+Exit via the "AI floor is bad" branch — both configs above the 70 %
+draw threshold. Three most-lopsided matchups all implicate the
+`reaper` + `hollow-disruption` pair; `fixed` piloting
+`bulwark-control` draws 97 % in its mirror. Hypothesis: weak
+closing pressure (intent `lethal_check`, consideration
+`conduit_softness`), not deck-level imbalance. Step 12.1 will
+iterate weights, not cards.
+
+No code changes.
+
+---
+
 ## 2026-04-19 — Step 10.2 complete (utility bot + BT shell + tournament)
 
 Delivered 10.2a–10.2i in one arc. New `src/Ccgnf.Bots/` project holds
