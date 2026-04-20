@@ -50,13 +50,14 @@ to be readable in a single pass.
 - [steps/09-godot-client.md](steps/09-godot-client.md)
 - [steps/10-long-term-ai.md](steps/10-long-term-ai.md)
 - [steps/11-humanizer-templates.md](steps/11-humanizer-templates.md)
-- [steps/12.0-balance-baseline.md](steps/12.0-balance-baseline.md) — balance arc opens with a measurement snapshot.
-- [steps/12.1-ai-floor-fix.md](steps/12.1-ai-floor-fix.md) — AI floor rule + ongoing iteration point.
-- [steps/12.2-engine-sanity-pass.md](steps/12.2-engine-sanity-pass.md) — rules can reach lethal in ≤ 8 turns.
-- [steps/12.3-card-threat-audit.md](steps/12.3-card-threat-audit.md) — card tags + per-faction closer ratios.
-- [steps/12.4-deck-construction.md](steps/12.4-deck-construction.md) — decks use the fixed pool honestly.
-- [steps/12.5-matched-ai-tune.md](steps/12.5-matched-ai-tune.md) — each deck's matched AI beats mismatched by 15 pp.
-- [steps/12.6-cross-matchup-polish.md](steps/12.6-cross-matchup-polish.md) — matrix inside [25%, 75%].
+- **[steps/12.INDEX-2026-04-20.md](steps/12.INDEX-2026-04-20.md) — state of the step-12 arc. Read this before touching any 12.x file.**
+- [steps/12.0-balance-baseline.md](steps/12.0-balance-baseline.md) — balance arc opens with a measurement snapshot. *(closed)*
+- [steps/12.1-ai-floor-fix.md](steps/12.1-ai-floor-fix.md) — AI floor rule + ongoing iteration point. *(closed — 2 passes landed)*
+- [steps/12.2-engine-sanity-pass.md](steps/12.2-engine-sanity-pass.md) — rules can reach lethal in ≤ 8 turns. *(closed — Knob 3 only)*
+- [steps/12.3-card-threat-audit.md](steps/12.3-card-threat-audit.md) — card tags + per-faction closer ratios. *(closed — 19 new closers authored)*
+- [steps/12.4-deck-construction.md](steps/12.4-deck-construction.md) — decks use the fixed pool honestly. *(shipped, partial — matched-AI bar deferred to 12.5)*
+- [steps/12.5-matched-ai-tune.md](steps/12.5-matched-ai-tune.md) — each deck's matched AI beats mismatched by 15 pp. *(open — next)*
+- [steps/12.6-cross-matchup-polish.md](steps/12.6-cross-matchup-polish.md) — matrix inside [25%, 75%]. *(blocked on 12.5)*
 
 ## Progress
 
