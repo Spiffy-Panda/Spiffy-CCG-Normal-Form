@@ -3,6 +3,31 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-19 — Step 10.2 complete (utility bot + BT shell + tournament)
+
+Delivered 10.2a–10.2i in one arc. New `src/Ccgnf.Bots/` project holds
+the extracted `IRoomBot` + `FixedLadderBot`, the `UtilityBot` with
+weight tables and seven considerations (`on_curve`,
+`tempo_per_aether`, `lowest_live_hp`, `opponent_priority`, `overlap`,
+`conduit_softness`, `threat_avoidance`), a stateless phase-BT shell
+loading from JSON, `PhaseMemory` for sticky intent, and a
+`BotMatchRunner` + `TournamentRunner` harness in `Bench/`.
+
+REST gains `/api/ai/{bots,weights,preview-score,tournament}`, all
+gated behind `CCGNF_AI_EDITOR=1`. Room takes a new `botKind` knob
+(`fixed` | `utility`) so operators can flip the default without
+recompiling. Deck JSON schema adds `archetypes: string[]` +
+`suggestedAi?: string`; ember-aggro and bulwark-control got tags.
+
+Web ships a minimal `#/ai` route: bot list, weights textarea with
+Save, deck-picker tournament runner. Preview-verified — page loads,
+gated endpoint returns 404 with the expected graceful error banner.
+
+269 tests pass (127 Ccgnf, 52 Rest, 90 Bots). The benchmark harness
+runs real Resonance games end-to-end.
+
+---
+
 ## 2026-04-19 — Units render on arenas + phase tracker
 
 Two frontend-only follow-ups to make 8e visible.

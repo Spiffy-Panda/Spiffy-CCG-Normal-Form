@@ -84,4 +84,24 @@ export const api = {
     fetch(`/api/rooms/${encodeURIComponent(id)}`, { method: "DELETE" }),
   exportRoom: (id: string) =>
     request<RoomExportDto>(`/api/rooms/${encodeURIComponent(id)}/export`),
+
+  aiBots: () =>
+    request<import("./dtos").BotProfileDto[]>("/api/ai/bots"),
+  aiWeights: () =>
+    request<import("./dtos").AiWeightsDto>("/api/ai/weights"),
+  aiPutWeights: (json: string) =>
+    request<{ ok: boolean; path: string }>("/api/ai/weights", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ json }),
+    }),
+  aiTournament: (deckId: string, games: number, seed: number, bots?: string[]) =>
+    postJson<import("./dtos").AiTournamentResponse>("/api/ai/tournament", {
+      deckId,
+      games,
+      seed,
+      bots,
+      maxInputsPerGame: 2000,
+      maxEventsPerGame: 50000,
+    }),
 };

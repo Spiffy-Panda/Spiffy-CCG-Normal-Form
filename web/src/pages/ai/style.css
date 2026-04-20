@@ -1,0 +1,148 @@
+.ai-page {
+  padding: 20px 24px;
+  max-width: 980px;
+  margin: 0 auto;
+  color: #e6e6e6;
+}
+
+.ai-page h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.ai-intro {
+  margin: 0 0 20px;
+  color: #aaa;
+  font-size: 13px;
+}
+
+.ai-section {
+  padding: 16px 18px;
+  margin-bottom: 20px;
+  background: #1e222a;
+  border: 1px solid #2f353f;
+  border-radius: 6px;
+}
+
+.ai-section h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ai-source {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+.ai-source-file { background: #14432c; color: #6fc38f; }
+.ai-source-default { background: #3a3318; color: #d2b86a; }
+.ai-source-unknown { background: #2b2b2b; color: #8e8e8e; }
+
+.ai-bot-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ai-bot-row {
+  display: grid;
+  grid-template-columns: 100px 180px 1fr;
+  gap: 12px;
+  align-items: baseline;
+  font-size: 13px;
+}
+.ai-bot-row code { color: #f0a846; }
+.ai-bot-name { font-weight: 600; }
+.ai-bot-desc { color: #9aa0a8; }
+
+#ai-weights-json {
+  width: 100%;
+  background: #151820;
+  color: #e6e6e6;
+  border: 1px solid #2f353f;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.ai-weights-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ai-btn {
+  background: #2a5a8a;
+  color: #ffffff;
+  border: none;
+  border-radius: 3px;
+  padding: 6px 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.ai-btn:hover:not(:disabled) { background: #366fa8; }
+
+.ai-status { font-size: 13px; }
+.ai-saving { color: #d2b86a; }
+.ai-saved { color: #6fc38f; }
+.ai-error { color: #e47272; }
+
+.ai-tournament-form {
+  display: flex;
+  gap: 14px;
+  align-items: end;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.ai-tournament-form label {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #aaa;
+}
+.ai-tournament-form select,
+.ai-tournament-form input {
+  background: #151820;
+  color: #e6e6e6;
+  border: 1px solid #2f353f;
+  border-radius: 3px;
+  padding: 5px 8px;
+  margin-top: 4px;
+  font-size: 13px;
+  min-width: 200px;
+}
+.ai-tournament-form input[type=number] { min-width: 80px; }
+
+.ai-tournament-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.ai-tournament-table th, .ai-tournament-table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid #2b2f38;
+}
+.ai-tournament-table th {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #aaa;
+}
+.ai-tournament-table tr:first-child td { font-weight: 600; color: #6fc38f; }
+
+.muted { color: #8a8a8a; font-size: 12px; }

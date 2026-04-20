@@ -54,10 +54,11 @@ CCGNF is pre-alpha. The preprocessor → parser → AST → validator → interp
 | Resonance rules (design docs)              | **Complete**                  |
 | Resonance CCGNF encoding                   | **Complete**; all 22 files parse cleanly under CI |
 | CLI host (`Ccgnf.Cli`)                     | **Working** — preprocess + parse; `--run` executes v1 interpreter |
-| REST host (`Ccgnf.Rest`)                   | **Working v1** — pipeline endpoints, sessions, cards / project data plane, decks mock-pool, rooms with SSE, static playground |
-| Web app (`web/`)                           | **Working v1** — Vite + TypeScript; `#/cards`, `#/decks`, `#/interpreter`, `#/play/lobby`, `#/play/tabletop/{id}`, `#/raw` |
+| REST host (`Ccgnf.Rest`)                   | **Working v1** — pipeline endpoints, sessions, cards / project data plane, decks mock-pool, rooms with SSE, static playground, `/api/ai/*` (editor-gated) |
+| Web app (`web/`)                           | **Working v1** — Vite + TypeScript; `#/cards`, `#/decks`, `#/interpreter`, `#/play/lobby`, `#/play/tabletop/{id}`, `#/ai`, `#/raw` |
+| Bot library (`Ccgnf.Bots`)                 | **Working v1** — `FixedLadderBot`, `UtilityBot` with 7 considerations + phase-BT + sticky intent, bench/tournament harness |
 | Godot host (`Ccgnf.Godot`)                 | Specified; not scaffolded     |
-| Solution + test project                    | **Working** — 130 tests green |
+| Solution + test project                    | **Working** — 269 tests green |
 | Linux CI (GitHub Actions)                  | **Wired**                     |
 
 "v1" means the component implements the core path specified in `grammar/GrammarSpec.md` against the e2e coverage fixture, with known gaps documented in §12 Open questions. Future passes will add source-map support, ASCII-`in` set-membership, and richer error recovery.

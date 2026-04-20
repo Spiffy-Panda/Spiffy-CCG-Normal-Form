@@ -146,6 +146,44 @@ export interface PresetDeckDto {
   cards: DeckCardEntry[];
   cardCount: number;
   unknownCards: string[];
+  archetypes: string[];
+  suggestedAi?: string | null;
+}
+
+export interface BotProfileDto {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface AiWeightsDto {
+  source: "file" | "default";
+  path?: string | null;
+  considerationKeys: string[];
+  json: string;
+}
+
+export interface AiPreviewRow {
+  kind: string;
+  label: string;
+  score: number;
+  breakdown: Record<string, number>;
+}
+
+export interface AiTournamentRow {
+  botName: string;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number;
+  avgSteps: number;
+}
+
+export interface AiTournamentResponse {
+  deckId: string;
+  rows: AiTournamentRow[];
+  timestamp: string;
 }
 
 export interface RoomCpuSeatSpec {

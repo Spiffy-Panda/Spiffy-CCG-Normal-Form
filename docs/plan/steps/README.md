@@ -20,6 +20,7 @@ updates if a threshold crossed, and an entry goes in
 | 8 | [08-full-game.md](08-full-game.md) | 1–7 | First full human + CPU game played through the Play tab — real turns, card play, Clash, Conduit collapse, GameEnd. |
 | 9 | [09-godot-client.md](09-godot-client.md) | 1–7 | Godot 4.x C# front-end against the same room REST API. Web and Godot clients share rooms. |
 | 10 | [10-long-term-ai.md](10-long-term-ai.md) | 7+ | Utility-AI-first CPU with a top-level BT shell. No look-ahead search. |
+| 10.2 | [10.2-long-term-ai-plan.md](10.2-long-term-ai-plan.md) | 10 | Concrete 10 plan: `Ccgnf.Bots`, UtilityBot + phase-BT + sticky intent, `/api/ai/*`, deck archetypes, tournament harness, `#/ai` editor. **Shipped.** |
 | 11 | [11-humanizer-templates.md](11-humanizer-templates.md) | 3+ | Move the per-builtin humanizer table to a data-driven, user-overridable template library. |
 
 Steps 3 / 4 / 5 are parallelisable after 1 + 2. Step 6 is the largest;
