@@ -91,6 +91,83 @@ Card MendPinger {
   abilities: []
 }
 
+// OnCardPlayed lambda-filter probe: when a NEUTRAL Maneuver is played by
+// the same controller, set Player2.debt = 77. Requires the lambda filter
+// expansion to inline the filter body as an If-guard in the effect.
+Card LambdaPinger {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  abilities: [
+    OnCardPlayed(
+      filter: c -> c.type == Maneuver,
+      effect: SetCounter(Player2, debt, 77))
+  ]
+}
+
+// Dummy Maneuver the LambdaPinger filters on. Doesn't need to do anything
+// on resolution — just being played is enough to trigger the OnCardPlayed.
+Card NoOpSpell {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [ OnResolve(NoOp) ]
+}
+
+// Recur keyword probe: unit enters play with Recur, controller's conduit
+// on that arena is pushed to 0 so the arena collapses, Recur replaces
+// the destroy-to-Cache with destroy-to-bottom-of-Arsenal.
+Card RecurUnit {
+  factions: {TIDE}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Recur ]
+  abilities: []
+}
+
+// Unique keyword probe: controller plays two copies; the second Replacement
+// bounces the duplicate to Cache instead of Battlefield.
+Card UniqueUnit {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: M, unique: true
+  keywords: [ Unique ]
+  abilities: []
+}
+
+// Phantom keyword probe: auto-fades at Start of Clash (projected force 0),
+// returns to hand at End of Clash with cost reduced by 1.
+Card PhantomUnit {
+  factions: {HOLLOW}, type: Unit, cost: 2, force: 3, ramparts: 1, rarity: C
+  keywords: [ Phantom ]
+  abilities: []
+}
+
+// Drift keyword probe: at end of controller's turn, unit moves to an
+// adjacent arena whose controller-side Conduit is alive.
+Card DriftUnit {
+  factions: {TIDE}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Drift ]
+  abilities: []
+}
+
+// Sprawl keyword probe via Maneuver OnResolve. Creates 2 Sapling tokens
+// in the caster's controlled arena.
+Card SprawlMaker {
+  factions: {THORN}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(Sprawl(2, in: Left, for: controller))
+  ]
+}
+
+// Shroud keyword probe: opponent's damage Maneuver targeting Shroud Unit
+// should find zero legal targets.
+Card ShroudUnit {
+  factions: {HOLLOW}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Shroud ]
+  abilities: []
+}
+
+// Opponent's targeting Maneuver that tries to DealDamage to any Unit.
+Card TargetedStrike {
+  factions: {NEUTRAL}, type: Maneuver, cost: 1, rarity: C
+  abilities: [
+    OnResolve(Target(u -> u.type == Unit, DealDamage(target, 1)))
+  ]
+}
+
 // Setup: conduits per (owner, arena), both players draw, both get a Main
 // Phase so either side can commit a Unit to the board. Player1 then drives
 // a single Clash pass.

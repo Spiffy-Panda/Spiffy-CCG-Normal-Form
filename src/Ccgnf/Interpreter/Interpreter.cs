@@ -361,6 +361,28 @@ public sealed class Interpreter
                 };
                 if (entity.OwnerId is int oid) fields["owner"] = new RtEntityRef(oid);
                 state.PendingEvents.Enqueue(new GameEvent("ConduitCollapsed", fields));
+
+                // Arena collapse destroys every Unit the owner has in this
+                // arena (GameRules §7.6). Runs each Unit through the
+                // Replacement walker so Recur intercepts and redirects the
+                // Destroy to Arsenal bottom instead of Cache.
+                if (entity.OwnerId is int ownerId &&
+                    entity.Parameters.TryGetValue("arena", out var av) &&
+                    av is RtSymbol arenaSym)
+                {
+                    foreach (var u in state.Entities.Values.ToList())
+                    {
+                        if (u.Kind != "Card") continue;
+                        if (u.OwnerId != ownerId) continue;
+                        if (!u.Characteristics.TryGetValue("in_play", out var ip) ||
+                            ip is not RtBool ib || !ib.V) continue;
+                        if (!u.Parameters.TryGetValue("arena", out var ua) ||
+                            ua is not RtSymbol us || us.Name != arenaSym.Name) continue;
+                        DestroyUnit(u, state, ev, reason: "ArenaCollapse");
+                        changed = true;
+                    }
+                }
+
                 changed = true;
             }
 
@@ -393,6 +415,75 @@ public sealed class Interpreter
             }
         }
         _ = ev;
+    }
+
+    /// <summary>
+    /// Run a Unit through the Replacement walker and move it to its default
+    /// destination if no Replacement fires. Recur's macro rewrites the
+    /// destination from <c>owner.Cache</c> to <c>bottom_of(owner.Arsenal)</c>,
+    /// so we evaluate the Replacement's <c>replace_with</c> effect when its
+    /// pattern matches and (if present) its guard holds.
+    /// </summary>
+    internal static void DestroyUnit(Entity unit, GameState state, Evaluator ev, string reason)
+    {
+        var destroyEvent = new GameEvent("Destroy", new Dictionary<string, RtValue>
+        {
+            ["target"] = new RtEntityRef(unit.Id),
+            ["reason"] = new RtSymbol(reason),
+        });
+
+        bool replaced = false;
+        foreach (var ab in unit.Abilities)
+        {
+            if (ab.Kind != AbilityKind.Replacement) continue;
+            if (ab.OnPattern is null) continue;
+            if (!TryMatchPattern(ab.OnPattern, destroyEvent, unit, out var bindings)) continue;
+            if (!CheckGuard(ab, unit, ev)) continue;
+
+            var replaceExpr = ab.Named.TryGetValue("replace_with", out var rw) ? rw : null;
+            if (replaceExpr is null) continue;
+
+            var env = RtEnv.Empty.Extend("self", new RtEntityRef(unit.Id));
+            if (unit.OwnerId is int ownerId)
+            {
+                env = env.Extend("controller", new RtEntityRef(ownerId));
+                env = env.Extend("owner", new RtEntityRef(ownerId));
+            }
+            if (bindings.Count > 0) env = env.Extend(bindings);
+            ev.Eval(replaceExpr, env);
+            CastLog.RecordTrigger(unit, ab.OnPattern, destroyEvent);
+            replaced = true;
+            break;
+        }
+
+        if (!replaced && unit.OwnerId is int oid &&
+            state.Entities.TryGetValue(oid, out var ownerEntity) &&
+            ownerEntity.Zones.TryGetValue("Cache", out var cache))
+        {
+            // Remove the Unit from every zone it's currently in, then place
+            // it in Cache — the default destroy destination.
+            foreach (var h in state.Entities.Values)
+            {
+                foreach (var z in h.Zones.Values) z.Contents.Remove(unit.Id);
+            }
+            cache.Contents.Add(unit.Id);
+            unit.Characteristics["in_play"] = new RtBool(false);
+        }
+
+        state.PendingEvents.Enqueue(destroyEvent);
+    }
+
+    private static bool CheckGuard(AbilityInstance ab, Entity self, Evaluator ev)
+    {
+        if (!ab.Named.TryGetValue("guard", out var guard)) return true;
+        var env = RtEnv.Empty.Extend("self", new RtEntityRef(self.Id));
+        if (self.OwnerId is int oid)
+        {
+            env = env.Extend("controller", new RtEntityRef(oid));
+            env = env.Extend("owner", new RtEntityRef(oid));
+        }
+        var v = ev.Eval(guard, env);
+        return v is RtBool b && b.V;
     }
 
     // -------------------------------------------------------------------------

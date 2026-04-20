@@ -72,12 +72,36 @@ internal static class Builtins
             // ----- Target / Damage -----
             case "Target":                  result = Target(call, env, ev); return true;
             case "DealDamage":              result = DealDamage(call, env, ev); return true;
+            case "Heal":                    result = Heal(call, env, ev); return true;
             case "HealSelfArenaConduit":    result = HealSelfArenaConduit(call, env, ev); return true;
             case "IgniteTickArenaConduit":  result = IgniteTickArenaConduit(call, env, ev); return true;
 
-            // ----- Mulligan / MoveTo — still stubbed (lands alongside full Target) -----
+            // ----- Resonance / tier predicates -----
+            case "CountEcho":               result = CountEchoBuiltin(call, env, ev); return true;
+            case "Resonance":               result = ResonanceBuiltin(call, env, ev); return true;
+            case "Peak":                    result = PeakBuiltin(call, env, ev); return true;
+            case "Banner":                  result = BannerBuiltin(call, env, ev); return true;
+            case "BannerExists":            result = BannerExistsBuiltin(call, env, ev); return true;
+            case "Tiers":                   result = TiersBuiltin(call, env, ev); return true;
+            case "When":                    result = WhenBuiltin(call, env, ev); return true;
+
+            // ----- Replacement guards / helpers -----
+            case "HasDuplicateInPlay":      result = HasDuplicateInPlayBuiltin(call, env, ev); return true;
+            case "has_keyword":             result = HasKeywordBuiltin(call, env, ev); return true;
+
+            // ----- Phantom / Drift support -----
+            case "SetPhantoming":           result = SetPhantomingBuiltin(call, env, ev); return true;
+            case "PhantomReturn":           result = PhantomReturnBuiltin(call, env, ev); return true;
+            case "DriftMoveUnit":           result = DriftMoveUnitBuiltin(call, env, ev); return true;
+
+            // ----- Sprawl / token creation -----
+            case "CreateToken":             result = CreateTokenBuiltin(call, env, ev); return true;
+            case "Sprawl":                  result = SprawlBuiltin(call, env, ev); return true;
+
+            // ----- Mulligan / MoveTo -----
             case "PerformMulligan":         result = new RtVoid(); return true;
-            case "MoveTo":                  result = new RtVoid(); return true;
+            case "MoveTo":                  result = MoveTo(call, env, ev); return true;
+            case "bottom_of":               result = BottomOf(call, env, ev); return true;
 
             default:
                 result = null!;
@@ -342,8 +366,25 @@ internal static class Builtins
         // (there shouldn't be any, but...) can't grow the set mid-scan.
         var snapshot = ev.State.Entities.Values.ToList();
         var candidates = new List<Entity>();
+        // Source controller — used for the Shroud legality check. When a
+        // Maneuver's OnResolve calls Target, the env carries `controller`
+        // bound to the card's controller via PlayManeuver.
+        int? sourceController = null;
+        if (env.TryLookup("controller", out var ctl) && ctl is RtEntityRef ctlRef)
+        {
+            sourceController = ctlRef.Id;
+        }
         foreach (var entity in snapshot)
         {
+            // Shroud: opposing effects can't choose this entity as an explicit
+            // target. Same-controller self-targets and non-targeted sweepers
+            // are unaffected (sweepers don't go through Target).
+            if (sourceController is int sc &&
+                KeywordRuntime.HasKeyword(entity, "Shroud") &&
+                entity.OwnerId is int eoid && eoid != sc)
+            {
+                continue;
+            }
             var testEnv = env.Extend(paramName, new RtEntityRef(entity.Id));
             if (Evaluator.AsBool(ev.Eval(lambda.Body, testEnv)))
             {
@@ -473,25 +514,629 @@ internal static class Builtins
         {
             return new RtVoid();
         }
-        // Opposing Conduit only — self-targeting would heal the attacker's
-        // own base, exactly the opposite of the keyword's intent.
+        if (amount <= 0) return new RtVoid();
         var opponent = ev.State.Players.FirstOrDefault(p => p.Id != ownerId);
         if (opponent is null) return new RtVoid();
-        var conduit = FindConduit(ev, opponent.Id, arenaSym.Name);
-        if (conduit is null || amount <= 0) return new RtVoid();
 
-        int before = conduit.Counters.GetValueOrDefault("integrity", 0);
-        conduit.Counters["integrity"] = Math.Max(0, before - amount);
-        ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+        // GameRules: Ignite N pings opposing Units with current_ramparts ≤ 2
+        // in this Arena for N damage each. When no Unit qualifies, the
+        // opposing Conduit takes the chip instead so Ignite has a floor
+        // effect even on an empty arena.
+        bool hitAnyUnit = false;
+        foreach (var opposing in ev.State.Entities.Values.ToList())
+        {
+            if (opposing.OwnerId != opponent.Id) continue;
+            if (!opposing.Characteristics.TryGetValue("in_play", out var ip) ||
+                ip is not RtBool ib || !ib.V) continue;
+            if (!opposing.Parameters.TryGetValue("arena", out var aa) ||
+                aa is not RtSymbol ap || ap.Name != arenaSym.Name) continue;
+            int ramparts = opposing.Counters.GetValueOrDefault("current_ramparts", 0);
+            if (ramparts > 2) continue;
+            int before = opposing.Counters.GetValueOrDefault("current_ramparts", 0);
+            opposing.Counters["current_ramparts"] = Math.Max(0, before - amount);
+            hitAnyUnit = true;
+            ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+                new Dictionary<string, RtValue>
+                {
+                    ["source"] = new RtEntityRef(unit.Id),
+                    ["target"] = new RtEntityRef(opposing.Id),
+                    ["counter"] = new RtSymbol("current_ramparts"),
+                    ["amount"] = new RtInt(amount),
+                    ["reason"] = new RtSymbol("Ignite"),
+                }));
+        }
+
+        if (!hitAnyUnit)
+        {
+            var conduit = FindConduit(ev, opponent.Id, arenaSym.Name);
+            if (conduit is null) return new RtVoid();
+            int before = conduit.Counters.GetValueOrDefault("integrity", 0);
+            conduit.Counters["integrity"] = Math.Max(0, before - amount);
+            ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+                new Dictionary<string, RtValue>
+                {
+                    ["source"] = new RtEntityRef(unit.Id),
+                    ["target"] = new RtEntityRef(conduit.Id),
+                    ["counter"] = new RtSymbol("integrity"),
+                    ["amount"] = new RtInt(amount),
+                    ["reason"] = new RtSymbol("Ignite"),
+                }));
+        }
+        return new RtVoid();
+    }
+
+    // -------------------------------------------------------------------------
+    // MoveTo / bottom_of — zone-moving helpers used by keyword macros that
+    // relocate entities (Recur, Pilfer's exile, Phantom's return-to-hand,
+    // Thessa's take-from-Cache).
+    // -------------------------------------------------------------------------
+
+    private static RtValue MoveTo(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var entityVal = ev.Eval(ExprOf(call.Args[0]), env);
+        var zoneVal = ev.Eval(ExprOf(call.Args[1]), env);
+        if (entityVal is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var entity))
+        {
+            return new RtVoid();
+        }
+
+        // Resolve destination zone. `zoneVal` may already be an
+        // RtZoneRef (bare `owner.Cache`), a tagged RtZoneRef produced by
+        // `bottom_of(...)`, or an RtEntityRef (treat as "move into this
+        // entity's default zone", not supported in v1).
+        bool appendAtBottom = false;
+        RtZoneRef? dest = null;
+        switch (zoneVal)
+        {
+            case RtZoneRef zr: dest = zr; break;
+            case RtTuple t when t.Elements.Count == 2
+                               && t.Elements[0] is RtSymbol { Name: "bottom" }
+                               && t.Elements[1] is RtZoneRef zrb:
+                dest = zrb; appendAtBottom = true; break;
+        }
+        if (dest is null) return new RtVoid();
+
+        // Remove from wherever it currently is.
+        foreach (var holder in ev.State.Entities.Values)
+        {
+            foreach (var z in holder.Zones.Values) z.Contents.Remove(er.Id);
+        }
+        if (ev.State.Entities.TryGetValue(dest.OwnerId, out var owner) &&
+            owner.Zones.TryGetValue(dest.Name, out var zone))
+        {
+            if (appendAtBottom)
+            {
+                zone.Contents.Insert(0, er.Id);
+            }
+            else
+            {
+                zone.Contents.Add(er.Id);
+            }
+        }
+
+        // Unit-specific: leaving Battlefield clears in_play.
+        if (dest.Name != "Battlefield")
+        {
+            entity.Characteristics["in_play"] = new RtBool(false);
+        }
+        ev.State.PendingEvents.Enqueue(new GameEvent("ZoneMoved",
             new Dictionary<string, RtValue>
             {
-                ["source"] = new RtEntityRef(unit.Id),
-                ["target"] = new RtEntityRef(conduit.Id),
-                ["counter"] = new RtSymbol("integrity"),
-                ["amount"] = new RtInt(amount),
-                ["reason"] = new RtSymbol("Ignite"),
+                ["entity"] = new RtEntityRef(entity.Id),
+                ["zone"] = new RtSymbol(dest.Name),
+                ["owner"] = new RtEntityRef(dest.OwnerId),
             }));
         return new RtVoid();
+    }
+
+    private static RtValue BottomOf(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtVoid();
+        var zv = ev.Eval(ExprOf(call.Args[0]), env);
+        if (zv is RtZoneRef zr)
+        {
+            return new RtTuple(new List<RtValue> { new RtSymbol("bottom"), zr });
+        }
+        return zv;
+    }
+
+    // -------------------------------------------------------------------------
+    // Heal — additive inverse of DealDamage. Restores the first available
+    // counter (current_ramparts / current_hp / integrity) up to its starting
+    // value. Used by Reconstitute, SealTheBreach, PatchJob, etc.
+    // -------------------------------------------------------------------------
+
+    private static RtValue Heal(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var targetRef = ev.Eval(ExprOf(call.Args[0]), env);
+        int amount = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[1]), env));
+        if (targetRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var entity))
+        {
+            return new RtVoid();
+        }
+
+        int cap = int.MaxValue;
+        foreach (var a in call.Args)
+        {
+            if (a is AstArgNamed n && n.Name == "cap")
+            {
+                var capVal = ev.Eval(n.Value, env);
+                if (capVal is RtInt ci) cap = ci.V;
+                else if (capVal is RtSymbol cs && cs.Name == "starting_integrity")
+                    cap = GetStartingIntegrity(entity);
+            }
+        }
+
+        foreach (var counter in new[] { "integrity", "current_hp", "current_ramparts" })
+        {
+            if (!entity.Counters.ContainsKey(counter)) continue;
+            int before = entity.Counters[counter];
+            int afterCap = counter == "integrity"
+                ? Math.Min(cap, GetStartingIntegrity(entity))
+                : cap;
+            int after = Math.Min(afterCap, before + amount);
+            if (after == before) return new RtVoid();
+            entity.Counters[counter] = after;
+            ev.State.PendingEvents.Enqueue(new GameEvent("Healed",
+                new Dictionary<string, RtValue>
+                {
+                    ["target"] = new RtEntityRef(entity.Id),
+                    ["counter"] = new RtSymbol(counter),
+                    ["amount"] = new RtInt(after - before),
+                }));
+            return new RtVoid();
+        }
+        return new RtVoid();
+    }
+
+    // -------------------------------------------------------------------------
+    // Resonance-field predicates — count pushed echoes against the current
+    // controller's field. `controller` is bound by DispatchEvent / OnResolve;
+    // falls back to the first player when the env doesn't carry one (e.g.,
+    // Game-level triggered abilities with no owning Unit).
+    // -------------------------------------------------------------------------
+
+    private static Entity? ResolveController(RtEnv env, Evaluator ev)
+    {
+        if (env.TryLookup("controller", out var v) && v is RtEntityRef er &&
+            ev.State.Entities.TryGetValue(er.Id, out var p) && p.Kind == "Player")
+        {
+            return p;
+        }
+        return ev.State.Players.FirstOrDefault();
+    }
+
+    private static RtValue CountEchoBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtInt(0);
+        var factionVal = ev.Eval(ExprOf(call.Args[0]), env);
+        if (factionVal is not RtSymbol factionSym) return new RtInt(0);
+        var controller = ResolveController(env, ev);
+        if (controller is null) return new RtInt(0);
+        return new RtInt(KeywordRuntime.CountEcho(controller, factionSym.Name));
+    }
+
+    private static RtValue ResonanceBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtBool(false);
+        var factionVal = ev.Eval(ExprOf(call.Args[0]), env);
+        int n = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[1]), env));
+        if (factionVal is not RtSymbol factionSym) return new RtBool(false);
+        var controller = ResolveController(env, ev);
+        if (controller is null) return new RtBool(false);
+        return new RtBool(KeywordRuntime.CountEcho(controller, factionSym.Name) >= n);
+    }
+
+    private static RtValue PeakBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtBool(false);
+        var factionVal = ev.Eval(ExprOf(call.Args[0]), env);
+        if (factionVal is not RtSymbol factionSym) return new RtBool(false);
+        var controller = ResolveController(env, ev);
+        if (controller is null) return new RtBool(false);
+        return new RtBool(
+            KeywordRuntime.CountEcho(controller, factionSym.Name) >=
+            KeywordRuntime.ResonanceFieldCapacity);
+    }
+
+    private static RtValue BannerBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtBool(false);
+        var factionVal = ev.Eval(ExprOf(call.Args[0]), env);
+        if (factionVal is not RtSymbol factionSym) return new RtBool(false);
+        var controller = ResolveController(env, ev);
+        if (controller is null) return new RtBool(false);
+        // Banner(F) = "F is the most-pushed faction on your field".
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var echo in KeywordRuntime.GetResonanceField(controller))
+        {
+            if (echo is not RtSymbol s) continue;
+            counts[s.Name] = counts.GetValueOrDefault(s.Name, 0) + 1;
+        }
+        if (counts.Count == 0) return new RtBool(false);
+        int max = counts.Values.Max();
+        if (counts.GetValueOrDefault(factionSym.Name, 0) != max) return new RtBool(false);
+        // Tie-break: only a single faction at max holds the Banner.
+        int tiesAtMax = counts.Count(kv => kv.Value == max);
+        return new RtBool(tiesAtMax == 1);
+    }
+
+    private static RtValue BannerExistsBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        _ = call;
+        var controller = ResolveController(env, ev);
+        if (controller is null) return new RtBool(false);
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var echo in KeywordRuntime.GetResonanceField(controller))
+        {
+            if (echo is not RtSymbol s) continue;
+            counts[s.Name] = counts.GetValueOrDefault(s.Name, 0) + 1;
+        }
+        if (counts.Count == 0) return new RtBool(false);
+        int max = counts.Values.Max();
+        return new RtBool(counts.Count(kv => kv.Value == max) == 1);
+    }
+
+    /// <summary>
+    /// Tiers([(cond_1, effect_1), ...]) — evaluates each case in order,
+    /// runs the first whose predicate is true. The last case is typically
+    /// <c>Default</c>, which always fires. Matches the macro's intent in
+    /// <c>encoding/engine/01-resonance-macros.ccgnf</c>.
+    /// </summary>
+    private static RtValue TiersBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        var arg = FirstPositional(call);
+        if (arg is not AstListLit list) return new RtVoid();
+        foreach (var el in list.Elements)
+        {
+            if (el is not AstParen paren || paren.Elements.Count != 2) continue;
+            var condExpr = paren.Elements[0];
+            var effectExpr = paren.Elements[1];
+
+            bool fires;
+            if (condExpr is AstIdent id && id.Name == "Default")
+            {
+                fires = true;
+            }
+            else
+            {
+                var v = ev.Eval(condExpr, env);
+                fires = v is RtBool rb && rb.V;
+            }
+            if (fires)
+            {
+                ev.Eval(effectExpr, env);
+                return new RtVoid();
+            }
+        }
+        return new RtVoid();
+    }
+
+    /// <summary>
+    /// When(cond, effect) — Tiers's single-case shorthand. `Tiers([(cond,
+    /// effect)])` with no Default fall-through.
+    /// </summary>
+    private static RtValue WhenBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var cond = ev.Eval(ExprOf(call.Args[0]), env);
+        if (cond is RtBool b && b.V)
+        {
+            ev.Eval(ExprOf(call.Args[1]), env);
+        }
+        return new RtVoid();
+    }
+
+    /// <summary>
+    /// HasDuplicateInPlay(self) — true when the controller already has
+    /// another card with the same name in-play (Unique replacement guard).
+    /// </summary>
+    private static RtValue HasDuplicateInPlayBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtBool(false);
+        var v = ev.Eval(ExprOf(call.Args[0]), env);
+        if (v is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var self))
+        {
+            return new RtBool(false);
+        }
+        foreach (var other in ev.State.Entities.Values)
+        {
+            if (other.Id == self.Id) continue;
+            if (other.OwnerId != self.OwnerId) continue;
+            if (!string.Equals(other.DisplayName, self.DisplayName, StringComparison.Ordinal)) continue;
+            if (!other.Characteristics.TryGetValue("in_play", out var ip) ||
+                ip is not RtBool ib || !ib.V) continue;
+            return new RtBool(true);
+        }
+        return new RtBool(false);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phantom helpers.
+    //
+    // v1 wiring is auto-fade: Phantom Units always fade at Start of Clash
+    // and always return to hand at End of Clash. The authored Choice is
+    // conceptually preserved for a later wave — interactive clients should
+    // prompt the controller, but the bench bots don't score Phantom yet and
+    // the auto-fade shape is the simplest way to prove the pipeline
+    // (PhaseBegin Clash → set phantoming tag → zero projected force /
+    // fortification → PhaseEnd Clash → return to hand → reduce base cost
+    // → emit PhantomReturn event for the raw-Triggered cards that listen
+    // for it).
+    // -------------------------------------------------------------------------
+
+    private static RtValue SetPhantomingBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtVoid();
+        var v = ev.Eval(ExprOf(call.Args[0]), env);
+        if (v is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var unit))
+        {
+            return new RtVoid();
+        }
+        bool on = true;
+        if (call.Args.Count >= 2)
+        {
+            var flag = ev.Eval(ExprOf(call.Args[1]), env);
+            on = flag is RtBool rb ? rb.V : true;
+        }
+        if (on) unit.Tags.Add("phantoming");
+        else    unit.Tags.Remove("phantoming");
+        return new RtVoid();
+    }
+
+    private static RtValue PhantomReturnBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtVoid();
+        var v = ev.Eval(ExprOf(call.Args[0]), env);
+        if (v is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var unit) ||
+            unit.OwnerId is not int ownerId ||
+            !ev.State.Entities.TryGetValue(ownerId, out var owner))
+        {
+            return new RtVoid();
+        }
+        // Only fires when the unit is actually phantoming this clash.
+        if (!unit.Tags.Contains("phantoming")) return new RtVoid();
+
+        // Remove from every zone, then drop into Hand.
+        foreach (var h in ev.State.Entities.Values)
+        {
+            foreach (var z in h.Zones.Values) z.Contents.Remove(unit.Id);
+        }
+        if (owner.Zones.TryGetValue("Hand", out var hand)) hand.Contents.Add(unit.Id);
+        unit.Characteristics["in_play"] = new RtBool(false);
+        unit.Tags.Remove("phantoming");
+
+        // Persistent base-cost reduction (min 0). Stored on the card
+        // entity; the play-protocol reads this when computing the next
+        // play's cost.
+        int reduction = unit.Counters.GetValueOrDefault("base_cost_reduction", 0) + 1;
+        unit.Counters["base_cost_reduction"] = reduction;
+
+        ev.State.PendingEvents.Enqueue(new GameEvent("PhantomReturn",
+            new Dictionary<string, RtValue>
+            {
+                ["target"] = new RtEntityRef(unit.Id),
+                ["reduction"] = new RtInt(reduction),
+            }));
+        return new RtVoid();
+    }
+
+    // -------------------------------------------------------------------------
+    // Drift — move unit to an adjacent non-collapsed arena at end of its
+    // controller's turn. v1 simplification: pick the first adjacent arena
+    // whose conduit (for the owner) is still alive; no player Choice.
+    // -------------------------------------------------------------------------
+
+    private static RtValue DriftMoveUnitBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 1) return new RtVoid();
+        var v = ev.Eval(ExprOf(call.Args[0]), env);
+        if (v is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var unit) ||
+            unit.OwnerId is not int ownerId ||
+            !unit.Parameters.TryGetValue("arena", out var av) ||
+            av is not RtSymbol currentArena)
+        {
+            return new RtVoid();
+        }
+
+        var adjacent = AdjacentArenas(currentArena.Name);
+        foreach (var neighbour in adjacent)
+        {
+            // Skip arenas whose owner-side conduit is collapsed.
+            var conduit = FindConduit(ev, ownerId, neighbour);
+            if (conduit is null) continue;
+            // Move.
+            unit.Parameters["arena"] = new RtSymbol(neighbour);
+            var targetArena = ev.State.Arenas.FirstOrDefault(a =>
+                a.Parameters.TryGetValue("pos", out var ap) &&
+                ap is RtSymbol aps && aps.Name == neighbour);
+            if (targetArena is not null)
+            {
+                unit.Parameters["arena_entity"] = new RtEntityRef(targetArena.Id);
+            }
+            ev.State.PendingEvents.Enqueue(new GameEvent("Drifted",
+                new Dictionary<string, RtValue>
+                {
+                    ["target"] = new RtEntityRef(unit.Id),
+                    ["from"] = new RtSymbol(currentArena.Name),
+                    ["to"] = new RtSymbol(neighbour),
+                }));
+            return new RtVoid();
+        }
+        return new RtVoid();
+    }
+
+    private static IEnumerable<string> AdjacentArenas(string pos) => pos switch
+    {
+        "Left"   => new[] { "Center", "Right" },
+        "Center" => new[] { "Left",   "Right" },
+        "Right"  => new[] { "Center", "Left" },
+        _ => Array.Empty<string>(),
+    };
+
+    // -------------------------------------------------------------------------
+    // CreateToken / Sprawl — token generation. Tokens are allocated as
+    // Unit-kind entities with default stats (Force 1, Ramparts 1) and
+    // placed on the controller's Battlefield in the target arena.
+    // Sprawl(N) is the keyword-body form; cards like SprawlVanguard invoke
+    // it directly from their OnResolve.
+    // -------------------------------------------------------------------------
+
+    private static RtValue CreateTokenBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        string template = "ThornSapling";
+        RtValue? ownerRef = null;
+        RtValue? arenaRef = null;
+        RtValue? controllerRef = null;
+        foreach (var a in call.Args)
+        {
+            switch (a)
+            {
+                case AstArgNamed { Name: "template" } n:
+                    if (ev.Eval(n.Value, env) is RtSymbol ts) template = ts.Name;
+                    break;
+                case AstArgNamed { Name: "owner" } n2:       ownerRef = ev.Eval(n2.Value, env); break;
+                case AstArgNamed { Name: "controller" } n3:  controllerRef = ev.Eval(n3.Value, env); break;
+                case AstArgNamed { Name: "zone" } n4:
+                case AstArgNamed { Name: "arena" } n5:
+                    arenaRef = ev.Eval(a is AstArgNamed nn ? nn.Value : ExprOf(a), env);
+                    break;
+            }
+        }
+        int? ownerId = (ownerRef ?? controllerRef) is RtEntityRef er ? er.Id : null;
+        if (ownerId is null) return new RtVoid();
+
+        RtSymbol? arenaSym = arenaRef switch
+        {
+            RtSymbol s => s,
+            RtEntityRef aer when ev.State.Entities.TryGetValue(aer.Id, out var ae)
+                             && ae.Parameters.TryGetValue("pos", out var p)
+                             && p is RtSymbol ps => ps,
+            _ => null,
+        };
+
+        var token = ev.State.AllocateEntity("Card", template);
+        token.OwnerId = ownerId;
+        token.Characteristics["type"] = new RtSymbol("Unit");
+        token.Characteristics["in_play"] = new RtBool(true);
+        token.Characteristics["is_token"] = new RtBool(true);
+        token.Counters["force"] = 1;
+        token.Counters["max_ramparts"] = 1;
+        token.Counters["current_ramparts"] = 1;
+        if (arenaSym is not null) token.Parameters["arena"] = arenaSym;
+
+        if (ev.State.Entities.TryGetValue(ownerId.Value, out var ownerEntity) &&
+            ownerEntity.Zones.TryGetValue("Battlefield", out var bf))
+        {
+            bf.Contents.Add(token.Id);
+        }
+
+        ev.State.PendingEvents.Enqueue(new GameEvent("TokenCreated",
+            new Dictionary<string, RtValue>
+            {
+                ["token"] = new RtEntityRef(token.Id),
+                ["owner"] = new RtEntityRef(ownerId.Value),
+            }));
+        // EnterPlay so OnEnter / OnArenaEnter triggers (Rally) react to the
+        // token as a real Unit.
+        var enterFields = new Dictionary<string, RtValue>
+        {
+            ["target"] = new RtEntityRef(token.Id),
+            ["player"] = new RtEntityRef(ownerId.Value),
+        };
+        if (arenaSym is not null) enterFields["arena"] = arenaSym;
+        ev.State.PendingEvents.Enqueue(new GameEvent("EnterPlay", enterFields));
+        return new RtEntityRef(token.Id);
+    }
+
+    private static RtValue SprawlBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        int count = 1;
+        if (call.Args.Count > 0)
+        {
+            count = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[0]), env));
+        }
+        int? ownerId = null;
+        RtSymbol? arenaSym = null;
+        foreach (var a in call.Args.OfType<AstArgNamed>())
+        {
+            if (a.Name == "in" || a.Name == "arena")
+            {
+                var av = ev.Eval(a.Value, env);
+                arenaSym = av as RtSymbol;
+            }
+            else if (a.Name == "for" || a.Name == "controller")
+            {
+                var cv = ev.Eval(a.Value, env);
+                if (cv is RtEntityRef er) ownerId = er.Id;
+            }
+        }
+        if (ownerId is null && env.TryLookup("controller", out var cl) && cl is RtEntityRef cler)
+        {
+            ownerId = cler.Id;
+        }
+        if (ownerId is null) return new RtVoid();
+        if (arenaSym is null && env.TryLookup("self", out var sv) && sv is RtEntityRef ser
+            && ev.State.Entities.TryGetValue(ser.Id, out var se)
+            && se.Parameters.TryGetValue("arena", out var sa) && sa is RtSymbol sas)
+        {
+            arenaSym = sas;
+        }
+        for (int i = 0; i < count; i++)
+        {
+            var synth = new List<AstArg>
+            {
+                new AstArgNamed(Ccgnf.Diagnostics.SourceSpan.Unknown, "template",
+                    new AstIdent(Ccgnf.Diagnostics.SourceSpan.Unknown, "ThornSapling")),
+                new AstArgNamed(Ccgnf.Diagnostics.SourceSpan.Unknown, "owner",
+                    new AstIdent(Ccgnf.Diagnostics.SourceSpan.Unknown, "__synthOwner__")),
+            };
+            if (arenaSym is not null)
+            {
+                synth.Add(new AstArgNamed(Ccgnf.Diagnostics.SourceSpan.Unknown, "arena",
+                    new AstIdent(Ccgnf.Diagnostics.SourceSpan.Unknown, arenaSym.Name)));
+            }
+            var subEnv = env.Extend("__synthOwner__", new RtEntityRef(ownerId.Value));
+            var subCall = new AstFunctionCall(
+                Ccgnf.Diagnostics.SourceSpan.Unknown,
+                new AstIdent(Ccgnf.Diagnostics.SourceSpan.Unknown, "CreateToken"),
+                synth);
+            CreateTokenBuiltin(subCall, subEnv, ev);
+        }
+        return new RtVoid();
+    }
+
+    /// <summary>
+    /// has_keyword(entity, Keyword) — true if the entity carries the keyword
+    /// in its tag set (see KeywordRuntime.ApplyKeywords). Used by Phantom,
+    /// Shroud guards, and bot scoring.
+    /// </summary>
+    private static RtValue HasKeywordBuiltin(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtBool(false);
+        var entRef = ev.Eval(ExprOf(call.Args[0]), env);
+        var kw = ev.Eval(ExprOf(call.Args[1]), env);
+        if (entRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var entity))
+        {
+            return new RtBool(false);
+        }
+        string? name = kw switch
+        {
+            RtSymbol s => s.Name,
+            RtString str => str.V,
+            _ => null,
+        };
+        if (name is null) return new RtBool(false);
+        return new RtBool(KeywordRuntime.HasKeyword(entity, name));
     }
 
     private static int GetStartingIntegrity(Entity conduit)
@@ -570,7 +1215,7 @@ internal static class Builtins
             {
                 if (!ev.State.Entities.TryGetValue(cardId, out var card)) continue;
                 if (!ev.State.CardDecls.TryGetValue(card.DisplayName, out var decl)) continue;
-                int cost = GetCardCost(decl);
+                int cost = ComputeEffectiveCost(ev, player, card, decl);
                 if (cost > aether) continue;
                 playable[cardId] = (decl, cost);
                 legal.Add(new LegalAction(
@@ -622,6 +1267,12 @@ internal static class Builtins
         int cost)
     {
         player.Counters["aether"] = Math.Max(0, player.Counters.GetValueOrDefault("aether", 0) - cost);
+
+        // Push this card's factions onto the controller's ResonanceField
+        // before any card-resolution effects fire, so tier predicates
+        // (Resonance(F, N) / Peak(F)) evaluate against the just-pushed
+        // echo — the card "contributes its own echo" per GameRules §6.3.
+        KeywordRuntime.PushEchoes(player, KeywordRuntime.ReadFactions(decl));
 
         var type = GetCardType(decl);
         if (type == "Unit")
@@ -785,6 +1436,23 @@ internal static class Builtins
         ev.Log.LogInformation("Played Unit {Name} (#{Id}) into arena {Arena} for {Cost} aether",
             cardEntity.DisplayName, cardEntity.Id, arenaPos?.Name ?? "<none>", cost);
 
+        // Unique replacement: if another copy of this Unit is already in
+        // play for this controller, bounce this copy straight to Cache and
+        // skip the EnterPlay / UnitEntered events so downstream triggers
+        // don't fire for a non-existent board presence.
+        if (ApplyEnterPlayReplacement(cardEntity, player, ev))
+        {
+            ev.State.PendingEvents.Enqueue(new GameEvent("CardPlayed",
+                new Dictionary<string, RtValue>
+                {
+                    ["player"] = new RtEntityRef(player.Id),
+                    ["card"] = new RtEntityRef(cardEntity.Id),
+                    ["cost"] = new RtInt(cost),
+                    ["type"] = new RtSymbol("Unit"),
+                }));
+            return;
+        }
+
         var fields = new Dictionary<string, RtValue>
         {
             ["player"] = new RtEntityRef(player.Id),
@@ -805,8 +1473,60 @@ internal static class Builtins
             ["target"] = new RtEntityRef(cardEntity.Id),
             ["player"] = new RtEntityRef(player.Id),
         };
-        if (arenaEntityId is int aid3) enterFields["arena"] = new RtEntityRef(aid3);
+        // Pattern matchers expect `arena` as a symbol (so `arena=self.arena`
+        // comparisons resolve to a symbol-equality check). The entity ref
+        // is still available via `arena_entity` for effects that need to
+        // reach the Arena's abilities / characteristics.
+        if (arenaPos is not null) enterFields["arena"] = arenaPos;
+        if (arenaEntityId is int aid3) enterFields["arena_entity"] = new RtEntityRef(aid3);
         ev.State.PendingEvents.Enqueue(new GameEvent("EnterPlay", enterFields));
+    }
+
+    /// <summary>
+    /// Apply any EnterPlay-targeted Replacement ability attached to the
+    /// freshly-placed Unit. Returns true when a replacement fired (the
+    /// caller should skip the normal EnterPlay/UnitEntered event
+    /// emission — the replacement already moved the card into its
+    /// alternate destination).
+    /// </summary>
+    private static bool ApplyEnterPlayReplacement(Entity unit, Entity player, Evaluator ev)
+    {
+        var enterEvent = new GameEvent("EnterPlay", new Dictionary<string, RtValue>
+        {
+            ["target"] = new RtEntityRef(unit.Id),
+            ["player"] = new RtEntityRef(player.Id),
+        });
+        foreach (var ab in unit.Abilities)
+        {
+            if (ab.Kind != AbilityKind.Replacement) continue;
+            if (ab.OnPattern is null) continue;
+            if (!Interpreter.TryMatchPattern(ab.OnPattern, enterEvent, unit, out var bindings))
+            {
+                continue;
+            }
+            // Guard evaluation.
+            if (ab.Named.TryGetValue("guard", out var guard))
+            {
+                var guardEnv = RtEnv.Empty.Extend("self", new RtEntityRef(unit.Id));
+                if (player.Id != 0)
+                {
+                    guardEnv = guardEnv.Extend("owner", new RtEntityRef(player.Id));
+                    guardEnv = guardEnv.Extend("controller", new RtEntityRef(player.Id));
+                }
+                var gv = ev.Eval(guard, guardEnv);
+                if (gv is not RtBool rb || !rb.V) continue;
+            }
+            if (!ab.Named.TryGetValue("replace_with", out var rw)) continue;
+
+            var env = RtEnv.Empty.Extend("self", new RtEntityRef(unit.Id))
+                                 .Extend("owner", new RtEntityRef(player.Id))
+                                 .Extend("controller", new RtEntityRef(player.Id));
+            if (bindings.Count > 0) env = env.Extend(bindings);
+            ev.Eval(rw, env);
+            CastLog.RecordTrigger(unit, ab.OnPattern, enterEvent);
+            return true;
+        }
+        return false;
     }
 
     /// <summary>
@@ -896,7 +1616,14 @@ internal static class Builtins
             "EndOfClash"      => MakeEventPattern("PhaseEnd",   ("phase", MakeIdent("Clash"))),
             _ => null,
         };
-        if (pattern is null) return null;
+        if (pattern is null)
+        {
+            // Lambda-filter shorthands need custom expansion: the filter
+            // lambda's parameter name is reused as the event-field binding
+            // so the lambda body can reference it naturally in the If-guard
+            // we wrap around the effect.
+            return TryExpandLambdaFilterShorthand(name, fc);
+        }
 
         var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
         {
@@ -904,6 +1631,80 @@ internal static class Builtins
             ["effect"] = effectExpr,
         };
         // OwnerId is fixed up by the caller.
+        return new AbilityInstance(AbilityKind.Triggered, ownerId: 0, named, Array.Empty<Ast.AstExpr>());
+    }
+
+    /// <summary>
+    /// Expands the two lambda-filter shorthand forms
+    /// (<c>OnArenaEnter(filter: u -> ..., effect: ...)</c> and
+    /// <c>OnCardPlayed(filter: c -> ..., effect: ...)</c>). The filter's
+    /// parameter becomes the pattern binding name, so the lambda body
+    /// can reference it directly inside the If-guard we wrap around the
+    /// effect. The synthesised shape is:
+    /// <code>
+    /// Triggered(
+    ///     on:     Event.EventName(&lt;event field&gt;=&lt;paramName&gt;),
+    ///     effect: If(&lt;filter body&gt;, &lt;original effect&gt;, NoOp))
+    /// </code>
+    /// </summary>
+    private static AbilityInstance? TryExpandLambdaFilterShorthand(string name, Ast.AstFunctionCall fc)
+    {
+        Ast.AstLambda? filter = null;
+        Ast.AstExpr? effectExpr = null;
+        foreach (var a in fc.Args)
+        {
+            if (a is not Ast.AstArgNamed n) continue;
+            if (n.Name == "filter" && n.Value is Ast.AstLambda lam && lam.Parameters.Count == 1)
+            {
+                filter = lam;
+            }
+            else if (n.Name == "effect")
+            {
+                effectExpr = n.Value;
+            }
+        }
+        if (filter is null || effectExpr is null) return null;
+
+        var paramIdent = MakeIdent(filter.Parameters[0]);
+
+        // Per-shorthand event pattern. OnArenaEnter also adds
+        // arena=self.arena so the pattern matcher filters to the Unit's
+        // own arena before we even evaluate the filter lambda.
+        (Ast.AstExpr pattern, Ast.AstExpr guard) PatternAndGuard() => name switch
+        {
+            "OnArenaEnter" => (
+                MakeEventPattern("EnterPlay",
+                    ("target", paramIdent),
+                    ("arena",  MakeSelfMember("arena"))),
+                // Skip self-entry (OnArenaEnter's defining "another Unit").
+                new Ast.AstBinaryOp(_shorthandSpan, "∧",
+                    new Ast.AstBinaryOp(_shorthandSpan, "!=", paramIdent, MakeIdent("self")),
+                    filter.Body)),
+            "OnCardPlayed" => (
+                MakeEventPattern("CardPlayed",
+                    ("card",   paramIdent),
+                    ("player", MakeSelfMember("controller"))),
+                filter.Body),
+            _ => (null!, null!),
+        };
+        var (patternExpr, guardExpr) = PatternAndGuard();
+        if (patternExpr is null) return null;
+
+        var noOp = new Ast.AstFunctionCall(_shorthandSpan,
+            MakeIdent("NoOp"), Array.Empty<Ast.AstArg>());
+        var ifWrapped = new Ast.AstFunctionCall(_shorthandSpan,
+            MakeIdent("If"), new List<Ast.AstArg>
+            {
+                new Ast.AstArgPositional(_shorthandSpan, guardExpr),
+                new Ast.AstArgPositional(_shorthandSpan, effectExpr),
+                new Ast.AstArgPositional(_shorthandSpan, noOp),
+            });
+
+        var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+        {
+            ["on"] = patternExpr,
+            ["effect"] = ifWrapped,
+        };
         return new AbilityInstance(AbilityKind.Triggered, ownerId: 0, named, Array.Empty<Ast.AstExpr>());
     }
 
@@ -944,6 +1745,47 @@ internal static class Builtins
     }
 
     private static int GetCardCost(Ast.AstCardDecl decl) => GetCardIntField(decl, "cost");
+
+    /// <summary>
+    /// Effective cost at the play step (GrammarSpec §6.2):
+    /// base cost − persistent <c>base_cost_reduction</c> (Phantom's
+    /// per-return rebate) − Surge rebate (−1 if another Echo of the same
+    /// faction was pushed this turn), floored at 0.
+    /// </summary>
+    private static int ComputeEffectiveCost(Evaluator ev, Entity player, Entity card, Ast.AstCardDecl decl)
+    {
+        int cost = GetCardCost(decl);
+        cost -= card.Counters.GetValueOrDefault("base_cost_reduction", 0);
+
+        if (HasKeywordOnDecl(decl, "Surge"))
+        {
+            // "costs 1 less if another EMBER Echo was Pushed this turn."
+            // With only ResonanceField-wide counts (no per-turn history yet),
+            // the interim heuristic is "you have >=2 echoes of any of this
+            // card's factions on the field" — two echoes means "another
+            // echo exists besides this card's own push".
+            var factions = KeywordRuntime.ReadFactions(decl);
+            foreach (var f in factions)
+            {
+                if (KeywordRuntime.CountEcho(player, f) >= 2)
+                {
+                    cost -= 1;
+                    break;
+                }
+            }
+        }
+        _ = ev;
+        return Math.Max(0, cost);
+    }
+
+    private static bool HasKeywordOnDecl(Ast.AstCardDecl decl, string name)
+    {
+        foreach (var (n, _) in KeywordRuntime.ReadKeywords(decl))
+        {
+            if (n == name) return true;
+        }
+        return false;
+    }
 
     private static int GetCardIntField(Ast.AstCardDecl decl, string name)
     {
@@ -1013,6 +1855,19 @@ internal static class Builtins
         }
         var opponent = ev.State.Players.FirstOrDefault(p => p.Id != attacker.Id);
 
+        // Before iterating Units for attack/hold prompts, auto-mark every
+        // Phantom-keyword Unit belonging to either player as phantoming
+        // for this clash. The authored macro is a Choice-driven StartOfClash
+        // fade — v1 simplification is always-fade, which is what the
+        // existing probes and card wording assume.
+        foreach (var e in ev.State.Entities.Values.ToList())
+        {
+            if (!KeywordRuntime.HasKeyword(e, "Phantom")) continue;
+            if (!e.Characteristics.TryGetValue("in_play", out var ipp) ||
+                ipp is not RtBool ipb || !ipb.V) continue;
+            e.Tags.Add("phantoming");
+        }
+
         // Per-arena: attack/hold prompt for each active-player Unit whose
         // `arena` parameter matches the arena's `pos`. Holds are a no-op;
         // attackers accumulate into a list, then damage resolves after all
@@ -1025,7 +1880,11 @@ internal static class Builtins
                 continue;
             }
 
-            var units = UnitsOnArena(ev, attacker.Id, pos.Name);
+            // Phantoming Units are off the board for this Clash; skip
+            // their attack/hold prompt entirely.
+            var units = UnitsOnArena(ev, attacker.Id, pos.Name)
+                .Where(u => !u.Tags.Contains("phantoming"))
+                .ToList();
             if (units.Count == 0) continue;
 
             ev.State.PendingEvents.Enqueue(new GameEvent("ClashBegin",
@@ -1115,7 +1974,10 @@ internal static class Builtins
         }
         // One PhaseEnd(phase=Clash) at the end of the whole phase, after
         // every arena's Clash window has closed. EndOfClash-shorthand
-        // triggers on Units match on this pattern.
+        // triggers on Units match on this pattern. Enqueued BEFORE any
+        // phantoming-return cleanup so PhantomReturn-listening triggers
+        // (e.g. BlankfaceCultist's Pilfer) see the event order they
+        // expect.
         ev.State.PendingEvents.Enqueue(new GameEvent("PhaseEnd",
             new Dictionary<string, RtValue>
             {

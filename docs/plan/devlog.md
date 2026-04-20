@@ -3,6 +3,60 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 13 waves 2.5-5: the engine is keyword-complete
+
+Finished the remaining step-13 arc in one long session. Six waves in:
+
+- **2.5 Lambda-filter shorthand.** `AttachCardAbilities` expands
+  `OnArenaEnter(filter: u -> p(u), effect: E)` and `OnCardPlayed(...)`
+  to raw Triggered, inlining the filter body as an If-guard with the
+  lambda's param name reused as the event binding. CohortCaptain's
+  BULWARK Fortify grant aura and RippleBreaker's Reshape-on-play
+  both fire end-to-end.
+- **3 Replacement dispatch.** Replacement walker runs at the two
+  points where it matters: arena collapse → `DestroyUnit` (Recur
+  redirects to Arsenal-bottom), and PlaceUnit post-stats (Unique
+  bounces duplicates to Cache). Four new builtins: `MoveTo`,
+  `bottom_of`, `HasDuplicateInPlay`, `has_keyword`.
+- **4 Phantom.** Keyword synthesises two Triggered abilities: a
+  StartOfClash fade (sets `phantoming` tag, zeroes Clash
+  contribution) and a PhaseEnd(Clash) return (MoveTo hand, +1
+  base_cost_reduction counter, emits `Event.PhantomReturn`).
+  BlankfaceCultist's raw PhantomReturn trigger now fires. v1
+  auto-fade — Choice prompt can layer on later.
+- **5 ResonanceField.** FIFO 5-slot list in each Player's
+  Characteristics, pushed on every CardPlayed. `CountEcho`,
+  `Resonance(F, N)`, `Peak(F)`, `Banner(F)`, `Tiers([(cond, eff),
+  ...])`, `When(cond, eff)` builtins default to the env's
+  `controller` binding.
+- **Bonus.** `Heal` (additive inverse of DealDamage, caps at
+  starting_integrity), `CreateToken` / `Sprawl` (THORN token
+  generation, emits EnterPlay so Rally fires on them), `DriftMoveUnit`
+  (adjacency-aware move), Shroud filter in `Target`, Surge cost
+  rebate in `ComputeEffectiveCost`, Ignite upgraded from
+  Conduit-chip approximation to opposing-Unit-with-≤2-Ramparts
+  path with Conduit fall-through.
+- **Pattern matcher** now resolves `self.arena` to the entity's
+  arena parameter and `self.controller` to its OwnerId ref;
+  `EnterPlay` events carry `arena` as a symbol so pattern
+  comparisons work cleanly.
+
+Bench movement (`post-wiring-full.*.results.json`) vs post-Ontrig:
+- KeywordCoverage trigger-fires: 19,736 → **201,398**. Zero
+  declared-but-silent cards in the cast log.
+- PairCorrectly draw rate: 34.6 % → **0.0 %**. Every game resolves.
+- EmbHell decisive WR: 34.6 % → 66.7 % (+32 pp; Ignite chips
+  work, Resonance tiers gate EMBER copies from Eremis).
+- AiDeckMatrix ember-aggro: 44.1 % → 68.2 % (+24 pp).
+- AiDeckMatrix tide-thorn: 81.1 % → 66.4 % (Drift moves things,
+  Recur reshuffles, Phantom fades deny clash contributions).
+- Per-AI aggregates inside a 3-pp band — bots still play the game.
+
+283+ Ccgnf/Bots/Rest tests green. Step 13 exit criteria all ticked
+in docs/plan/steps/13-engine-completion.md. Residual gaps (Kindle
+counter-fire, Reshape echo swap, Interrupt Debt) deferred as
+small-scope, low-impact.
+
 ## 2026-04-20 — Step 13 wave 2: Triggered-on-Unit + Mend/Rally/Ignite live
 
 Closed the major step-13 gaps the cast log pointed at. Landed:

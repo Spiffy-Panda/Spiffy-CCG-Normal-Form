@@ -19,6 +19,91 @@ namespace Ccgnf.Interpreter;
 public static class KeywordRuntime
 {
     public const string TagPrefix = "kw:";
+    public const int ResonanceFieldCapacity = 5;
+
+    /// <summary>
+    /// Read the <c>factions: {...}</c> field off a card declaration as a
+    /// flat list of faction name strings. Multi-faction cards push one
+    /// echo per faction; single-faction cards push one echo. Returns
+    /// empty when the card has no factions field.
+    /// </summary>
+    public static IReadOnlyList<string> ReadFactions(AstCardDecl decl)
+    {
+        var result = new List<string>(2);
+        foreach (var field in decl.Body.Fields)
+        {
+            if (field.Key.Name != "factions") continue;
+            if (field.Value is not AstFieldExpr fe) continue;
+            CollectFactionIdents(fe.Value, result);
+            break;
+        }
+        return result;
+    }
+
+    private static void CollectFactionIdents(AstExpr expr, List<string> sink)
+    {
+        switch (expr)
+        {
+            case AstIdent id:
+                sink.Add(id.Name);
+                break;
+            case AstBraceExpr be:
+                foreach (var entry in be.Entries)
+                {
+                    if (entry is AstBraceValue bv)
+                    {
+                        CollectFactionIdents(bv.Value, sink);
+                    }
+                }
+                break;
+            case AstListLit ll:
+                foreach (var el in ll.Elements)
+                {
+                    CollectFactionIdents(el, sink);
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Append each faction in <paramref name="factions"/> to the player's
+    /// ResonanceField (stored as <c>Characteristics["ResonanceField"]</c>
+    /// on the player entity, carrying an <see cref="RtList"/> of
+    /// <see cref="RtSymbol"/>). The field is a FIFO capped at
+    /// <see cref="ResonanceFieldCapacity"/> — every push beyond the cap
+    /// evicts the oldest echo.
+    /// </summary>
+    public static void PushEchoes(Entity player, IEnumerable<string> factions)
+    {
+        var current = GetResonanceField(player);
+        var updated = new List<RtValue>(current);
+        foreach (var f in factions)
+        {
+            updated.Add(new RtSymbol(f));
+            while (updated.Count > ResonanceFieldCapacity) updated.RemoveAt(0);
+        }
+        player.Characteristics["ResonanceField"] = new RtList(updated);
+    }
+
+    public static IReadOnlyList<RtValue> GetResonanceField(Entity player)
+    {
+        if (player.Characteristics.TryGetValue("ResonanceField", out var v) &&
+            v is RtList list)
+        {
+            return list.Elements;
+        }
+        return Array.Empty<RtValue>();
+    }
+
+    public static int CountEcho(Entity player, string faction)
+    {
+        int count = 0;
+        foreach (var echo in GetResonanceField(player))
+        {
+            if (echo is RtSymbol s && s.Name == faction) count++;
+        }
+        return count;
+    }
 
     /// <summary>
     /// Read the <c>keywords: [ ... ]</c> field from a card declaration and
@@ -79,9 +164,103 @@ public static class KeywordRuntime
                 unit.Counters[key] = unit.Counters.GetValueOrDefault(key, 0) + n;
             }
 
-            if (TryMakeKeywordAbility(unit, name, param) is AbilityInstance kwAbility)
+            foreach (var kwAbility in MakeKeywordAbilities(unit, name, param))
             {
                 unit.Abilities.Add(kwAbility);
+            }
+        }
+    }
+
+    private static IEnumerable<AbilityInstance> MakeKeywordAbilities(
+        Entity unit, string name, int? param)
+    {
+        if (TryMakeKeywordAbility(unit, name, param) is AbilityInstance single)
+        {
+            yield return single;
+            yield break;
+        }
+        foreach (var extra in TryMakeMultiAbilityKeyword(unit, name, param))
+        {
+            yield return extra;
+        }
+    }
+
+    private static IEnumerable<AbilityInstance> TryMakeMultiAbilityKeyword(
+        Entity unit, string name, int? param)
+    {
+        var span = Ccgnf.Diagnostics.SourceSpan.Unknown;
+        Ast.AstExpr selfIdent = new Ast.AstIdent(span, "self");
+        Ast.AstExpr selfController = new Ast.AstMemberAccess(span, selfIdent, "controller");
+
+        Ast.AstFunctionCall MakeEventPattern(string ev, params (string F, Ast.AstExpr V)[] fields)
+        {
+            var args = new List<Ast.AstArg>(fields.Length);
+            foreach (var (f, v) in fields) args.Add(new Ast.AstArgNamed(span, f, v));
+            var callee = new Ast.AstMemberAccess(span, new Ast.AstIdent(span, "Event"), ev);
+            return new Ast.AstFunctionCall(span, callee, args);
+        }
+
+        AbilityInstance MakeTriggeredInline(Ast.AstExpr pattern, Ast.AstExpr effect)
+        {
+            var nameds = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+            {
+                ["on"] = pattern,
+                ["effect"] = effect,
+            };
+            return new AbilityInstance(AbilityKind.Triggered, unit.Id, nameds, Array.Empty<Ast.AstExpr>());
+        }
+
+        switch (name)
+        {
+            case "Phantom":
+            {
+                // Keyword_Phantom expands to a StartOfClash Choice.
+                // v1 wiring: auto-fade at start of clash, auto-return at
+                // end of clash. SetPhantoming zeros the Clash contribution
+                // via GetClashProjectedForce / GetClashFortification. At
+                // EndOfClash the unit moves back to hand and gets its
+                // per-return cost reduction applied.
+                var setPhantoming = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "SetPhantoming"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, new Ast.AstIdent(span, "true")),
+                    });
+                yield return MakeTriggeredInline(
+                    MakeEventPattern("PhaseBegin",
+                        ("phase", new Ast.AstIdent(span, "Clash"))),
+                    setPhantoming);
+
+                var phantomReturn = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "PhantomReturn"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                    });
+                yield return MakeTriggeredInline(
+                    MakeEventPattern("PhaseEnd", ("phase", new Ast.AstIdent(span, "Clash"))),
+                    phantomReturn);
+                yield break;
+            }
+            case "Drift":
+            {
+                // EndOfYourTurn drift to a random non-collapsed adjacent
+                // arena. v1 simplification: pick randomly rather than
+                // prompting the controller (preserves the "drift happens
+                // on your end of turn" cadence in bench).
+                var driftCall = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "DriftMoveUnit"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                    });
+                yield return MakeTriggeredInline(
+                    MakeEventPattern("PhaseBegin",
+                        ("phase",  new Ast.AstIdent(span, "Fall")),
+                        ("player", selfController)),
+                    driftCall);
+                yield break;
             }
         }
     }
@@ -181,6 +360,68 @@ public static class KeywordRuntime
                         ("player", selfController)),
                     effect);
             }
+            case "Recur":
+            {
+                // Replacement on Destroy: redirect the move from Cache to
+                // bottom_of(Arsenal). The Interpreter's Replacement walker
+                // evaluates `replace_with` with `self` bound to this Unit
+                // and `owner` bound to its controller.
+                var ownerIdent = new Ast.AstIdent(span, "owner");
+                var arsenal = new Ast.AstMemberAccess(span, ownerIdent, "Arsenal");
+                var bottomCall = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "bottom_of"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, arsenal),
+                    });
+                var moveTo = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "MoveTo"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, bottomCall),
+                    });
+                var pattern = MakeEventPattern("Destroy", ("target", selfIdent));
+                var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+                {
+                    ["on"] = pattern,
+                    ["replace_with"] = moveTo,
+                };
+                return new AbilityInstance(
+                    AbilityKind.Replacement, unit.Id, named, Array.Empty<Ast.AstExpr>());
+            }
+            case "Unique":
+            {
+                // Replacement on EnterPlay(target=self): if the controller
+                // already has another in-play copy of this name, redirect
+                // into their Cache. The engine handles the guard via the
+                // `HasDuplicateInPlay` builtin the Replacement walker
+                // evaluates before firing `replace_with`.
+                var cacheRef = new Ast.AstMemberAccess(span,
+                    new Ast.AstIdent(span, "owner"), "Cache");
+                var moveTo = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "MoveTo"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, cacheRef),
+                    });
+                var guard = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "HasDuplicateInPlay"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                    });
+                var pattern = MakeEventPattern("EnterPlay", ("target", selfIdent));
+                var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+                {
+                    ["on"] = pattern,
+                    ["guard"] = guard,
+                    ["replace_with"] = moveTo,
+                };
+                return new AbilityInstance(
+                    AbilityKind.Replacement, unit.Id, named, Array.Empty<Ast.AstExpr>());
+            }
             default:
                 return null;
         }
@@ -240,6 +481,7 @@ public static class KeywordRuntime
     public static int GetClashProjectedForce(Entity unit, GameState state)
     {
         _ = state;
+        if (unit.Tags.Contains("phantoming")) return 0;
         if (HasKeyword(unit, "Sentinel")) return 0;
         return unit.Counters.GetValueOrDefault("force", 0);
     }
@@ -251,6 +493,8 @@ public static class KeywordRuntime
     /// </summary>
     public static int GetClashFortification(Entity unit, GameState state)
     {
+        // Phantoming Units are off the board for Clash: zero contribution.
+        if (unit.Tags.Contains("phantoming")) return 0;
         int basis = EffectiveRamparts(unit, state);
         if (HasKeyword(unit, "Sentinel"))
         {

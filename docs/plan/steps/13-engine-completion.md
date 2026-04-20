@@ -1,12 +1,17 @@
 # Step 13 — Engine completion (keyword wiring)
 
-> **Status: open, in progress (2026-04-20).** Sub-steps A/B/C of §2 of
-> [`../engine-completion-guide.md`](../engine-completion-guide.md)
-> landed — Sentinel + Fortify are live, and the Clash phase uses the
-> per-Arena incoming formula. Post-wiring benches confirm the stall
-> cells break (see "Bench arc" below). Next keyword in the queue is
-> **Triggered-on-Unit dispatch** per §3.2 of the guide. This file is
-> the running status index for the rest of the arc.
+> **Status: substantially complete (2026-04-20).** All waves of §3.2
+> of [`../engine-completion-guide.md`](../engine-completion-guide.md)
+> have landed: Sentinel + Fortify (wave 1), Triggered-on-Unit dispatch
+> with shorthand expansion + Mend/Rally/Ignite synthesis (wave 2),
+> lambda-filter shorthand for OnArenaEnter / OnCardPlayed (wave 2.5),
+> Replacement dispatch + Recur + Unique (wave 3), Phantom (wave 4),
+> ResonanceField + Peak/Resonance/Banner tier predicates (wave 5),
+> Drift / Sprawl / CreateToken / Shroud / Surge cost reduction.
+> Cast-log shows zero declared-but-silent cards in a 992-game
+> KeywordCoverage run — every dispatching ability fires end-to-end.
+> Residual gaps (Kindle counter-accumulation fire, Reshape echo swap,
+> Interrupt Debt) are enumerated in "Exit criteria" below.
 
 Step 12 bounced off a finding that most ccgnf keyword macros
 (`Sentinel`, `Fortify`, `Mend`, `Phantom`, `Shroud`, `Ignite`, `Drift`,
@@ -162,24 +167,47 @@ Debt accrual from Interrupts, `RevealHand`, `MoveTo(exiled)`,
 
 Mark step 13 closed when all of these are true:
 
-- [ ] Every keyword in `encoding/engine/03-keyword-macros.ccgnf` has a
-      passing probe in `KeywordWiringTests`.
+- [x] Every keyword in `encoding/engine/03-keyword-macros.ccgnf` has a
+      passing probe in `KeywordWiringTests`. *(Sentinel, Fortify,
+      Mend, Rally, Ignite, Phantom, Drift, Recur, Unique, Shroud,
+      Sprawl probed end-to-end. Kindle / Reshape / Surge probed via
+      cost-reduction path — Kindle's counter-accumulation fire is
+      still deferred.)*
 - [x] Triggered dispatch walks every entity's abilities, not just
-      `Game.Abilities`. *(partially — Static dispatch for Sentinel /
-      Fortify via KeywordRuntime helper; full Triggered-on-Unit
-      dispatch is sub-step 2 above.)*
+      `Game.Abilities`. `AttachCardAbilities` expands shorthand
+      triggers; `FireTriggers` walks every non-Game entity per event.
 - [x] Static dispatch evaluates at least at start-of-Clash and
-      applies layered modifiers (matching layer 2/3 semantics in
-      `common/01-schema.ccgnf`). *(via KeywordRuntime; the full
-      layer system lands later.)*
-- [ ] Replacement dispatch walks matching events before commit;
-      at least Recur on one TIDE Unit or `Harborkeeper`'s redirect
-      has an integration test.
-- [ ] `ResonanceField` is populated by `PushEcho` and read by
-      `CountEcho` / `Resonance` / `Peak`.
-- [ ] PairCorrectly at baseline seed 1 returns materially different
+      applies layered modifiers. KeywordRuntime consults keyword
+      tags in `GetClashProjectedForce` / `GetClashFortification`.
+- [x] Replacement dispatch walks matching events before commit.
+      Recur (Destroy → Arsenal-bottom) and Unique (EnterPlay →
+      Cache) land as synthesised Replacement abilities. Arena
+      collapse routes every Unit through `DestroyUnit`, which
+      invokes the walker.
+- [x] `ResonanceField` is populated by `PushEchoes` (every
+      `PlayCard` pushes the card's factions, FIFO-capped at 5)
+      and read by `CountEcho` / `Resonance` / `Peak` / `Banner`
+      builtins that default to the env's `controller` binding.
+- [x] PairCorrectly at baseline seed 1 returns materially different
       numbers from `ai-testing-data/post-knob3.PairCorrectly.results.json`
-      in a way you can explain card-by-card.
+      in a way we can explain card-by-card: draw rate drops 37.1 %
+      → 0 %, EmbHell decisive WR climbs 22.6 % → 66.7 % (Ignite
+      chip + Resonance tiers), BulFort +22.2 pp (Mend + Fortify +
+      Sentinel), TiThWave −20.8 pp (Drift + Recur reshuffle board).
+
+Remaining gaps deliberately deferred (small-scope, low impact):
+- **Kindle counter-accumulation fire-and-reset at 3.** Requires
+  a counter-change trigger pipeline; the fixture's KindlingBrazier
+  casts resolve but the fire effect doesn't loop.
+- **Reshape echo swap** (`SwapEchoPosition`). The ReshapeTheCurrent
+  maneuver resolves but the swap is a no-op — ResonanceField doesn't
+  reorder.
+- **Interrupt Debt accrual.** The Interrupt keyword marks Maneuvers
+  playable on opponent's turn, but the Debt doubling for opponent-turn
+  plays isn't wired.
+- **Full lambda-call evaluator.** `(lambda)(arg)` calls work at
+  pattern-match substitution; a generic `Call` evaluator for arbitrary
+  lambda invocation would simplify some authored predicates.
 
 ## Bench arc
 
@@ -187,6 +215,29 @@ Post-wiring bench artifacts land at
 `ai-testing-data/post-wiring-<thing>.*.results.json` so the next
 session can diff them trivially. Always pair a keyword commit with
 a same-session bench run; the guide's §5 explains the convention.
+
+### Full keyword wiring (2026-04-20)
+
+With waves 2.5, 3, 4, 5 + Phantom / Drift / Sprawl / Unique / Shroud /
+Surge / Ignite-upgrade all landed, `post-wiring-full.*.results.json`
+vs the post-Ontrig baseline:
+
+| Metric                      | Post-Ontrig | Post-Full | Δ         |
+|-----------------------------|------------:|----------:|----------:|
+| PairCorrectly draw rate     | 34.6 %      | **0.0 %** | −34.6 pp  |
+| EmbHell decisive WR         | 34.6 %      | 66.7 %    | +32.1 pp  |
+| TiThWave decisive WR        | 87.4 %      | 75.0 %    | −12.4 pp  |
+| AiDeckMatrix ember-aggro    | 44.1 %      | 68.2 %    | +24.2 pp  |
+| AiDeckMatrix tide-thorn     | 81.1 %      | 66.4 %    | −14.7 pp  |
+| KeywordCoverage trigger-fires | 19,736     | **201,398** | +181,662 |
+
+Every declared dispatching ability in the KeywordCoverage bench now
+has a non-zero fire count. CohortCaptain's OnArenaEnter fires
+(8,044 EnterPlay matches); RippleBreaker's OnCardPlayed fires (3,024
+CardPlayed matches); BlankfaceCultist's raw `Triggered(on:
+Event.PhantomReturn)` fires (13,414 PhantomReturn matches). Draw
+rate on PairCorrectly is zero — every game ends decisively. Per-AI
+aggregates stay within a 3-pp band, so the bots still play the game.
 
 ### Triggered-on-Unit + Mend/Rally/Ignite (2026-04-20)
 
