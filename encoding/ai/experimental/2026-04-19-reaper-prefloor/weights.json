@@ -25,8 +25,8 @@
       "lowest_live_hp": 3.5,
       "opponent_priority": 2.5,
       "overlap": 1.6,
-      "conduit_softness": 2.5,
-      "threat_avoidance": 0.8
+      "conduit_softness": 0.8,
+      "threat_avoidance": 1.0
     },
     "defend_conduit": {
       "on_curve": 1.2,

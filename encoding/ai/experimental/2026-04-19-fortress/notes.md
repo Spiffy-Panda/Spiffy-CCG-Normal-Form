@@ -1,5 +1,22 @@
 # Fortress — experimental CPU (2026-04-19)
 
+> **2026-04-20 — Step 12.1 floor edit.** `pushing` intent now satisfies
+> the `conduit_softness ≥ threat_avoidance` floor rule
+> (`cs: 0.6 → 3.0`, `ta: 2.5 → 2.0`). All other intents unchanged —
+> Fortress still defends in `default`, `early_tempo`, and
+> `defend_conduit`; it just finishes when committed to a push.
+>
+> **Bench:** `FortNew` vs `FortOld` on `bulwark-control`, 40 games.
+> Result `2-2-36` (only 4 decisive, 50% decisive WR). The floor fix
+> does not regress Fortress and does not promote it either — the
+> bulwark-control mirror draws almost everything regardless of
+> `pushing` weights, so the bench is under-powered to distinguish
+> versions. **Not promoted to `stable/`.** Artifact:
+> [`ai-testing-data/12.1-fortress.results.json`](../../../../ai-testing-data/12.1-fortress.results.json).
+> Diagnosis: the draw dominance is a card/engine issue rather than a
+> weight issue — see Step 12.3 (card threat audit) and Step 12.2
+> (engine sanity pass).
+
 ## Concept
 
 Fortress is a defence-first utility bot: it refuses to trade when trading

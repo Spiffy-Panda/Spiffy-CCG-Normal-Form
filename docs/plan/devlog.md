@@ -3,6 +3,39 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 12.1: AI floor fix (no promotion)
+
+Audited all four experimental bots for
+`conduit_softness ≥ threat_avoidance` under `pushing` + `lethal_check`.
+Two violators: Fortress (`pushing` cs 0.6 vs ta 2.5) and Reaper
+(`pushing` cs 0.8 vs ta 1.0). Pre-edit snapshots preserved under
+`experimental/2026-04-19-{fortress,reaper}-prefloor/`; live weights
+edited in place. Hellfire and Wavebreaker already passed, no edit.
+
+Bench (40 games, matched deck, new vs old):
+
+- Fortress on `bulwark-control`: 2-2-36, decisive WR 50 %. Mirror too
+  draw-heavy for a confident signal — below 55 % promotion bar but
+  not a regression.
+- Reaper on `hollow-disruption`: 4-11-25, decisive WR **26.7 %** —
+  regression. Pre-edit Reaper was accidentally winning its mirror by
+  stalling; forcing a closer pulls it out of that equilibrium. Kept
+  anyway because the floor rule is a hard invariant.
+
+PairCorrectly re-run at baseline seed: draw rate **unchanged at
+81.7 %** (byte-identical per-pair numbers vs 12.0). `pushing` intent
+is rarely the active state in matched-pair cross-matchups. **Exit
+criterion ≤ 40 % draw rate missed by 41.7 pp** → diagnosis routes to
+Step 12.3 (card threat audit, primary) and Step 12.2 (engine sanity
+pass, secondary). The closer-density deficit in bulwark-control +
+hollow-disruption is the real blocker; weights alone can't fix it.
+
+`encoding/ai/stable/` still absent — no bot cleared the 55 % bar this
+cycle. Full writeup: [`docs/plan/balance/ai-floor-2026-04-20.md`](balance/ai-floor-2026-04-20.md).
+Bench artifacts: [`ai-testing-data/12.1-*.results.json`](../../ai-testing-data/).
+
+---
+
 ## 2026-04-20 — Step 12.0: balance baseline captured
 
 Ran the two reference tournaments at post-bump defaults (40 games /

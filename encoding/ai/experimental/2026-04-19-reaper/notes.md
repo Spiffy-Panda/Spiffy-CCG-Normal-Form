@@ -1,5 +1,26 @@
 # Reaper — experimental CPU (2026-04-19, → hollow-disruption)
 
+> **2026-04-20 — Step 12.1 floor edit.** `pushing` intent now satisfies
+> the `conduit_softness ≥ threat_avoidance` floor rule
+> (`cs: 0.8 → 2.5`, `ta: 1.0 → 0.8`). Removal-first identity preserved
+> in `default`, `early_tempo`, and `defend_conduit` (dominant
+> `lowest_live_hp` untouched); the edit only asserts that Reaper
+> finishes when it has already committed to closing.
+>
+> **Bench:** `ReapNew` vs `ReapOld` on `hollow-disruption`, 40 games.
+> Result `4-11-25` — ReapNew won only 26.7% of 15 decisive games, a
+> net **regression** versus pre-edit weights. Notably avg game length
+> dropped to 303 steps (from 331 in the 12.0 baseline's HolReap row),
+> so the bots *are* engaging `pushing` more often; pre-edit Reaper's
+> stall-through-ambiguity behaviour was accidentally winning the
+> mirror. **Not promoted to `stable/`.** Kept anyway because the
+> floor rule is a hard invariant — a bot that won't close when ahead
+> is broken by definition, even if mirror-match numbers prefer the
+> broken version. Artifact:
+> [`ai-testing-data/12.1-reaper.results.json`](../../../../ai-testing-data/12.1-reaper.results.json).
+> Diagnosis: hollow-disruption lacks reliable closers (see the "No
+> closer" weakness below) — fix lives in Step 12.3, not here.
+
 ## Concept
 
 Reaper is the removal-first profile: it spends every targeted action

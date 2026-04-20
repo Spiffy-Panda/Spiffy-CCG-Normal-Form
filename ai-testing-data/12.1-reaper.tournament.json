@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "12.1-reaper",
+  "description": "Step 12.1 floor-fix bench — Reaper (post-edit) vs Reaper-prefloor (pre-edit) on hollow-disruption. 40 games cross-pair (no mirror, no self). Post-edit Reaper passes if it wins >=55% of decisive games. Same tournament harness + caps as 12.0 baseline: 6000 inputs, 150000 events, logLevel=llm.",
+  "pairs": [
+    {
+      "pairId": "ReapNew",
+      "deckId": "hollow-disruption",
+      "botProfile": "experimental/2026-04-19-reaper",
+      "label": "ReapNew"
+    },
+    {
+      "pairId": "ReapOld",
+      "deckId": "hollow-disruption",
+      "botProfile": "experimental/2026-04-19-reaper-prefloor",
+      "label": "ReapOld"
+    }
+  ],
+  "matchups": null,
+  "includeMirror": false,
+  "gamesPerMatchup": 40,
+  "baseSeed": 1,
+  "maxInputsPerGame": 6000,
+  "maxEventsPerGame": 150000,
+  "logLevel": "llm"
+}
