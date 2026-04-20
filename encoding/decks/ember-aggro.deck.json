@@ -5,6 +5,7 @@
   "factions": ["EMBER"],
   "description": "Low-curve burn and fast Blitz/Surge bodies. Threatens the opposing Conduit before defenders stabilize.",
   "archetypes": ["aggro", "tempo"],
+  "suggested_ai": "experimental/2026-04-19-hellfire",
   "cards": [
     { "name": "Cinderling", "count": 3 },
     { "name": "Spark", "count": 3 },
