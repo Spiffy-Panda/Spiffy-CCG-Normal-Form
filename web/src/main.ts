@@ -8,6 +8,7 @@ import { renderRaw } from "./pages/raw";
 import { renderLobby } from "./pages/play/lobby";
 import { renderTabletop } from "./pages/play/tabletop";
 import { renderAi } from "./pages/ai";
+import { renderTournament } from "./pages/tournament";
 
 const root = document.getElementById("app");
 if (!root) throw new Error("Missing #app root");
@@ -18,6 +19,7 @@ const view = renderShell(root, [
   { label: "Interpreter", href: "#/interpreter" },
   { label: "Play", href: "#/play/lobby" },
   { label: "AI", href: "#/ai" },
+  { label: "Tournament", href: "#/tournament" },
   { label: "Raw", href: "#/raw" },
 ]);
 
@@ -30,6 +32,7 @@ const router = createRouter(
     { path: "/play/lobby", render: (c, m) => renderLobby(c, m) },
     { path: "/play/tabletop", render: (c, m) => renderTabletop(c, m), prefix: true },
     { path: "/ai", render: (c) => renderAi(c) },
+    { path: "/tournament", render: (c) => renderTournament(c) },
   ],
   (c, match) => {
     c.innerHTML = `<main style="padding: 24px"><p class="muted">No route for <code>${match.path}</code></p></main>`;

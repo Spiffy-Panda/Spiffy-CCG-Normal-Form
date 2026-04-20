@@ -104,4 +104,12 @@ export const api = {
       maxInputsPerGame: 2000,
       maxEventsPerGame: 50000,
     }),
+  aiTournamentRun: (cfg: import("./dtos").TournamentConfigV2) =>
+    postJson<import("./dtos").TournamentRunResponseV2>("/api/ai/tournament/run", cfg),
+  aiTournamentValidate: (cfg: import("./dtos").TournamentConfigV2) =>
+    postJson<import("./dtos").TournamentValidateResponse>("/api/ai/tournament/validate", cfg),
+  aiTournamentLogs: () =>
+    request<import("./dtos").TournamentLogListResponse>("/api/ai/tournament/logs"),
+  aiTournamentLogFetch: (id: string) =>
+    requestText(`/api/ai/tournament/logs/${encodeURIComponent(id)}`),
 };

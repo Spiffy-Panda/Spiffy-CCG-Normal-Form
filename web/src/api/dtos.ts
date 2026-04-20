@@ -187,6 +187,109 @@ export interface AiTournamentResponse {
   timestamp: string;
 }
 
+// ─── Tournament V2 (heterogeneous deck/bot pairs) ──────────────────────
+
+export interface TournamentPairDto {
+  pairId: string;
+  deckId: string;
+  botProfile: string;
+  label?: string | null;
+}
+
+export interface TournamentMatchupDto {
+  aPairId: string;
+  bPairId: string;
+}
+
+export type TournamentLogLevel = "silent" | "summary" | "llm";
+
+export interface TournamentConfigV2 {
+  version: number;
+  name?: string;
+  description?: string;
+  pairs: TournamentPairDto[];
+  matchups?: TournamentMatchupDto[] | null;
+  includeMirror: boolean;
+  gamesPerMatchup: number;
+  baseSeed: number;
+  maxInputsPerGame: number;
+  maxEventsPerGame: number;
+  /** "silent" | "summary" | "llm". Controls verbosity + disk persistence. */
+  logLevel?: TournamentLogLevel;
+}
+
+export interface TournamentPairRowDto {
+  pairId: string;
+  deckId: string;
+  botProfile: string;
+  games: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  winRate: number;
+  avgSteps: number;
+}
+
+export interface TournamentMatchupResultDto {
+  aPairId: string;
+  bPairId: string;
+  games: number;
+  aWins: number;
+  bWins: number;
+  draws: number;
+  aWinRate: number;
+  avgSteps: number;
+}
+
+export interface TournamentAnalysisDto {
+  totalMatchups: number;
+  totalGames: number;
+  avgGameLength: number;
+  topPerformer?: string | null;
+  topPerformerAdvantage?: number | null;
+  weakestPerformer?: string | null;
+  mostBalancedMatchup?: string | null;
+  mostLopsidedMatchup?: string | null;
+  longestGameMatchup?: string | null;
+  shortestGameMatchup?: string | null;
+  notes: string[];
+}
+
+export interface TournamentRunResponseV2 {
+  config: TournamentConfigV2;
+  pairs: TournamentPairRowDto[];
+  matchups: TournamentMatchupResultDto[];
+  analysis: TournamentAnalysisDto;
+  timestamp: string;
+  logLevel: TournamentLogLevel;
+  /** Natural-language statements for LLM consumption; empty unless
+   *  logLevel is "llm". */
+  learningLog: string[];
+  /** Relative path to the on-disk JSONL log, or null. */
+  logPath?: string | null;
+}
+
+export interface TournamentValidateResponse {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export interface TournamentLogSummaryDto {
+  id: string;
+  path: string;
+  timestamp: string;
+  name?: string | null;
+  pairCount: number;
+  totalGames: number;
+  topPerformer?: string | null;
+  topPerformerAdvantage?: number | null;
+}
+
+export interface TournamentLogListResponse {
+  logs: TournamentLogSummaryDto[];
+}
+
 export interface RoomCpuSeatSpec {
   name?: string | null;
   deck?: RoomDeckSpec | null;
