@@ -25,6 +25,9 @@ export_presets.cfg
 tmp/
 scratch/
 
+# Reference code extracted from other projects for local study
+reference-code/
+
 # -----------------------------------------------------------------------------
 # .NET build artifacts
 # -----------------------------------------------------------------------------
