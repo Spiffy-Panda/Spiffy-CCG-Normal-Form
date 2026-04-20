@@ -102,6 +102,94 @@ public class KeywordWiringTests
         Assert.Equal(5, KeywordRuntime.GetClashFortification(sentinel, run.State));
     }
 
+    // -----------------------------------------------------------------------
+    // Fortify N — §2.2 Sub-step B: +N Ramparts while controller's Conduit in
+    // this Arena is at integrity ≥ 4. Suppressed (not destroyed) when the
+    // Conduit drops below 4; returns if healed back.
+    // -----------------------------------------------------------------------
+
+    [Fact]
+    public void Fortify_RecordsNumericParamOnRuntimeUnit()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "HeavyStriker" }, new[] { "FortifyWall" }));
+
+        // P2 plays FortifyWall Left.
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        // P1 passes.
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        Assert.Null(run.WaitPending());
+
+        var p2 = run.State.NamedEntities["Player2"];
+        var wall = run.State.Entities[p2.Zones["Battlefield"].Contents.Single()];
+        Assert.True(KeywordRuntime.HasKeyword(wall, "Fortify"));
+        Assert.Equal(2, KeywordRuntime.GetFortifyAmount(wall));
+    }
+
+    [Fact]
+    public void Fortify_EffectiveRamparts_FollowsConduitIntegrityThreshold()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "HeavyStriker" }, new[] { "FortifyWall" }));
+
+        // P2 plays FortifyWall Left; P1 passes; run drains.
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        Assert.Null(run.WaitPending());
+
+        var state = run.State;
+        var p2 = state.NamedEntities["Player2"];
+        var wall = state.Entities[p2.Zones["Battlefield"].Contents.Single()];
+        Assert.Equal("FortifyWall", wall.DisplayName);
+        Assert.Equal(3, wall.Counters["current_ramparts"]);
+
+        // P2's Conduit in Left starts at integrity 7 (fixture). Fortify(2)
+        // is active → base 3 + 2 = 5.
+        var p2LeftConduit = state.Entities.Values.Single(e =>
+            e.Kind == "Conduit" && e.OwnerId == p2.Id &&
+            e.Parameters.TryGetValue("arena", out var a) &&
+            a is RtSymbol s && s.Name == "Left");
+        Assert.Equal(7, p2LeftConduit.Counters["integrity"]);
+        Assert.Equal(5, KeywordRuntime.EffectiveRamparts(wall, state));
+
+        // Drop the Conduit below the Fortify threshold: bonus suppresses.
+        p2LeftConduit.Counters["integrity"] = 3;
+        Assert.Equal(3, KeywordRuntime.EffectiveRamparts(wall, state));
+
+        // Heal back to exactly the threshold: bonus returns.
+        p2LeftConduit.Counters["integrity"] = 4;
+        Assert.Equal(5, KeywordRuntime.EffectiveRamparts(wall, state));
+    }
+
+    [Fact]
+    public void Fortify_ClashFortification_TracksEffectiveRamparts()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "HeavyStriker" }, new[] { "FortifyWall" }));
+
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        Assert.Null(run.WaitPending());
+
+        var p2 = run.State.NamedEntities["Player2"];
+        var wall = run.State.Entities[p2.Zones["Battlefield"].Contents.Single()];
+
+        // FortifyWall has no Sentinel, so projected_force == force == 2 and
+        // fortification == effective_ramparts (base 3 + fortify 2 while
+        // Conduit healthy).
+        Assert.Equal(2, KeywordRuntime.GetClashProjectedForce(wall, run.State));
+        Assert.Equal(5, KeywordRuntime.GetClashFortification(wall, run.State));
+    }
+
     [Fact]
     public void VanillaUnit_ClashHelpers_ReturnForceAndRampartsUnchanged()
     {
