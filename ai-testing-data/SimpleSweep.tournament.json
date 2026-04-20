@@ -1,7 +1,7 @@
 {
   "version": 2,
   "name": "SimpleSweep",
-  "description": "Every available bot piloting the SAME deck (bulwark-control). A mirror-included round-robin so any win-rate spread is attributable to pilot skill, not deck choice. Mirror cells (self-vs-self) measure per-bot seed variance. Pairs with PairCorrectly to separate deck signal from bot signal. ENGINE STATUS (2026-04-20): because bulwark-control is built around Sentinel + Fortify + Mend, and those keyword macros are not yet dispatched at runtime (see docs/plan/engine-completion-guide.md), this mirror currently measures how each bot handles raw-stat BULWARK bodies, not the full control plan. Expect draws to dominate until the keyword pass lands; the pre-Knob-1 draw rate (~91 %) is the current floor.",
+  "description": "Every available bot piloting the SAME deck (bulwark-control). A mirror-included round-robin so any win-rate spread is attributable to pilot skill, not deck choice. Mirror cells (self-vs-self) measure per-bot seed variance. Pairs with PairCorrectly to separate deck signal from bot signal. ENGINE STATUS (2026-04-20): because bulwark-control is built around Sentinel + Fortify + Mend, and those keyword macros are not yet dispatched at runtime (see docs/plan/engine-completion-guide.md), this mirror currently measures how each bot handles raw-stat BULWARK bodies, not the full control plan. Expect draws to dominate until the keyword pass lands; the pre-Knob-1 draw rate (~91 %) is the current floor. RUN: `make bench-run TOURNAMENT=SimpleSweep`. ANALYSE: `make bench-summary RESULTS=<path> [BASELINE=<path>]` (backed by tools/bench-summarize.py).",
   "pairs": [
     {
       "pairId": "Fort",

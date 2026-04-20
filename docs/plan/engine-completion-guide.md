@@ -390,6 +390,21 @@ scoring. Both diagnoses are valuable.
   plausibly move the bench lands with a paired
   `ai-testing-data/post-wiring-<thing>.PairCorrectly.results.json`
   so the next session can diff it trivially.
+- **Use the bench helpers, not inline Python.** Two Python scripts
+  live at `tools/bench-summarize.py` and `tools/bench-matrix.py`,
+  exposed as Makefile targets:
+  - `make bench-run TOURNAMENT=PairCorrectly` — posts the config
+    and prints a summary (REST must already be running — in a
+    separate shell: `export CCGNF_AI_EDITOR=1 && make rest`).
+  - `make bench-summary RESULTS=ai-testing-data/<name>.results.json [BASELINE=<path>] [MATCHUPS=1]`
+    — re-summarise any saved JSON, optionally diffing against a
+    baseline. Default analysis: draw rate, per-pair
+    W-L-D + raw WR + decisive WR, sorted.
+  - `make bench-matrix RESULTS=ai-testing-data/AiDeckMatrix.results.json [BASELINE=<path>]`
+    — decks × bots matrix + per-deck aggregate + per-AI aggregate.
+    Deltas rendered inline when BASELINE is given.
+  Reach for these before writing inline Python — they're the
+  distilled output of ~8 hand-rolled variants during step 12.
 
 ---
 

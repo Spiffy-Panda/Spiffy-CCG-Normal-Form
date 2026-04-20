@@ -16,7 +16,8 @@ DOTNET    ?= dotnet
 
 .PHONY: all help restore build test clean format ci rest \
         web web-dev web-build \
-        ccgnf-lint ccgnf-build card-distribution
+        ccgnf-lint ccgnf-build card-distribution \
+        bench-run bench-summary bench-matrix
 
 all: build
 
@@ -37,6 +38,10 @@ help:
 	@echo ""
 	@echo "  make ccgnf-lint (future) validate all .ccgnf source files"
 	@echo "  make ccgnf-build (future) preprocess .ccgnf into intermediates"
+	@echo ""
+	@echo "  make bench-run TOURNAMENT=PairCorrectly [OUT=...]   post + summarise"
+	@echo "  make bench-summary RESULTS=... [BASELINE=...] [MATCHUPS=1]"
+	@echo "  make bench-matrix  RESULTS=... [BASELINE=...]       decks x bots slice"
 	@echo ""
 	@echo "Overrides:"
 	@echo "  make CONFIG=Release build       debug vs release configuration"
@@ -109,3 +114,43 @@ ccgnf-build:
 
 card-distribution:
 	python3 tools/update-card-distribution.py
+
+# ---------------------------------------------------------------------------
+# Tournament benches.
+#
+#   make bench-run TOURNAMENT=PairCorrectly [OUT=...]
+#       Posts ai-testing-data/<TOURNAMENT>.tournament.json to a running REST
+#       server (start one with `make rest` + CCGNF_AI_EDITOR=1 in another
+#       shell), saves the result to ai-testing-data/<TOURNAMENT>.results.json
+#       or the path given via OUT=, then prints the bench-summarize.py
+#       summary.
+#
+#   make bench-summary RESULTS=ai-testing-data/<name>.results.json [BASELINE=...]
+#       Pretty-print the per-pair summary (and deltas if BASELINE= is given).
+#       Use this on any saved results JSON without re-running the bench.
+#
+#   make bench-matrix RESULTS=ai-testing-data/AiDeckMatrix.results.json [BASELINE=...]
+#       Slice a decks-x-bots matrix result by deck and by AI.
+#
+# ---------------------------------------------------------------------------
+
+TOURNAMENT ?= PairCorrectly
+OUT        ?= ai-testing-data/$(TOURNAMENT).results.json
+
+bench-run:
+	@curl -sf http://localhost:19397/api/health > /dev/null || \
+	  (echo "bench-run: REST not on :19397. Start it with 'make rest' (export CCGNF_AI_EDITOR=1 first)."; exit 1)
+	curl -s -X POST http://localhost:19397/api/ai/tournament/run \
+	  -H 'content-type: application/json' \
+	  --data-binary @ai-testing-data/$(TOURNAMENT).tournament.json \
+	  -o "$(OUT)" \
+	  -w 'http=%{http_code} time=%{time_total}s\n'
+	python3 tools/bench-summarize.py "$(OUT)"
+
+bench-summary:
+	@[ -n "$(RESULTS)" ] || (echo "usage: make bench-summary RESULTS=<path> [BASELINE=<path>]"; exit 1)
+	python3 tools/bench-summarize.py "$(RESULTS)" $(if $(BASELINE),--baseline "$(BASELINE)",) $(if $(MATCHUPS),--matchups,)
+
+bench-matrix:
+	@[ -n "$(RESULTS)" ] || (echo "usage: make bench-matrix RESULTS=<path> [BASELINE=<path>]"; exit 1)
+	python3 tools/bench-matrix.py "$(RESULTS)" $(if $(BASELINE),--baseline "$(BASELINE)",)
