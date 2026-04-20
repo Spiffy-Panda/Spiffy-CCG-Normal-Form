@@ -1,5 +1,21 @@
 # Hellfire — experimental CPU (2026-04-19, → ember-aggro)
 
+> **2026-04-20 — Step 12.1 retune (post-12.4 deck reconstruction).**
+> `default` and `early_tempo` tightened against the new post-12.4
+> field: `tempo_per_aether` 2.5 → 2.8, `conduit_softness` 3.0 → 3.5
+> (default) and 2.5 → 3.0 (early), `lowest_live_hp` nudged down
+> 1.5 → 1.2 / 1.2 → 1.0, `opponent_priority` 2.5 → 2.2 /
+> 2.0 → 1.8. Intent: push hellfire further into raw Conduit pressure
+> and away from Unit-targeting — BULWARK's Sentinel wall gives
+> hellfire too many mediocre removal targets, and the PairCorrectly
+> BulFort-vs-EmbHell cell is 37/40 draws (EMBER can't break through
+> Fortify). `threat_avoidance` kept at 0.0 — hellfire's aggro
+> identity stays reckless. **Bench:** 143/240 draws (59.6 %) vs
+> 142/240 (59.2 %) pre-edit. Movement ±1 game, below the noise
+> floor; the BulFort-vs-EmbHell cell did not unstick. Conclusion:
+> same as reaper's — this is a 12.2 engine-knob problem, not a
+> weight-tuning one.
+
 ## Concept
 
 Hellfire is the all-in aggression profile. It will attack in every

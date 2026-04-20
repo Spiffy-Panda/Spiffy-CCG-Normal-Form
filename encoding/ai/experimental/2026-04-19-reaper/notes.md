@@ -1,5 +1,26 @@
 # Reaper — experimental CPU (2026-04-19, → hollow-disruption)
 
+> **2026-04-20 — Step 12.1 retune (post-12.4 deck reconstruction).**
+> `default` and `early_tempo` now lean slightly more on Conduit
+> pressure (`tempo_per_aether` 0.8 → 1.5 in default,
+> `conduit_softness` 0.5 → 1.0, `lowest_live_hp` 3.5 → 3.0): with
+> HOLLOW's new 9-closer deck load, reaper was holding cards in
+> `default` and never transitioning to `pushing` fast enough.
+> `pushing` itself bumped `conduit_softness` 2.5 → 3.5 and dropped
+> `threat_avoidance` 0.8 → 0.5 so the finishing sequence actually
+> commits once triggered.
+>
+> **Bench:** PairCorrectly at baseline seed 1 measured 143/240 draws
+> (59.6 %), HolReap 2-53-65; before these edits the same config
+> measured 142/240 (59.2 %), HolReap 3-53-64. Net movement ±1 game —
+> **noise floor**. Conclusion: HolReap's weakness isn't reaper's
+> weights; it's the matchup triangle (HOLLOW can't pressure a
+> Sentinel-wall deck without board presence). The 12.2 engine-knob
+> queue is the next lever per `12.3` exit criteria. Kept the edits
+> because the new tempo values match reaper's stated design (a
+> removal-first bot that still commits to its closers once it has
+> them) better than the previous tempo 0.8 / cs 0.5 shape.
+
 > **2026-04-20 — Step 12.1 floor edit.** `pushing` intent now satisfies
 > the `conduit_softness ≥ threat_avoidance` floor rule
 > (`cs: 0.8 → 2.5`, `ta: 1.0 → 0.8`). Removal-first identity preserved
