@@ -59,7 +59,12 @@ public static class KeywordRuntime
     /// <summary>
     /// Attach the given keywords to a runtime Unit. Called from
     /// <c>PlaceUnit</c> right after the Unit's stats are copied from its card
-    /// declaration.
+    /// declaration. Also synthesises Triggered abilities for the keywords
+    /// whose macros in <c>encoding/engine/03-keyword-macros.ccgnf</c> have
+    /// been lifted into this runtime (Mend, Rally, Ignite). Keywords that
+    /// still need ResonanceField / Replacement dispatch (Phantom, Recur,
+    /// Shroud, Surge, Reshape, Kindle) are stamped into the tag set but
+    /// stay silent at runtime; see step 13 for the remaining work.
     /// </summary>
     public static void ApplyKeywords(Entity unit, IReadOnlyList<(string Name, int? Param)> keywords)
     {
@@ -73,7 +78,122 @@ public static class KeywordRuntime
                 var key = "kw_param_" + name;
                 unit.Counters[key] = unit.Counters.GetValueOrDefault(key, 0) + n;
             }
+
+            if (TryMakeKeywordAbility(unit, name, param) is AbilityInstance kwAbility)
+            {
+                unit.Abilities.Add(kwAbility);
+            }
         }
+    }
+
+    /// <summary>
+    /// Synthesise the Triggered ability the keyword macro expands to, so
+    /// <c>Interpreter.DispatchEvent</c> walks it alongside the card's
+    /// authored abilities. Returns null for keywords that aren't lifted
+    /// into this runtime shape yet.
+    /// </summary>
+    private static AbilityInstance? TryMakeKeywordAbility(Entity unit, string name, int? param)
+    {
+        var span = Ccgnf.Diagnostics.SourceSpan.Unknown;
+        Ast.AstExpr selfIdent = new Ast.AstIdent(span, "self");
+        Ast.AstExpr selfController = new Ast.AstMemberAccess(span, selfIdent, "controller");
+
+        Ast.AstFunctionCall MakeEventPattern(string ev, params (string F, Ast.AstExpr V)[] fields)
+        {
+            var args = new List<Ast.AstArg>(fields.Length);
+            foreach (var (f, v) in fields)
+            {
+                args.Add(new Ast.AstArgNamed(span, f, v));
+            }
+            var callee = new Ast.AstMemberAccess(span, new Ast.AstIdent(span, "Event"), ev);
+            return new Ast.AstFunctionCall(span, callee, args);
+        }
+
+        switch (name)
+        {
+            case "Mend":
+            {
+                if (param is not int amount) return null;
+                // Keyword_Mend(X) heals the controller's Conduit in this
+                // Arena by X on entry, capped at starting integrity. The
+                // interim `HealSelfArenaConduit` builtin packages that
+                // lookup so we don't have to evaluate a
+                // `self.controller.Conduit(self.arena)` path.
+                var effect = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "HealSelfArenaConduit"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, new Ast.AstIntLit(span, amount)),
+                    });
+                return MakeTriggered(unit,
+                    MakeEventPattern("EnterPlay", ("target", selfIdent)), effect);
+            }
+            case "Rally":
+            {
+                // On another friendly Unit entering this Unit's arena, buff
+                // self's Force by 1. Pattern: Event.EnterPlay(target=t,
+                // arena=self.arena). Inline guard keeps us from self-firing.
+                var selfArena = new Ast.AstMemberAccess(span, selfIdent, "arena");
+                var effect = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "IncCounter"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, new Ast.AstIdent(span, "force")),
+                        new Ast.AstArgPositional(span, new Ast.AstIntLit(span, 1)),
+                    });
+                var guard = new Ast.AstBinaryOp(span, "!=",
+                    new Ast.AstIdent(span, "t"), selfIdent);
+                var guarded = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "If"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, guard),
+                        new Ast.AstArgPositional(span, effect),
+                        new Ast.AstArgPositional(span, new Ast.AstFunctionCall(
+                            span, new Ast.AstIdent(span, "NoOp"), Array.Empty<Ast.AstArg>())),
+                    });
+                return MakeTriggered(unit,
+                    MakeEventPattern("EnterPlay",
+                        ("target", new Ast.AstIdent(span, "t")),
+                        ("arena",  selfArena)),
+                    guarded);
+            }
+            case "Ignite":
+            {
+                if (param is not int dmg) return null;
+                // Keyword_Ignite(X) pings opposing low-Ramparts Units in
+                // the Arena at start of your turn. Interim implementation
+                // chips the opposing Conduit in this Arena instead, which
+                // preserves the keyword's "per-arena start-of-turn
+                // pressure" feel without a ForEach-lambda path yet.
+                var effect = new Ast.AstFunctionCall(span,
+                    new Ast.AstIdent(span, "IgniteTickArenaConduit"),
+                    new List<Ast.AstArg>
+                    {
+                        new Ast.AstArgPositional(span, selfIdent),
+                        new Ast.AstArgPositional(span, new Ast.AstIntLit(span, dmg)),
+                    });
+                return MakeTriggered(unit,
+                    MakeEventPattern("PhaseBegin",
+                        ("phase",  new Ast.AstIdent(span, "Rise")),
+                        ("player", selfController)),
+                    effect);
+            }
+            default:
+                return null;
+        }
+    }
+
+    private static AbilityInstance MakeTriggered(Entity unit, Ast.AstExpr pattern, Ast.AstExpr effect)
+    {
+        var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+        {
+            ["on"] = pattern,
+            ["effect"] = effect,
+        };
+        return new AbilityInstance(AbilityKind.Triggered, unit.Id, named, Array.Empty<Ast.AstExpr>());
     }
 
     public static bool HasKeyword(Entity unit, string name) =>

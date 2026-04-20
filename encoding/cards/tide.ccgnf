@@ -118,8 +118,13 @@ Card Thessa_WhoReturns {
     // non-Unique TIDE card from your Cache to your hand. The
     // once_per_turn: true annotation gates firing and auto-clears at Rise
     // (see common/02-lifecycle.ccgnf).
-    OnCardPlayed(
-      filter:        c -> c.controller == self.controller ∧ TIDE ∈ c.factions,
+    // Raw Triggered(...) rather than the OnCardPlayed shorthand because
+    // the macro is 2-arg and this card needs the extra `once_per_turn`
+    // guard preserved on the attached ability.
+    Triggered(
+      on:            Event.CardPlayed(c -> c.controller == self.controller
+                                        ∧ TIDE ∈ c.factions),
+      check_at:      announcement,
       once_per_turn: true,
       effect: When(Resonance(TIDE, 3),
         Choice(self.controller, {

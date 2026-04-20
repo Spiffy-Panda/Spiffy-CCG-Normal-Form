@@ -64,6 +64,33 @@ Card DebtPinger {
   ]
 }
 
+// OnEnter shorthand — the Attach-time expander should rewrite this to the
+// Triggered form above. Sets Player2.debt = 7 on entry.
+Card OnEnterShorthandPinger {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  abilities: [
+    OnEnter(SetCounter(Player2, debt, 7))
+  ]
+}
+
+// EndOfClash shorthand — expander should rewrite to Triggered(on:
+// Event.PhaseEnd(phase=Clash), ...). Sets Player2.debt = 11.
+Card EndOfClashPinger {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 0, ramparts: 1, rarity: C
+  abilities: [
+    EndOfClash(SetCounter(Player2, debt, 11))
+  ]
+}
+
+// Mend 2 keyword — KeywordRuntime should synthesise an OnEnter-shaped
+// Triggered that calls HealSelfArenaConduit. Conduit must start below
+// starting_integrity for the heal to be observable.
+Card MendPinger {
+  factions: {NEUTRAL}, type: Unit, cost: 1, force: 1, ramparts: 1, rarity: C
+  keywords: [ Mend(2) ]
+  abilities: []
+}
+
 // Setup: conduits per (owner, arena), both players draw, both get a Main
 // Phase so either side can commit a Unit to the board. Player1 then drives
 // a single Clash pass.

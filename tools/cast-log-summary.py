@@ -126,11 +126,15 @@ def main(argv: list[str]) -> int:
         "OnEnter", "OnPlayed", "OnCardPlayed", "OnArenaEnter",
         "StartOfYourTurn", "EndOfYourTurn", "StartOfClash", "EndOfClash",
     }
+    # A shorthand is "unexpanded" only if the card declared it AND no trigger
+    # ever fired. Cards where the C#-side expander rewrites OnEnter → Triggered
+    # at attach time still show `kind: OnEnter` in the cast record, but their
+    # EnterPlay triggers do fire; those are wired, not silent.
     unexpanded = sorted({
         f"{card}:{ab}"
         for card in all_cards
         for ab in declared_ability_kinds.get(card, set())
-        if ab in shorthands
+        if ab in shorthands and not triggers.get(card)
     }, key=str.casefold)
     print()
     print(f"Totals: {len(all_cards)} distinct cards, "
@@ -138,10 +142,11 @@ def main(argv: list[str]) -> int:
     if silent:
         print(f"Declared-but-silent cards ({len(silent)}): {', '.join(sorted(silent, key=str.casefold))}")
     if unexpanded:
-        print(f"Unexpanded shorthand triggers ({len(unexpanded)}): "
+        print(f"Unwired shorthand-declared cards ({len(unexpanded)}): "
               f"{', '.join(unexpanded[:8])}{'...' if len(unexpanded) > 8 else ''}")
-        print("  (these mean the preprocessor didn't expand the shorthand "
-              "macro -- see docs/plan/engine-completion-guide.md.)")
+        print("  (these declared a shorthand trigger whose C#-side expander "
+              "isn't wired yet -- filter-lambda forms like OnArenaEnter / "
+              "OnCardPlayed; see docs/plan/steps/13-engine-completion.md.)")
     return 0
 
 

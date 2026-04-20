@@ -3,6 +3,36 @@
 Newest first. One entry per meaningful work session. Keep each entry to
 ≤ 200 words. Link to commits and files where relevant.
 
+## 2026-04-20 — Step 13 wave 2: Triggered-on-Unit + Mend/Rally/Ignite live
+
+Closed the major step-13 gaps the cast log pointed at. Landed:
+
+- **Shorthand triggers expanded C#-side** in `AttachCardAbilities`
+  (`OnEnter`, `OnPlayed`, `StartOfYourTurn`, `EndOfYourTurn`,
+  `StartOfClash`, `EndOfClash`) — the ccgnf preprocessor never
+  sees `engine/02-trigger-shorthands.ccgnf` when it processes
+  `cards/` (alphabetical sort puts cards first); we no longer
+  depend on that.
+- **`Mend`, `Rally`, `Ignite` keyword synthesis** in
+  `KeywordRuntime.ApplyKeywords` — the keyword list on a card
+  now produces real Triggered abilities, with two helper builtins
+  (`HealSelfArenaConduit`, `IgniteTickArenaConduit`) to paper over
+  the missing `self.controller.Conduit(self.arena)` accessor.
+- **Pattern matcher** resolves `self.controller` and `self.arena`
+  against the owning entity; **`PhaseEnd(phase=Clash)`** is now
+  emitted after the arena loop so EndOfClash triggers fire.
+- Also fixed 2 cards (Eremis, Thessa) whose `OnCardPlayed` call
+  passed 3 named args to a 2-arg macro — rewritten to use raw
+  `Triggered(...)` with the extra guard preserved.
+
+Bench movement (`post-wiring-ontrig.*.results.json`) vs post-Fortify:
+EMBER aggro decWR +17.3 pp (Ignite chips); BULWARK control −12.1 pp.
+Cast log now reports **19,736 trigger-fires** across a 992-game
+KeywordCoverage run (was 0).
+
+Still-silent cards (`OnArenaEnter` + `OnCardPlayed` with lambda
+filters, `PhantomReturn`) listed in step 13 plan of work.
+
 ## 2026-04-20 — Step 13: Fortify + Sentinel wired; BulFort stall cell breaks
 
 Opened [step 13](steps/13-engine-completion.md) to execute the

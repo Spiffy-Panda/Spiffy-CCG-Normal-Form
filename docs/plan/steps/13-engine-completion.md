@@ -77,16 +77,53 @@ Ship one keyword (or keyword family) per commit; each lands with a
    trigger on a non-Game entity. Most of the step-12.3 closer pool
    (RampartCharger, SiegeCaptain, WatchtowerArcher, WallbreakerIncarnate,
    BishopOfMending, …) becomes real text the moment this lands.
-   *Dispatch landed 2026-04-20* — `DispatchEvent` walks every entity,
-   `PlaceUnit` copies the card's `abilities:` list onto the runtime
-   Unit, `EnterPlay(target=self)` is now emitted, and the pattern
-   matcher gained a `selfEntityId` path so `target=self` is an
-   entity-ref equality check rather than a lowercase binding. One
-   `DebtPinger.OnEnter` probe fires end-to-end. Remaining work on
-   this wave: re-bench the full cards/*.ccgnf corpus (which already
-   declares the shorthand `OnEnter` / `EndOfClash` / ...) — if the
-   preprocessor expands those inside the corpus, the real closer
-   pool should activate and move numbers again.
+   *Dispatch + shorthand expansion + keyword synthesis landed
+   2026-04-20.* Done so far:
+   - `DispatchEvent` walks every entity's abilities; non-Game entries
+     bind `self` and `controller` in the env before firing, and
+     `CastLog.RecordTrigger` logs each fire for the keyword-coverage
+     bench.
+   - `AttachCardAbilities` in `Builtins.cs` expands the simple
+     shorthand-trigger forms into raw `Triggered(on: Event.X(...),
+     effect: ...)` at attach time (`OnEnter`, `OnPlayed`,
+     `StartOfYourTurn`, `EndOfYourTurn`, `StartOfClash`, `EndOfClash`).
+     The ccgnf preprocessor processes `cards/` before `engine/` and
+     so never expanded these itself; we don't depend on that anymore.
+   - `KeywordRuntime.ApplyKeywords` synthesises a `Triggered` ability
+     for the three "keyword = OnEnter / OnArenaEnter / StartOfYourTurn
+     with a canned effect" macros that don't need lambda filters:
+     `Mend(N)` (heal controller's Conduit in-arena on entry, capped
+     at starting integrity), `Rally` (+1 Force when another friendly
+     Unit enters this arena), `Ignite(N)` (start-of-turn Conduit chip
+     in this arena). Implemented with two helper builtins,
+     `HealSelfArenaConduit` + `IgniteTickArenaConduit`.
+   - `ResolveClashPhase` emits a single `PhaseEnd(phase=Clash,
+     player=active)` event once all arenas' Clash windows close, so
+     `EndOfClash` triggers on Units fire at the right moment.
+   - Pattern matcher (`Interpreter.TryMatchPattern`) resolves
+     `self.controller` to the owning entity's `OwnerId` ref and
+     `self.arena` to its `arena` parameter, so the shorthand's
+     `player=self.controller` gate on `StartOfYourTurn` and the
+     `arena=self.arena` gate on Rally match correctly.
+
+   Cast-log after this wave (~992 games across 32 pairs): **19,736
+   trigger-fires** (vs 0 before). Eleven OnEnter cards now fire
+   end-to-end (Brinescribe, DriftStriker, RampartCharger, Thornpup,
+   ThornseedPlanter, TanglevineDruid, Tidalshaper, Tidewatcher,
+   Veilwraith, BriarWatcher, ConduitTender+Lodgekeeper via Mend);
+   two Ignite units fire their per-turn pings (Pyrebrand, Sparkbearer).
+
+   Still out of scope for this wave and deferred:
+   - **Lambda-filter shorthands** (`OnArenaEnter`, `OnCardPlayed` with
+     a `filter: c -> pred` argument). The C# expander doesn't inline
+     the filter yet, so CohortCaptain's Fortify-grant aura and
+     RippleBreaker's on-card-played trigger stay silent. Needs a
+     lambda-evaluation path in the pattern matcher or an inline-If
+     wrapper emitting a bound `c` from the event.
+   - **`Event.PhantomReturn`** — BlankfaceCultist / Veilstrike declare
+     raw `Triggered(on: Event.PhantomReturn(target=self), ...)`. The
+     event is never emitted because Phantom's StartOfClash `Choice →
+     fade → ScheduleAt(end_of_clash)` path isn't wired (wave 4 below).
 3. **Replacement-ability dispatch.** Unlocks Recur, Unique, Shroud
    target-legality, Harborkeeper's redirect. Harder than Triggered:
    Replacement interposes on an event *before* it commits, so the
@@ -150,6 +187,26 @@ Post-wiring bench artifacts land at
 `ai-testing-data/post-wiring-<thing>.*.results.json` so the next
 session can diff them trivially. Always pair a keyword commit with
 a same-session bench run; the guide's §5 explains the convention.
+
+### Triggered-on-Unit + Mend/Rally/Ignite (2026-04-20)
+
+`ai-testing-data/post-wiring-ontrig.*.results.json` vs the
+post-Fortify baseline:
+
+| Metric                      | Post-Fortify | Post-Ontrig | Δ         |
+|-----------------------------|-------------:|------------:|----------:|
+| PairCorrectly draw rate     | 21.7 %       | 34.6 %      | +12.9 pp  |
+| BulFort decisive WR         | 71.6 %       | 59.5 %      | −12.1 pp  |
+| EmbHell decisive WR         | 19.5 %       | 34.6 %      | +15.1 pp  |
+| AiDeckMatrix ember-aggro    | 26.8 %       | 44.1 %      | +17.3 pp  |
+| AiDeckMatrix bulwark-ctl    | 66.9 %       | 54.8 %      | −12.1 pp  |
+
+The direction matches expectations: Ignite now chips opposing
+Conduits per turn of its arena, which EMBER decks pump; Mend
+keeps BULWARK's walls alive but the chip damage accumulates, so
+the old BulFort-vs-EmbHell stall cell now trades instead of
+stalling. Per-AI aggregates stay inside a 1-pp band — the bots
+still play the game.
 
 ### Fortify + Sentinel (2026-04-20)
 

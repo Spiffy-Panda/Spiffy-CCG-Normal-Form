@@ -23,7 +23,7 @@ Resolves: if Peak EMBER, deal 5 damage, split as you choose; otherwise, deal 3 d
 At start of your turn: for each opposing Unit in this Arena, deal 1 damage to u; when EMBER 4, if Conduit[other_player(self.controller), self.arena] exists and not this Arena has collapsed for the other player of you, deal 1 damage to Conduit[other_player(self.controller), self.arena].
 
 === Eremis_TheUnfaded ===
-When a card matching EMBER Maneuver is played: when Peak EMBER, play a copy of the triggering card.
+Triggered (Event.CardPlayed(c -> c.controller == self.controller ∧ c.type == Maneuver ∧ EMBER ∈ c.factions)): when Peak EMBER, play a copy of the triggering card.
 
 === Ashcharger ===
 (none)

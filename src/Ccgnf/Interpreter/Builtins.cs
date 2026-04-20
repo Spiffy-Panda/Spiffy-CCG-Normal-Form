@@ -72,6 +72,8 @@ internal static class Builtins
             // ----- Target / Damage -----
             case "Target":                  result = Target(call, env, ev); return true;
             case "DealDamage":              result = DealDamage(call, env, ev); return true;
+            case "HealSelfArenaConduit":    result = HealSelfArenaConduit(call, env, ev); return true;
+            case "IgniteTickArenaConduit":  result = IgniteTickArenaConduit(call, env, ev); return true;
 
             // ----- Mulligan / MoveTo — still stubbed (lands alongside full Target) -----
             case "PerformMulligan":         result = new RtVoid(); return true;
@@ -416,6 +418,96 @@ internal static class Builtins
     }
 
     // -------------------------------------------------------------------------
+    // HealSelfArenaConduit / IgniteTickArenaConduit — keyword-macro helpers.
+    //
+    // Mend and Ignite both reference `self.controller.Conduit(self.arena)`
+    // via macro expansion; that path needs a MemberCall evaluator the v1
+    // interpreter doesn't have. These builtins package the lookup so the
+    // synthesised keyword abilities in KeywordRuntime can express
+    // "heal the owner's Conduit in my arena" / "chip the opponent's Conduit
+    // in my arena" without inventing a full accessor algebra.
+    // -------------------------------------------------------------------------
+
+    private static RtValue HealSelfArenaConduit(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var selfRef = ev.Eval(ExprOf(call.Args[0]), env);
+        int amount = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[1]), env));
+        if (selfRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var unit) ||
+            unit.OwnerId is not int ownerId ||
+            !unit.Parameters.TryGetValue("arena", out var av) ||
+            av is not RtSymbol arenaSym)
+        {
+            return new RtVoid();
+        }
+        var conduit = FindConduit(ev, ownerId, arenaSym.Name);
+        if (conduit is null) return new RtVoid();
+
+        int cap = GetStartingIntegrity(conduit);
+        int before = conduit.Counters.GetValueOrDefault("integrity", 0);
+        int after = Math.Min(cap, before + amount);
+        if (after == before) return new RtVoid();
+        conduit.Counters["integrity"] = after;
+        ev.State.PendingEvents.Enqueue(new GameEvent("ConduitHealed",
+            new Dictionary<string, RtValue>
+            {
+                ["source"] = new RtEntityRef(unit.Id),
+                ["target"] = new RtEntityRef(conduit.Id),
+                ["counter"] = new RtSymbol("integrity"),
+                ["amount"] = new RtInt(after - before),
+            }));
+        return new RtVoid();
+    }
+
+    private static RtValue IgniteTickArenaConduit(AstFunctionCall call, RtEnv env, Evaluator ev)
+    {
+        if (call.Args.Count < 2) return new RtVoid();
+        var selfRef = ev.Eval(ExprOf(call.Args[0]), env);
+        int amount = Evaluator.AsInt(ev.Eval(ExprOf(call.Args[1]), env));
+        if (selfRef is not RtEntityRef er ||
+            !ev.State.Entities.TryGetValue(er.Id, out var unit) ||
+            unit.OwnerId is not int ownerId ||
+            !unit.Parameters.TryGetValue("arena", out var av) ||
+            av is not RtSymbol arenaSym)
+        {
+            return new RtVoid();
+        }
+        // Opposing Conduit only — self-targeting would heal the attacker's
+        // own base, exactly the opposite of the keyword's intent.
+        var opponent = ev.State.Players.FirstOrDefault(p => p.Id != ownerId);
+        if (opponent is null) return new RtVoid();
+        var conduit = FindConduit(ev, opponent.Id, arenaSym.Name);
+        if (conduit is null || amount <= 0) return new RtVoid();
+
+        int before = conduit.Counters.GetValueOrDefault("integrity", 0);
+        conduit.Counters["integrity"] = Math.Max(0, before - amount);
+        ev.State.PendingEvents.Enqueue(new GameEvent("DamageDealt",
+            new Dictionary<string, RtValue>
+            {
+                ["source"] = new RtEntityRef(unit.Id),
+                ["target"] = new RtEntityRef(conduit.Id),
+                ["counter"] = new RtSymbol("integrity"),
+                ["amount"] = new RtInt(amount),
+                ["reason"] = new RtSymbol("Ignite"),
+            }));
+        return new RtVoid();
+    }
+
+    private static int GetStartingIntegrity(Entity conduit)
+    {
+        // Conduits aren't created with a permanent "starting_integrity"
+        // counter, so we use the owner's Player.characteristics if we can
+        // find one — falling back to 7 (the v1 default).
+        if (conduit.Characteristics.TryGetValue("starting_integrity", out var v) &&
+            v is RtInt ri)
+        {
+            return ri.V;
+        }
+        return 7;
+    }
+
+    // -------------------------------------------------------------------------
     // DealDamage — apply HP loss to a target entity.
     // -------------------------------------------------------------------------
 
@@ -720,10 +812,15 @@ internal static class Builtins
     /// <summary>
     /// Copy <c>Triggered(...)</c> abilities off a card's declaration onto
     /// the runtime entity so <see cref="Interpreter.DispatchEvent"/> can walk
-    /// them. Static / Replacement entries are parsed too (so they show up
-    /// in diagnostics and in the serializer) but currently ride on the
-    /// KeywordRuntime direct-check path for wired keywords, not on this
-    /// dispatcher.
+    /// them. Also expands the common trigger-shorthand forms
+    /// (<c>OnEnter</c>, <c>EndOfClash</c>, <c>StartOfYourTurn</c>, etc.) to
+    /// their underlying <c>Triggered(on: Event.X(...), effect: ...)</c>
+    /// shape right here, since the ccgnf preprocessor doesn't always have
+    /// <c>encoding/engine/02-trigger-shorthands.ccgnf</c> in scope when it
+    /// processes card files (alphabetical sort puts <c>cards/</c> first).
+    /// Static / Replacement entries are parsed too (so they show up in
+    /// diagnostics and in the serializer) but Static currently rides on
+    /// the KeywordRuntime direct-check path and Replacement is unwired.
     /// </summary>
     private static void AttachCardAbilities(Entity unit, Ast.AstCardDecl decl)
     {
@@ -736,6 +833,15 @@ internal static class Builtins
             {
                 if (el is not Ast.AstFunctionCall fc) continue;
                 if (fc.Callee is not Ast.AstIdent id) continue;
+
+                if (TryExpandShorthand(id.Name, fc) is AbilityInstance shorthand)
+                {
+                    shorthand = new AbilityInstance(
+                        shorthand.Kind, unit.Id, shorthand.Named, shorthand.Positional);
+                    unit.Abilities.Add(shorthand);
+                    continue;
+                }
+
                 AbilityKind kind = id.Name switch
                 {
                     "Triggered" => AbilityKind.Triggered,
@@ -759,6 +865,82 @@ internal static class Builtins
                 unit.Abilities.Add(new AbilityInstance(kind, unit.Id, named, positional));
             }
         }
+    }
+
+    private static readonly Ccgnf.Diagnostics.SourceSpan _shorthandSpan =
+        Ccgnf.Diagnostics.SourceSpan.Unknown;
+
+    /// <summary>
+    /// Expands one of the trigger-shorthand macros defined in
+    /// <c>encoding/engine/02-trigger-shorthands.ccgnf</c> into a Triggered
+    /// <see cref="AbilityInstance"/>. Returns null for unrecognised callees
+    /// so the caller falls through to the raw Triggered/Static/Replacement
+    /// path.
+    /// </summary>
+    private static AbilityInstance? TryExpandShorthand(string name, Ast.AstFunctionCall fc)
+    {
+        Ast.AstExpr? effectExpr = FirstArgValue(fc);
+        if (effectExpr is null) return null;
+
+        Ast.AstExpr? pattern = name switch
+        {
+            "OnEnter"         => MakeEventPattern("EnterPlay",  ("target", MakeIdent("self"))),
+            "OnPlayed"        => MakeEventPattern("CardPlayed", ("card",   MakeIdent("self"))),
+            "StartOfYourTurn" => MakeEventPattern("PhaseBegin",
+                                                  ("phase",  MakeIdent("Rise")),
+                                                  ("player", MakeSelfMember("controller"))),
+            "EndOfYourTurn"   => MakeEventPattern("PhaseBegin",
+                                                  ("phase",  MakeIdent("Fall")),
+                                                  ("player", MakeSelfMember("controller"))),
+            "StartOfClash"    => MakeEventPattern("PhaseBegin", ("phase", MakeIdent("Clash"))),
+            "EndOfClash"      => MakeEventPattern("PhaseEnd",   ("phase", MakeIdent("Clash"))),
+            _ => null,
+        };
+        if (pattern is null) return null;
+
+        var named = new Dictionary<string, Ast.AstExpr>(StringComparer.Ordinal)
+        {
+            ["on"] = pattern,
+            ["effect"] = effectExpr,
+        };
+        // OwnerId is fixed up by the caller.
+        return new AbilityInstance(AbilityKind.Triggered, ownerId: 0, named, Array.Empty<Ast.AstExpr>());
+    }
+
+    private static Ast.AstExpr? FirstArgValue(Ast.AstFunctionCall fc)
+    {
+        // Shorthand calls use either OnX(effect_expr) or OnX(effect: ...).
+        // Accept both; for 2-arg OnArenaEnter / OnCardPlayed the `effect`
+        // arg is what we pick up; OnArenaEnter's `filter` isn't wired yet
+        // (it requires lambda-level pattern matching).
+        foreach (var a in fc.Args)
+        {
+            if (a is Ast.AstArgNamed { Name: "effect" } n) return n.Value;
+        }
+        foreach (var a in fc.Args)
+        {
+            if (a is Ast.AstArgPositional p) return p.Value;
+        }
+        return null;
+    }
+
+    private static Ast.AstIdent MakeIdent(string name) =>
+        new(_shorthandSpan, name);
+
+    private static Ast.AstMemberAccess MakeSelfMember(string member) =>
+        new(_shorthandSpan, MakeIdent("self"), member);
+
+    private static Ast.AstFunctionCall MakeEventPattern(
+        string eventName,
+        params (string Field, Ast.AstExpr Value)[] args)
+    {
+        var callee = new Ast.AstMemberAccess(_shorthandSpan, MakeIdent("Event"), eventName);
+        var synArgs = new List<Ast.AstArg>(args.Length);
+        foreach (var (field, value) in args)
+        {
+            synArgs.Add(new Ast.AstArgNamed(_shorthandSpan, field, value));
+        }
+        return new Ast.AstFunctionCall(_shorthandSpan, callee, synArgs);
     }
 
     private static int GetCardCost(Ast.AstCardDecl decl) => GetCardIntField(decl, "cost");
@@ -931,6 +1113,15 @@ internal static class Builtins
                     ["attackers"] = new RtInt(attackers.Count),
                 }));
         }
+        // One PhaseEnd(phase=Clash) at the end of the whole phase, after
+        // every arena's Clash window has closed. EndOfClash-shorthand
+        // triggers on Units match on this pattern.
+        ev.State.PendingEvents.Enqueue(new GameEvent("PhaseEnd",
+            new Dictionary<string, RtValue>
+            {
+                ["phase"] = new RtSymbol("Clash"),
+                ["player"] = new RtEntityRef(attacker.Id),
+            }));
         return new RtVoid();
     }
 

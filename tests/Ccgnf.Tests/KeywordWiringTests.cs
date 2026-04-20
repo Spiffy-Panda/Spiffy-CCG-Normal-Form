@@ -249,6 +249,97 @@ public class KeywordWiringTests
         Assert.IsType<RtEntityRef>(targetVal);
     }
 
+    [Fact]
+    public void TriggeredOnUnit_OnEnterShorthand_ExpandsAndFires()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "OnEnterShorthandPinger" }, Array.Empty<string>()));
+
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        Assert.Equal(7, run.State.NamedEntities["Player2"].Counters["debt"]);
+    }
+
+    [Fact]
+    public void TriggeredOnUnit_EndOfClashShorthand_FiresAfterClashResolves()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "EndOfClashPinger" }, Array.Empty<string>()));
+
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        // PhaseEnd(phase=Clash) fires after the arena loop; the EndOfClash
+        // trigger on the Pinger catches it and rewrites debt to 11.
+        Assert.Equal(11, run.State.NamedEntities["Player2"].Counters["debt"]);
+    }
+
+    [Fact]
+    public void Mend_Keyword_HealsOwnersArenaConduitOnEnter()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "MendPinger" }, Array.Empty<string>()));
+
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+
+        // Before playing: drop P1's Left conduit to 3 so a Mend 2 heal
+        // moves it to 5 (below the starting_integrity cap of 7).
+        int p1Id = run.State.NamedEntities["Player1"].Id;
+        var p1LeftConduit = run.State.Entities.Values.Single(e =>
+            e.Kind == "Conduit" && e.OwnerId == p1Id &&
+            e.Parameters.TryGetValue("arena", out var a) &&
+            a is RtSymbol s && s.Name == "Left");
+        p1LeftConduit.Counters["integrity"] = 3;
+
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        Assert.Equal(5, p1LeftConduit.Counters["integrity"]);
+    }
+
+    [Fact]
+    public void Mend_Keyword_CapsAtStartingIntegrity()
+    {
+        var file = LoadClashSentinelFixture();
+        using var run = NewInterpreter().StartRun(
+            file, WithDecks(new[] { "MendPinger" }, Array.Empty<string>()));
+
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("pass"));
+        // Conduit starts at 7, which is also the default cap — Mend 2 heal
+        // should be clamped to 7, not 9.
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Kind == "play_card")));
+        run.Submit(new RtSymbol(PickLabel(run.WaitPending(), a => a.Metadata?["pos"] == "Left")));
+        Assert.NotNull(run.WaitPending());
+        run.Submit(new RtSymbol("hold"));
+        Assert.Null(run.WaitPending());
+
+        int p1Id = run.State.NamedEntities["Player1"].Id;
+        var p1LeftConduit = run.State.Entities.Values.Single(e =>
+            e.Kind == "Conduit" && e.OwnerId == p1Id &&
+            e.Parameters.TryGetValue("arena", out var a) &&
+            a is RtSymbol s && s.Name == "Left");
+        Assert.Equal(7, p1LeftConduit.Counters["integrity"]);
+    }
+
     // -----------------------------------------------------------------------
     // Sub-step C — per-Arena incoming formula.
     //   incoming[defender] = max(0, projected_force[attacker]

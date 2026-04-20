@@ -283,7 +283,7 @@ public sealed class Interpreter
         var game = state.Game;
         if (game is not null)
         {
-            FireTriggers(game, current, ev, selfEntityId: null);
+            FireTriggers(game, current, ev, self: null);
         }
 
         // Snapshot the entity list before iterating — a trigger might
@@ -294,7 +294,7 @@ public sealed class Interpreter
         {
             if (entity.Kind == "Game") continue;
             if (entity.Abilities.Count == 0) continue;
-            FireTriggers(entity, current, ev, selfEntityId: entity.Id);
+            FireTriggers(entity, current, ev, self: entity);
         }
     }
 
@@ -302,25 +302,25 @@ public sealed class Interpreter
         Entity owner,
         GameEvent current,
         Evaluator ev,
-        int? selfEntityId)
+        Entity? self)
     {
         foreach (var ability in owner.Abilities)
         {
             if (ability.Kind != AbilityKind.Triggered) continue;
             if (ability.OnPattern is null || ability.Effect is null) continue;
-            if (!TryMatchPattern(ability.OnPattern, current, selfEntityId, out var bindings))
+            if (!TryMatchPattern(ability.OnPattern, current, self, out var bindings))
             {
                 continue;
             }
             var env = RtEnv.Empty;
-            if (selfEntityId is int sid)
+            if (self is not null)
             {
-                env = env.Extend("self", new RtEntityRef(sid));
-                if (owner.OwnerId is int ownerPlayerId)
+                env = env.Extend("self", new RtEntityRef(self.Id));
+                if (self.OwnerId is int ownerPlayerId)
                 {
                     env = env.Extend("controller", new RtEntityRef(ownerPlayerId));
                 }
-                CastLog.RecordTrigger(owner, ability.OnPattern, current);
+                CastLog.RecordTrigger(self, ability.OnPattern, current);
             }
             if (bindings.Count > 0) env = env.Extend(bindings);
             ev.Eval(ability.Effect, env);
@@ -403,12 +403,12 @@ public sealed class Interpreter
         AstExpr pattern,
         GameEvent current,
         out List<(string, RtValue)> bindings) =>
-        TryMatchPattern(pattern, current, selfEntityId: null, out bindings);
+        TryMatchPattern(pattern, current, self: null, out bindings);
 
     internal static bool TryMatchPattern(
         AstExpr pattern,
         GameEvent current,
-        int? selfEntityId,
+        Entity? self,
         out List<(string, RtValue)> bindings)
     {
         bindings = new();
@@ -443,12 +443,41 @@ public sealed class Interpreter
 
                 // `self` is special: when we're dispatching a Triggered
                 // ability attached to a non-Game entity, the pattern value
-                // `self` means "this event must reference me". The current
-                // entity's id was threaded in via selfEntityId.
-                if (selfEntityId is int sid &&
-                    valueExpr is AstIdent { Name: "self" })
+                // `self` means "this event must reference me".
+                if (self is not null && valueExpr is AstIdent { Name: "self" })
                 {
-                    if (fieldValue is RtEntityRef er && er.Id == sid) continue;
+                    if (fieldValue is RtEntityRef er && er.Id == self.Id) continue;
+                    return false;
+                }
+
+                // `self.controller` / `self.arena` resolve against the
+                // owning entity — needed for shorthand triggers like
+                // `StartOfYourTurn(effect)` which expand to an event pattern
+                // that matches on player == self.controller.
+                if (self is not null
+                    && valueExpr is AstMemberAccess selfMa
+                    && selfMa.Target is AstIdent { Name: "self" })
+                {
+                    if (selfMa.Member == "controller")
+                    {
+                        if (fieldValue is RtEntityRef er2 &&
+                            self.OwnerId is int oid && er2.Id == oid)
+                        {
+                            continue;
+                        }
+                        return false;
+                    }
+                    if (selfMa.Member == "arena")
+                    {
+                        if (self.Parameters.TryGetValue("arena", out var sa) &&
+                            sa is RtSymbol ss &&
+                            fieldValue is RtSymbol fs && fs.Name == ss.Name)
+                        {
+                            continue;
+                        }
+                        return false;
+                    }
+                    // Unknown `self.<member>` — bail so we don't match spuriously.
                     return false;
                 }
 

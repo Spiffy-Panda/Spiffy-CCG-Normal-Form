@@ -24,7 +24,7 @@ When a card matching friendly is played: Reshape(1).
 When a card matching friendly is played: when Peak TIDE, choose one — you.
 
 === Thessa_WhoReturns ===
-When a card matching TIDE friendly is played: when TIDE 3, choose one — you.
+Triggered (Event.CardPlayed(c -> c.controller == self.controller ∧ TIDE ∈ c.factions)): when TIDE 3, choose one — you.
 
 === Tidewatcher ===
 When this enters play: Reshape(1).
