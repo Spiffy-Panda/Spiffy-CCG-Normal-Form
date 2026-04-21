@@ -110,3 +110,13 @@ web/dist/
 # (finalized archives with a known seed and approved contents) get committed.
 # -----------------------------------------------------------------------------
 encoding-artifacts/working-*.ccgnf
+
+# -----------------------------------------------------------------------------
+# Bench cast logs
+#
+# `*.cast.jsonl` files under ai-testing-data/ are per-cast event dumps from
+# tournament runs — ~240 lines per game, so a 1000-game bench produces a
+# ~240k-line file. Regeneratable via `make bench-run`; not worth committing.
+# `.tournament.json` inputs and `.results.json` summary outputs stay tracked.
+# -----------------------------------------------------------------------------
+ai-testing-data/*.cast.jsonl
